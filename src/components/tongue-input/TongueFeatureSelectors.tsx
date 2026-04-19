@@ -210,12 +210,12 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({ value,
 };
 
 // 导出组件
-export const TongueFeatureSelectors = {
-  TongueColorSelector,
-  TongueShapeSelector,
-  TongueCoatingSelector,
-  TongueStateSelector,
-};
+//export const TongueFeatureSelectors = {
+//  TongueColorSelector,
+//  TongueShapeSelector,
+//  TongueCoatingSelector,
+//  TongueStateSelector,
+//};
 
 export {
   TongueColorSelector,
