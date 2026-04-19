@@ -1,7 +1,7 @@
 # 舌诊辅助系统前端 (Tongue Mirror Frontend)
 
 基于 React + TypeScript + Tailwind CSS 构建的中医舌诊辨证系统前端界面。
-
+  
 ## 功能特性
 
 - 🔍 **舌象特征采集**：支持舌色、舌形、舌苔、舌态等多维度特征输入
