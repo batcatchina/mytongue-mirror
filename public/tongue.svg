@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- 舌头轮廓 -->
+  <path d="M20 40 Q20 20 50 15 Q80 20 80 40 L85 70 Q80 90 50 90 Q20 90 15 70 Z" fill="#ffcccc" stroke="#e57373" stroke-width="2"/>
+  <!-- 舌苔 -->
+  <path d="M25 30 Q50 25 75 30 L78 55 Q50 50 22 55 Z" fill="#ffffcc" opacity="0.8"/>
+  <!-- 舌中线 -->
+  <line x1="50" y1="15" x2="50" y2="85" stroke="#ffaaaa" stroke-width="1" opacity="0.5"/>
+  <!-- 齿痕 -->
+  <path d="M30 75 Q32 78 30 81 M70 75 Q72 78 70 81" fill="none" stroke="#999" stroke-width="1.5"/>
+</svg>
