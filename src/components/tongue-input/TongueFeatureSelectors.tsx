@@ -208,7 +208,3 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({ value,
     </div>
   );
 };
-
-// 重新导出ImageUpload和TongueColorDistribution
-export { ImageUpload } from './ImageUpload';
-export { TongueColorDistribution } from './TongueColorDistribution';
