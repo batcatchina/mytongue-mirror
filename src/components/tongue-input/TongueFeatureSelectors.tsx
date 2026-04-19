@@ -10,7 +10,7 @@ import {
   TONGUE_PARTS,
   DEGREE_LEVELS
 } from '@/types';
-
+ 
 // 舌色选项
 const tongueColorOptions = [
   { value: '淡红', color: 'bg-red-100', border: 'border-red-300', text: '淡红' },
