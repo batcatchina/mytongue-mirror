@@ -1,0 +1,269 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局基础样式 */
+@layer base {
+  html {
+    font-family: 'Noto Sans SC', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-stone-50 text-stone-800 min-h-screen;
+  }
+
+  /* 中医风格标题字体 */
+  h1, h2, h3, .font-chinese {
+    font-family: 'Noto Serif SC', 'Songti SC', serif;
+  }
+
+  /* 自定义滚动条 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-stone-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-stone-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-stone-400;
+  }
+}
+
+/* 中医风格组件样式 */
+@layer components {
+  /* 卡片容器 */
+  .tcm-card {
+    @apply bg-white rounded-xl shadow-tcm border border-stone-100;
+    @apply transition-all duration-300;
+  }
+
+  .tcm-card:hover {
+    @apply shadow-tcm-lg;
+  }
+
+  /* 区块标题 */
+  .tcm-section-title {
+    @apply font-chinese text-lg font-semibold text-primary-700;
+    @apply flex items-center gap-2 pb-2 mb-4;
+    @apply border-b-2 border-primary-200;
+  }
+
+  .tcm-section-title::before {
+    content: '';
+    @apply w-1 h-5 bg-primary-500 rounded-full;
+  }
+
+  /* 按钮样式 */
+  .tcm-btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .tcm-btn-primary {
+    @apply tcm-btn bg-primary-500 text-white;
+    @apply hover:bg-primary-600 focus:ring-primary-500;
+    @apply active:bg-primary-700;
+  }
+
+  .tcm-btn-secondary {
+    @apply tcm-btn bg-stone-100 text-stone-700;
+    @apply hover:bg-stone-200 focus:ring-stone-400;
+    @apply active:bg-stone-300;
+  }
+
+  .tcm-btn-danger {
+    @apply tcm-btn bg-red-50 text-red-600;
+    @apply hover:bg-red-100 focus:ring-red-400;
+    @apply active:bg-red-200;
+  }
+
+  /* 输入框样式 */
+  .tcm-input {
+    @apply w-full px-3 py-2 rounded-lg border border-stone-200;
+    @apply bg-white text-stone-800 placeholder-stone-400;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400;
+  }
+
+  .tcm-select {
+    @apply tcm-input appearance-none cursor-pointer;
+    @apply bg-no-repeat bg-right pr-10;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-size: 1.5rem 1.5rem;
+  }
+
+  /* 标签样式 */
+  .tcm-tag {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .tcm-tag-primary {
+    @apply tcm-tag bg-primary-100 text-primary-700;
+  }
+
+  .tcm-tag-success {
+    @apply tcm-tag bg-green-100 text-green-700;
+  }
+
+  .tcm-tag-warning {
+    @apply tcm-tag bg-yellow-100 text-yellow-700;
+  }
+
+  .tcm-tag-danger {
+    @apply tcm-tag bg-red-100 text-red-700;
+  }
+
+  /* 置信度条 */
+  .confidence-bar {
+    @apply h-2 bg-stone-200 rounded-full overflow-hidden;
+  }
+
+  .confidence-bar-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  /* 穴位标签 */
+  .acupoint-tag {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg;
+    @apply bg-gradient-to-r from-secondary-50 to-secondary-100;
+    @apply border border-secondary-200 text-secondary-700;
+    @apply transition-all duration-200 hover:shadow-md;
+  }
+
+  /* 脏腑标签 */
+  .organ-tag {
+    @apply inline-flex flex-col items-center justify-center;
+    @apply w-16 h-16 rounded-xl border-2;
+    @apply transition-all duration-200;
+  }
+
+  .organ-tag-major {
+    @apply organ-tag bg-red-50 border-red-300 text-red-600;
+  }
+
+  .organ-tag-minor {
+    @apply organ-tag bg-stone-50 border-stone-300 text-stone-500;
+  }
+
+  /* 分隔线 */
+  .tcm-divider {
+    @apply border-t border-dashed border-stone-200 my-4;
+  }
+
+  /* 空状态 */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-stone-400;
+  }
+
+  .empty-state svg {
+    @apply w-16 h-16 mb-4 opacity-50;
+  }
+
+  /* 加载状态 */
+  .loading-spinner {
+    @apply animate-spin rounded-full border-2 border-stone-200;
+    @apply border-t-primary-500;
+  }
+
+  /* 导航激活状态 */
+  .nav-link {
+    @apply px-4 py-2 rounded-lg text-stone-600 font-medium;
+    @apply transition-all duration-200;
+    @apply hover:bg-stone-100 hover:text-stone-900;
+  }
+
+  .nav-link-active {
+    @apply bg-primary-50 text-primary-700;
+    @apply hover:bg-primary-100 hover:text-primary-800;
+  }
+}
+
+/* 动画工具类 */
+@layer utilities {
+  .animate-in {
+    animation: fadeSlideIn 0.3s ease-out;
+  }
+
+  @keyframes fadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 舌象特征高亮 */
+  .tongue-feature-highlight {
+    @apply relative;
+  }
+
+  .tongue-feature-highlight::after {
+    content: '';
+    @apply absolute inset-0 bg-primary-200/30 rounded-lg -z-10;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.5; }
+  }
+
+  /* 阴影变体 */
+  .shadow-tcm {
+    box-shadow: 0 1px 3px 0 rgba(217, 119, 6, 0.1), 0 1px 2px -1px rgba(217, 119, 6, 0.1);
+  }
+
+  .shadow-tcm-lg {
+    box-shadow: 0 10px 15px -3px rgba(217, 119, 6, 0.1), 0 4px 6px -4px rgba(217, 119, 6, 0.1);
+  }
+
+  .shadow-green-md {
+    box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.1), 0 2px 4px -2px rgba(22, 163, 74, 0.1);
+  }
+
+  .shadow-blue-md {
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1), 0 2px 4px -2px rgba(59, 130, 246, 0.1);
+  }
+
+  /* 缩放动画 */
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.2s ease-out;
+  }
+
+  /* 脉冲发光效果 */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgba(217, 119, 6, 0);
+    }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s infinite;
+  }
+}
