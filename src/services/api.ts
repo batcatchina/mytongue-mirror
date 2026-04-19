@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import type { DiagnosisInput, DiagnosisOutput } from '@/types';
 
 // 扣子API配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.coze.cn/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.coze.cn';
 const BOT_ID = import.meta.env.VITE_BOT_ID || '';
 const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
 
@@ -50,11 +50,12 @@ export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisO
     throw new Error('请配置 VITE_API_TOKEN 环境变量');
   }
 
-  // 构造扣子API请求
+  // 构造扣子API请求（v3格式）
   const requestPayload = {
     bot_id: BOT_ID,
     user_id: generateUserId(),
     stream: false,
+    auto_save_history: true,
     additional_messages: [{
       role: 'user',
       content: JSON.stringify({
@@ -71,12 +72,13 @@ export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisO
         chief_complaint: input.patientInfo?.chiefComplaint,
         symptoms: input.symptoms?.map(s => s.symptom).join(', ') || '',
         mode: input.options?.mode || '详细模式',
-      }, null, 2)
+      }, null, 2),
+      content_type: 'text'
     }]
   };
 
   try {
-    const response = await apiClient.post('/chat', requestPayload);
+    const response = await apiClient.post('/v3/chat', requestPayload);
 
     // 解析扣子API返回结果
     const result = response.data;
