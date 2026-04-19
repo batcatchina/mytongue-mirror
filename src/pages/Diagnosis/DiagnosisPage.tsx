@@ -8,9 +8,9 @@ import {
   TongueShapeSelector,
   TongueCoatingSelector,
   TongueStateSelector,
-  ImageUpload,
-  TongueColorDistribution,
 } from '@/components/tongue-input/TongueFeatureSelectors';
+import { ImageUpload } from '@/components/tongue-input/ImageUpload';
+import { TongueColorDistribution } from '@/components/tongue-input/TongueColorDistribution';
 import SymptomInput from '@/components/tongue-input/SymptomInput';
 import PatientInfoForm from '@/components/tongue-input/PatientInfoForm';
 import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
