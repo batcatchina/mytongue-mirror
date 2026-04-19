@@ -108,42 +108,33 @@ export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisO
       result += chunk;
     }
 
-    // 解析SSE格式流式响应
-    const lines = result.split('\n');
+    // 解析流式响应，提取最终消息
+    const lines = result.split('\n').filter(line => line.trim());
     let finalContent = '';
     let reasoningContent = '';
-    let currentEvent = '';
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      // 解析event行
-      if (line.startsWith('event:')) {
-        currentEvent = line.slice(6).trim();
-        continue;
-      }
-      
-      // 解析data行
+    for (const line of lines) {
       if (line.startsWith('data:')) {
         try {
           const jsonStr = line.slice(5).trim();
           if (jsonStr === '[DONE]') continue;
           const data = JSON.parse(jsonStr);
           
-          // conversation.message.delta: 累积reasoning_content
-          if (currentEvent === 'conversation.message.delta') {
-            if (data.reasoning_content) {
-              reasoningContent += data.reasoning_content;
+          // 查找完成事件或消息内容
+          // 扣子API可能返回content或reasoning_content字段
+          if (data.event === 'conversation.message.delta') {
+            if (data.data?.content) {
+              finalContent += data.data.content;
             }
-            if (data.content) {
-              finalContent += data.content;
+            if (data.data?.reasoning_content) {
+              reasoningContent += data.data.reasoning_content;
             }
-          }
-          
-          // conversation.message.completed: 获取最终content
-          if (currentEvent === 'conversation.message.completed') {
-            if (data.content) {
-              finalContent = data.content;
+          } else if (data.event === 'conversation.message.completed') {
+            if (data.data?.content) {
+              finalContent = data.data.content;
+            }
+            if (data.data?.reasoning_content) {
+              reasoningContent = data.data.reasoning_content;
             }
           }
         } catch {
