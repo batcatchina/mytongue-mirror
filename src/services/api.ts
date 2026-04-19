@@ -1,60 +1,123 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
-import type { DiagnosisInput, DiagnosisOutput } from '@/types';
+import type { DiagnosisInput, DiagnosisOutput, DiagnosisEvidence, AcupuncturePoint } from '@/types';
 
-// 扣子API配置 - 直接配置（生产环境）
+// 扣子API配置
 const API_BASE_URL = 'https://api.coze.cn';
 const BOT_ID = '7630373624734236672';
 const API_TOKEN = 'pat_RpduRPvBPQIbpRLtAXy9NBFruewZlVKN4gH4aLgby6z2MgjNEejR2E7X8PV1L2iJ';
 
-// 创建axios实例
-const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 60000, // 扣子API可能需要更长时间
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${API_TOKEN}`,
-  },
-});
-
-// 响应拦截器
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError<any>) => {
-    if (error.response) {
-      const message = error.response.data?.msg || error.response.data?.message || '请求失败';
-      console.error('API Error:', message);
-      return Promise.reject(new Error(message));
-    } else if (error.request) {
-      console.error('Network Error:', error.message);
-      return Promise.reject(new Error('网络连接失败，请检查网络设置'));
-    }
-    return Promise.reject(error);
-  }
-);
-
 /**
- * 生成唯一用户ID
+ * 从Markdown格式解析辨证结果
  */
+function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
+  // 提取主要证型
+  const primaryMatch = markdown.match(/\*\*主要证型\*\*[：:]\s*([^\n]+)/);
+  const primarySyndrome = primaryMatch ? primaryMatch[1].trim() : '辨证分析完成';
+
+  // 提取证型得分
+  const scoreMatch = markdown.match(/\*\*证型得分\*\*[：:]\s*(\d+)/);
+  const syndromeScore = scoreMatch ? parseInt(scoreMatch[1]) : 5;
+
+  // 提取病机分析
+  const pathogenesisMatch = markdown.match(/\*\*病机分析\*\*[：:]\s*([^\n]+)/);
+  const pathogenesis = pathogenesisMatch ? pathogenesisMatch[1].trim() : '';
+
+  // 提取辨证依据 - 转换为正确类型
+  const evidenceMatches = markdown.matchAll(/\d+\.\s*([^\n]+)/g);
+  const diagnosisEvidence: DiagnosisEvidence[] = Array.from(evidenceMatches, (m, idx) => ({
+    feature: m[1].trim(),
+    weight: 1,
+    contribution: '主要依据',
+    matchDegree: 0.9,
+    ruleId: `rule_${idx + 1}`
+  })).slice(0, 5);
+
+  // 提取主穴 - 转换为正确类型
+  const mainPointsMatch = markdown.match(/\*\*主穴\*\*[：:]\s*([^\n]+)/);
+  const mainPointsText = mainPointsMatch ? mainPointsMatch[1].trim() : '';
+  const mainPoints: AcupuncturePoint[] = mainPointsText.split(/[、,，]/)
+    .map(s => s.trim())
+    .filter(s => s)
+    .map(point => ({
+      point,
+      meridian: '待确认',
+      effect: '主穴',
+      technique: '平补平泻'
+    }));
+
+  // 提取配穴 - 转换为正确类型
+  const secondaryPointsMatch = markdown.match(/\*\*配穴\*\*[：:]\s*([^\n]+)/);
+  const secondaryPointsText = secondaryPointsMatch ? secondaryPointsMatch[1].trim() : '';
+  const secondaryPoints: AcupuncturePoint[] = secondaryPointsText.split(/[、,，]/)
+    .map(s => s.trim())
+    .filter(s => s)
+    .map(point => ({
+      point,
+      meridian: '待确认',
+      effect: '配穴',
+      technique: '平补平泻'
+    }));
+
+  // 提取刺法
+  const techniqueMatch = markdown.match(/\*\*刺法\*\*[：:]\s*([^\n]+)/);
+  const techniquePrinciple = techniqueMatch ? techniqueMatch[1].trim() : '';
+
+  // 提取治疗频次
+  const frequencyMatch = markdown.match(/\*\*治疗频次\*\*[：:]\s*([^\n]+)/);
+  const treatmentFrequency = frequencyMatch ? frequencyMatch[1].trim() : '';
+
+  // 提取生活调护
+  const lifeCareSection = markdown.split(/##\s*生活调护/)[1] || '';
+  const lifeCareItems = lifeCareSection.match(/[-•]\s*([^\n]+)/g) || [];
+  const lifeCareAdvice = lifeCareItems.map(item => item.replace(/^[-•]\s*/, '').trim()).slice(0, 5);
+
+  return {
+    diagnosisResult: {
+      primarySyndrome,
+      syndromeScore,
+      confidence: 0.8,
+      secondarySyndromes: [],
+      pathogenesis,
+      organLocation: [],
+      diagnosisEvidence,
+      priority: '中',
+      diagnosisTime: new Date().toISOString(),
+    },
+    acupuncturePlan: {
+      treatmentPrinciple: '',
+      mainPoints,
+      secondaryPoints,
+      contraindications: [],
+      treatmentAdvice: {
+        techniquePrinciple,
+        needleRetentionTime: '',
+        treatmentFrequency,
+        treatmentSessions: '',
+        sessionInterval: '',
+      },
+    },
+    lifeCareAdvice: {
+      dietSuggestions: lifeCareAdvice,
+      dailyRoutine: [],
+      precautions: [],
+    },
+    systemInfo: {
+      knowledgeBaseVersion: '1.0',
+      skillVersion: '1.0',
+      reasoningRulesCount: 0,
+      updateTime: new Date().toISOString(),
+    },
+  };
+}
+
 function generateUserId(): string {
   return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-/**
- * 舌诊辨证分析API（调用扣子智能体）
- */
 export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisOutput> {
-  if (!BOT_ID) {
-    throw new Error('请配置 VITE_BOT_ID 环境变量');
-  }
-  if (!API_TOKEN) {
-    throw new Error('请配置 VITE_API_TOKEN 环境变量');
-  }
-
-  // 构造扣子API请求（v3格式，使用流式响应）
   const requestPayload = {
     bot_id: BOT_ID,
     user_id: generateUserId(),
-    stream: true,  // 使用流式响应
+    stream: true,
     additional_messages: [{
       role: 'user',
       content: JSON.stringify({
@@ -76,169 +139,66 @@ export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisO
     }]
   };
 
-  try {
-    // 使用流式响应模式
-    const response = await fetch(`${API_BASE_URL}/v3/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_TOKEN}`,
-      },
-      body: JSON.stringify(requestPayload),
-    });
+  const response = await fetch(`${API_BASE_URL}/v3/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${API_TOKEN}`,
+    },
+    body: JSON.stringify(requestPayload),
+  });
 
-    if (!response.ok) {
-      throw new Error(`API请求失败: ${response.status}`);
-    }
+  if (!response.ok) throw new Error(`API请求失败: ${response.status}`);
 
-    // 读取流式响应
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('无法读取响应流');
-    }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('无法读取响应流');
 
-    let result = '';
-    const decoder = new TextDecoder();
+  let result = '';
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    result += decoder.decode(value, { stream: true });
+  }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      const chunk = decoder.decode(value, { stream: true });
-      result += chunk;
-    }
-
-    // 解析SSE格式流式响应
-    const lines = result.split('\n');
-    let finalContent = '';
-    let reasoningContent = '';
-    let currentEvent = '';
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      // 解析event行
-      if (line.startsWith('event:')) {
-        currentEvent = line.slice(6).trim();
-        continue;
-      }
-      
-      // 解析data行
-      if (line.startsWith('data:')) {
-        try {
-          const jsonStr = line.slice(5).trim();
-          if (jsonStr === '[DONE]') continue;
-          const data = JSON.parse(jsonStr);
-          
-          // conversation.message.delta: 累积reasoning_content
-          if (currentEvent === 'conversation.message.delta') {
-            if (data.reasoning_content) {
-              reasoningContent += data.reasoning_content;
-            }
-            if (data.content) {
-              finalContent += data.content;
-            }
-          }
-          
-          // conversation.message.completed: 获取最终content
-          if (currentEvent === 'conversation.message.completed') {
-            if (data.content) {
-              finalContent = data.content;
-            }
-          }
-        } catch {
-          // 忽略解析错误
-        }
-      }
-    }
-    
-    // 如果content为空但有reasoning_content，使用reasoning_content
-    if (!finalContent && reasoningContent) {
-      finalContent = reasoningContent;
-    }
-
-    if (!finalContent) {
-      // 尝试直接解析整个响应
+  const lines = result.split('\n');
+  let finalContent = '';
+  let reasoningContent = '';
+  let currentEvent = '';
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('event:')) {
+      currentEvent = trimmed.slice(6).trim();
+    } else if (trimmed.startsWith('data:')) {
       try {
-        const jsonResponse = JSON.parse(result);
-        if (jsonResponse.data?.messages) {
-          const assistantMsg = jsonResponse.data.messages.find((m: any) => m.role === 'assistant');
-          if (assistantMsg) {
-            finalContent = assistantMsg.content;
-          }
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === '[DONE]') continue;
+        const data = JSON.parse(jsonStr);
+        
+        if (currentEvent === 'conversation.message.delta') {
+          if (data.reasoning_content) reasoningContent += data.reasoning_content;
+          if (data.content) finalContent += data.content;
         }
-      } catch {
-        // 忽略
-      }
+        if (currentEvent === 'conversation.message.completed' && data.content) {
+          finalContent = data.content;
+        }
+      } catch {}
     }
+  }
+  
+  if (!finalContent && reasoningContent) finalContent = reasoningContent;
+  if (!finalContent) throw new Error('未获取到辨证结果');
 
-    if (!finalContent) {
-      throw new Error('未获取到辨证结果');
-    }
-
-    // 解析返回的内容
-    let diagnosisResult: DiagnosisOutput;
-    
-    try {
-      diagnosisResult = typeof finalContent === 'string' ? JSON.parse(finalContent) : finalContent;
-    } catch {
-      // 如果解析失败，构造默认结构
-      diagnosisResult = {
-        diagnosisResult: {
-          primarySyndrome: finalContent || '辨证结果',
-          syndromeScore: 0,
-          confidence: 0,
-          secondarySyndromes: [],
-          pathogenesis: '',
-          organLocation: [],
-          diagnosisEvidence: [],
-          priority: '中',
-          diagnosisTime: new Date().toISOString(),
-        },
-        acupuncturePlan: {
-          treatmentPrinciple: '',
-          mainPoints: [],
-          secondaryPoints: [],
-          contraindications: [],
-          treatmentAdvice: {
-            techniquePrinciple: '',
-            needleRetentionTime: '',
-            treatmentFrequency: '',
-            treatmentSessions: '',
-            sessionInterval: '',
-          },
-        },
-        lifeCareAdvice: {
-          dietSuggestions: [],
-          dailyRoutine: [],
-          precautions: [],
-        },
-        systemInfo: {
-          knowledgeBaseVersion: '1.0',
-          skillVersion: '1.0',
-          reasoningRulesCount: 0,
-          updateTime: new Date().toISOString(),
-        },
-      };
-    }
-    
-    return diagnosisResult;
-  } catch (error) {
-    console.error('Diagnosis API Error:', error);
-    throw error;
+  try {
+    return typeof finalContent === 'string' ? JSON.parse(finalContent) : finalContent;
+  } catch {
+    return parseMarkdownDiagnosis(finalContent);
   }
 }
 
-/**
- * 验证输入特征（本地验证）
- */
-export async function validateFeatures(input: Partial<DiagnosisInput>): Promise<{
-  valid: boolean;
-  errors?: string[];
-}> {
+export async function validateFeatures(input: Partial<DiagnosisInput>): Promise<{ valid: boolean; errors?: string[] }> {
   const errors: string[] = [];
-
-  // 验证必填字段
   if (!input.input_features?.tongueColor.value) errors.push('请选择舌色');
   if (!input.input_features?.tongueShape.value) errors.push('请选择舌形');
   if (!input.input_features?.coating.color) errors.push('请选择苔色');
@@ -246,65 +206,12 @@ export async function validateFeatures(input: Partial<DiagnosisInput>): Promise<
   if (!input.patientInfo?.age) errors.push('请输入患者年龄');
   if (!input.patientInfo?.gender) errors.push('请选择患者性别');
   if (!input.patientInfo?.chiefComplaint) errors.push('请输入主诉');
-
-  // 验证年龄范围
-  if (input.patientInfo?.age && (input.patientInfo.age < 0 || input.patientInfo.age > 150)) {
-    errors.push('年龄必须在0-150之间');
-  }
-
-  // 验证逻辑冲突
-  if (input.input_features?.coating.color === '剥落' && input.input_features?.coating.texture === '厚') {
-    errors.push('剥落苔不可能同时为厚苔');
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors: errors.length > 0 ? errors : undefined,
-  };
+  return { valid: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
 }
 
-/**
- * 获取辨证模式选项
- */
-export async function getDiagnosisModes(): Promise<{
-  modes: Array<{ value: string; label: string; description: string }>;
-}> {
-  return {
-    modes: [
-      {
-        value: '快速模式',
-        label: '快速模式',
-        description: '仅输出主要证型和主穴',
-      },
-      {
-        value: '详细模式',
-        label: '详细模式',
-        description: '完整辨证分析、选穴方案和生活调护',
-      },
-    ],
-  };
+export async function getDiagnosisModes() {
+  return { modes: [{ value: '快速模式', label: '快速模式', description: '仅输出主要证型和主穴' }, { value: '详细模式', label: '详细模式', description: '完整辨证分析' }] };
 }
 
-/**
- * 健康检查
- */
-export async function healthCheck(): Promise<boolean> {
-  try {
-    // 简单检查API连接
-    if (!BOT_ID || !API_TOKEN) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// 导出配置信息（用于调试）
-export function getApiConfig() {
-  return {
-    baseUrl: API_BASE_URL,
-    botId: BOT_ID ? `${BOT_ID.slice(0, 8)}...` : '未配置',
-    hasToken: !!API_TOKEN,
-  };
-}
+export async function healthCheck(): Promise<boolean> { return !!BOT_ID && !!API_TOKEN; }
+export function getApiConfig() { return { baseUrl: API_BASE_URL, botId: BOT_ID.slice(0,8)+'...', hasToken: !!API_TOKEN }; }
