@@ -78,64 +78,107 @@ export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisO
   };
 
   try {
-    const response = await apiClient.post('/v3/chat', requestPayload);
-
-    // 解析扣子API返回结果
-    const result = response.data;
+    // 第一步：发起对话
+    const chatResponse = await apiClient.post('/v3/chat', requestPayload);
+    const chatResult = chatResponse.data;
     
-    if (result.code === 0 && result.data) {
-      // 尝试解析返回的内容
-      let diagnosisResult: DiagnosisOutput;
-      
-      try {
-        // 如果返回的是JSON字符串，解析它
-        const content = result.data.messages?.[0]?.content || result.data.content || '';
-        diagnosisResult = typeof content === 'string' ? JSON.parse(content) : content;
-      } catch {
-        // 如果解析失败，构造默认结构
-        diagnosisResult = {
-          diagnosisResult: {
-            primarySyndrome: '辨证结果',
-            syndromeScore: 0,
-            confidence: 0,
-            secondarySyndromes: [],
-            pathogenesis: '',
-            organLocation: [],
-            diagnosisEvidence: [],
-            priority: '中',
-            diagnosisTime: new Date().toISOString(),
-          },
-          acupuncturePlan: {
-            treatmentPrinciple: '',
-            mainPoints: [],
-            secondaryPoints: [],
-            contraindications: [],
-            treatmentAdvice: {
-              techniquePrinciple: '',
-              needleRetentionTime: '',
-              treatmentFrequency: '',
-              treatmentSessions: '',
-              sessionInterval: '',
-            },
-          },
-          lifeCareAdvice: {
-            dietSuggestions: [],
-            dailyRoutine: [],
-            precautions: [],
-          },
-          systemInfo: {
-            knowledgeBaseVersion: '1.0',
-            skillVersion: '1.0',
-            reasoningRulesCount: 0,
-            updateTime: new Date().toISOString(),
-          },
-        };
-      }
-      
-      return diagnosisResult;
+    if (chatResult.code !== 0) {
+      throw new Error(chatResult.msg || '发起对话失败');
     }
-
-    throw new Error(result.msg || '辨证分析失败');
+    
+    const chatId = chatResult.data?.id;
+    const conversationId = chatResult.data?.conversation_id;
+    
+    if (!chatId || !conversationId) {
+      throw new Error('未获取到对话ID');
+    }
+    
+    // 第二步：轮询等待对话完成
+    let isCompleted = false;
+    let retryCount = 0;
+    const maxRetries = 30; // 最多等待60秒
+    
+    while (!isCompleted && retryCount < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+      
+      const statusResponse = await apiClient.get(`/v3/chat/retrieve?conversation_id=${conversationId}&chat_id=${chatId}`);
+      const statusData = statusResponse.data;
+      
+      if (statusData.data?.status === 'completed') {
+        isCompleted = true;
+      } else if (statusData.data?.status === 'failed') {
+        throw new Error('对话处理失败');
+      }
+      retryCount++;
+    }
+    
+    if (!isCompleted) {
+      throw new Error('对话处理超时');
+    }
+    
+    // 第三步：获取消息列表
+    const messagesResponse = await apiClient.get(`/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`);
+    const messagesData = messagesResponse.data;
+    
+    if (messagesData.code !== 0) {
+      throw new Error(messagesData.msg || '获取消息失败');
+    }
+    
+    // 找到助手回复的消息
+    const assistantMessage = messagesData.data?.find((msg: any) => msg.role === 'assistant' && msg.type === 'answer');
+    
+    if (!assistantMessage) {
+      throw new Error('未获取到辨证结果');
+    }
+    
+    // 解析返回的内容
+    let diagnosisResult: DiagnosisOutput;
+    
+    try {
+      const content = assistantMessage.content;
+      diagnosisResult = typeof content === 'string' ? JSON.parse(content) : content;
+    } catch {
+      // 如果解析失败，构造默认结构
+      diagnosisResult = {
+        diagnosisResult: {
+          primarySyndrome: '辨证结果',
+          syndromeScore: 0,
+          confidence: 0,
+          secondarySyndromes: [],
+          pathogenesis: '',
+          organLocation: [],
+          diagnosisEvidence: [],
+          priority: '中',
+          diagnosisTime: new Date().toISOString(),
+        },
+        acupuncturePlan: {
+          treatmentPrinciple: '',
+          mainPoints: [],
+          secondaryPoints: [],
+          contraindications: [],
+          treatmentAdvice: {
+            techniquePrinciple: '',
+            needleRetentionTime: '',
+            treatmentFrequency: '',
+            treatmentSessions: '',
+            sessionInterval: '',
+          },
+        },
+        lifeCareAdvice: {
+          dietSuggestions: [],
+          dailyRoutine: [],
+          precautions: [],
+        },
+        systemInfo: {
+          knowledgeBaseVersion: '1.0',
+          skillVersion: '1.0',
+          reasoningRulesCount: 0,
+          updateTime: new Date().toISOString(),
+        },
+      };
+    }
+    
+    return diagnosisResult;
   } catch (error) {
     console.error('Diagnosis API Error:', error);
     throw error;
