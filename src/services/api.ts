@@ -44,14 +44,23 @@ export const ERROR_EVENTS = [
 ];
 
 function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
-  const primaryMatch = markdown.match(/\*\*主要证型\*\*[：:]\s*([^\n]+)/);
+  // 主要证型 - 同时支持 **主要证型** 和 主要证型 两种格式
+  const primaryMatch = markdown.match(/\*\*主要证型\*\*[：:]\s*([^\n]+)/) 
+    || markdown.match(/主要证型[：:]\s*([^\n]+)/);
   const primarySyndrome = primaryMatch ? primaryMatch[1].trim() : '辨证分析完成';
 
-  const scoreMatch = markdown.match(/\*\*证型得分\*\*[：:]\s*(\d+)/);
+  const scoreMatch = markdown.match(/\*\*证型得分\*\*[：:]\s*(\d+)/)
+    || markdown.match(/证型得分[：:]\s*(\d+)/);
   const syndromeScore = scoreMatch ? parseInt(scoreMatch[1]) : 5;
 
-  const pathogenesisMatch = markdown.match(/\*\*病机分析\*\*[：:]\s*([^\n]+)/);
-  const pathogenesis = pathogenesisMatch ? pathogenesisMatch[1].trim() : '';
+  // 病机分析 - 同时支持 **病机分析** 和 病机分析 两种格式，并捕获多行内容
+  // 优先匹配多行内容（从"病机分析："到下一个空行或特定标记）
+  const pathogenesisMultiMatch = markdown.match(/病机分析[：:]\s*([\s\S]*?)(?=\n\n|\n针灸|##|$)/);
+  const pathogenesisMatch = markdown.match(/\*\*病机分析\*\*[：:]\s*([^\n]+)/)
+    || markdown.match(/病机分析[：:]\s*([^\n]+)/);
+  const pathogenesis = pathogenesisMultiMatch 
+    ? pathogenesisMultiMatch[1].trim().replace(/\n+/g, ' ')  // 多行合并为单行
+    : (pathogenesisMatch ? pathogenesisMatch[1].trim() : '');
 
   const evidenceMatches = markdown.matchAll(/\d+\.\s*([^\n]+)/g);
   const diagnosisEvidence: DiagnosisEvidence[] = Array.from(evidenceMatches, (m, idx) => ({
@@ -62,7 +71,7 @@ function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
     ruleId: `rule_${idx + 1}`
   })).slice(0, 5);
 
-  // 解析主穴 - 支持多种格式
+  // 解析主穴 - 支持多种格式（粗体和非粗体）
   const mainPointsPatterns = [
     /\*\*主穴\*\*[：:]\s*([^\n]+)/,
     /主穴[：:]\s*([^\n]+)/,
@@ -127,10 +136,12 @@ function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
 
   const secondaryPoints = parseSecondaryPoints(markdown);
 
-  const techniqueMatch = markdown.match(/\*\*刺法\*\*[：:]\s*([^\n]+)/);
+  const techniqueMatch = markdown.match(/\*\*刺法\*\*[：:]\s*([^\n]+)/)
+    || markdown.match(/刺法[：:]\s*([^\n]+)/);
   const techniquePrinciple = techniqueMatch ? techniqueMatch[1].trim() : '';
 
-  const frequencyMatch = markdown.match(/\*\*治疗频次\*\*[：:]\s*([^\n]+)/);
+  const frequencyMatch = markdown.match(/\*\*治疗频次\*\*[：:]\s*([^\n]+)/)
+    || markdown.match(/治疗频次[：:]\s*([^\n]+)/);
   const treatmentFrequency = frequencyMatch ? frequencyMatch[1].trim() : '';
 
   const lifeCareSection = markdown.split(/##\s*生活调护/)[1] || '';
