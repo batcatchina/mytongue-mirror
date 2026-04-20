@@ -194,7 +194,16 @@ export async function submitDiagnosis(
   let result = '';
   const decoder = new TextDecoder();
   let messageCount = 0;
-  const errorKeywords = ['非舌象', '不是舌象', '请重新上传', 'INVALID_IMAGE', 'LOW_QUALITY_IMAGE'];
+  // 更精确的错误关键词检测，避免误判
+  const errorPatterns = [
+    '非舌象图片',
+    '不是舌象图片', 
+    '图片不是舌象',
+    '请重新上传舌象',
+    'INVALID_IMAGE',
+    'LOW_QUALITY_IMAGE',
+    '非舌象照片'
+  ];
   
   // 设置超时（60秒）
   const TIMEOUT = 60000;
@@ -210,9 +219,9 @@ export async function submitDiagnosis(
     if (done) break;
     result += decoder.decode(value, { stream: true });
     
-    // 实时检测错误关键词，立即停止
-    for (const keyword of errorKeywords) {
-      if (result.includes(keyword)) {
+    // 精确检测错误关键词（完整短语匹配）
+    for (const pattern of errorPatterns) {
+      if (result.includes(pattern)) {
         throw new Error('请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。');
       }
     }
