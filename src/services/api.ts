@@ -62,6 +62,13 @@ function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
     ? pathogenesisMultiMatch[1].trim().replace(/\n+/g, ' ')  // 多行合并为单行
     : (pathogenesisMatch ? pathogenesisMatch[1].trim() : '');
 
+  // 脏腑定位解析 - 同时支持粗体和非粗体格式
+  const organMatch = markdown.match(/\*\*脏腑定位\*\*[：:]\s*([^\n]+)/)
+    || markdown.match(/脏腑定位[：:]\s*([^\n]+)/);
+  const organLocation = organMatch 
+    ? organMatch[1].split(/[、,，\s]+/).filter((s: string) => s.trim()) 
+    : [];
+
   const evidenceMatches = markdown.matchAll(/\d+\.\s*([^\n]+)/g);
   const diagnosisEvidence: DiagnosisEvidence[] = Array.from(evidenceMatches, (m, idx) => ({
     feature: m[1].trim(),
@@ -155,7 +162,7 @@ function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
       confidence: 0.8,
       secondarySyndromes: [],
       pathogenesis,
-      organLocation: [],
+      organLocation,
       diagnosisEvidence,
       priority: '中',
       diagnosisTime: new Date().toISOString(),
