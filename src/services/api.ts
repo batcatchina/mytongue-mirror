@@ -168,11 +168,19 @@ export async function submitDiagnosis(
   let result = '';
   const decoder = new TextDecoder();
   let messageCount = 0;
+  const errorKeywords = ['非舌象', '不是舌象', '请重新上传', 'INVALID_IMAGE', 'LOW_QUALITY_IMAGE'];
   
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     result += decoder.decode(value, { stream: true });
+    
+    // 实时检测错误关键词，立即停止
+    for (const keyword of errorKeywords) {
+      if (result.includes(keyword)) {
+        throw new Error('请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。');
+      }
+    }
     
     // 每收到一条消息触发一次进度更新
     messageCount++;
