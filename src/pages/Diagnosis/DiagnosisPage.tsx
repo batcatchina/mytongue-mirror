@@ -27,6 +27,8 @@ const DiagnosisPage: React.FC = () => {
     patientInfo,
     diagnosisResult,
     isAnalyzing,
+    currentStep,
+    stepProgress,
     setTongueColor,
     setTongueShape,
     setTongueState,
@@ -38,6 +40,8 @@ const DiagnosisPage: React.FC = () => {
     setDiagnosisResult,
     setIsAnalyzing,
     setError,
+    setCurrentStep,
+    resetProgress,
     resetInput,
     getDiagnosisInput,
     saveCase,
@@ -69,10 +73,30 @@ const DiagnosisPage: React.FC = () => {
 
     setIsAnalyzing(true);
     setError(null);
+    setCurrentStep('validating', 10);
 
     try {
       const input = getDiagnosisInput();
-      const result = await submitDiagnosis(input);
+      setCurrentStep('recognizing', 25);
+      
+      const result = await submitDiagnosis(input, (step) => {
+        switch (step) {
+          case 'recognizing':
+            setCurrentStep('recognizing', 40);
+            break;
+          case 'analyzing':
+            setCurrentStep('analyzing', 55);
+            break;
+          case 'reasoning':
+            setCurrentStep('reasoning', 70);
+            break;
+          case 'matching':
+            setCurrentStep('matching', 85);
+            break;
+        }
+      });
+      
+      setCurrentStep('matching', 95);
       setDiagnosisResult(result);
       toast.success('辨证分析完成！');
     } catch (error) {
@@ -81,6 +105,7 @@ const DiagnosisPage: React.FC = () => {
       toast.error(message);
     } finally {
       setIsAnalyzing(false);
+      resetProgress();
     }
   };
 
@@ -216,6 +241,50 @@ const DiagnosisPage: React.FC = () => {
                 )}
               </button>
             </div>
+
+            {/* 分步进度显示 */}
+            {isAnalyzing && (
+              <div className="tcm-card p-4 bg-gradient-to-r from-primary-50 to-secondary-50">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-stone-700">辨证分析进度</span>
+                    <span className="text-primary-600 font-medium">{stepProgress}%</span>
+                  </div>
+                  
+                  {/* 进度条 */}
+                  <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${stepProgress}%` }}
+                    />
+                  </div>
+                  
+                  {/* 步骤列表 */}
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <StepIndicator 
+                      label="识别舌象特征" 
+                      step="recognizing" 
+                      currentStep={currentStep} 
+                    />
+                    <StepIndicator 
+                      label="分析舌色舌苔" 
+                      step="analyzing" 
+                      currentStep={currentStep} 
+                    />
+                    <StepIndicator 
+                      label="辨证推理" 
+                      step="reasoning" 
+                      currentStep={currentStep} 
+                    />
+                    <StepIndicator 
+                      label="匹配针灸方案" 
+                      step="matching" 
+                      currentStep={currentStep} 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 右侧：结果展示 */}
@@ -294,6 +363,48 @@ const DiagnosisPage: React.FC = () => {
           </div>
         </div>
       </main>
+    </div>
+  );
+};
+
+// 分步进度指示器组件
+interface StepIndicatorProps {
+  label: string;
+  step: string;
+  currentStep: string;
+}
+
+const StepIndicator: React.FC<StepIndicatorProps> = ({ label, step, currentStep }) => {
+  const stepOrder = ['recognizing', 'analyzing', 'reasoning', 'matching'];
+  const currentIndex = stepOrder.indexOf(currentStep);
+  const stepIndex = stepOrder.indexOf(step);
+  
+  const isCompleted = stepIndex < currentIndex;
+  const isCurrent = stepIndex === currentIndex;
+  
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+      isCompleted 
+        ? 'bg-green-100 text-green-700' 
+        : isCurrent 
+          ? 'bg-primary-100 text-primary-700' 
+          : 'bg-stone-100 text-stone-400'
+    }`}>
+      {isCompleted ? (
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : isCurrent ? (
+        <svg className="w-4 h-4 flex-shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      ) : (
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      )}
+      <span className="truncate">{label}</span>
     </div>
   );
 };

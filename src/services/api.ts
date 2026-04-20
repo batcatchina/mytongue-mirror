@@ -99,7 +99,12 @@ function generateUserId(): string {
   return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisOutput> {
+export type DiagnosisProgressStep = 'recognizing' | 'analyzing' | 'reasoning' | 'matching';
+
+export async function submitDiagnosis(
+  input: DiagnosisInput, 
+  onProgress?: (step: DiagnosisProgressStep) => void
+): Promise<DiagnosisOutput> {
   const requestPayload = {
     bot_id: BOT_ID,
     user_id: generateUserId(),
@@ -141,10 +146,26 @@ export async function submitDiagnosis(input: DiagnosisInput): Promise<DiagnosisO
 
   let result = '';
   const decoder = new TextDecoder();
+  let messageCount = 0;
+  
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     result += decoder.decode(value, { stream: true });
+    
+    // 每收到一条消息触发一次进度更新
+    messageCount++;
+    if (onProgress && messageCount > 0) {
+      if (messageCount <= 2) {
+        onProgress('recognizing');
+      } else if (messageCount <= 4) {
+        onProgress('analyzing');
+      } else if (messageCount <= 6) {
+        onProgress('reasoning');
+      } else {
+        onProgress('matching');
+      }
+    }
   }
 
   // 解析SSE，只收集type="answer"的reasoning_content

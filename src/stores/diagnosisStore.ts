@@ -24,6 +24,15 @@ const initialPatientInfo: PatientInfo = {
   chiefComplaint: '',
 };
 
+// 进度步骤枚举
+export type DiagnosisStep = 
+  | 'idle'           // 空闲
+  | 'validating'     // 验证输入
+  | 'recognizing'    // 识别舌象特征
+  | 'analyzing'      // 分析舌色舌苔
+  | 'reasoning'      // 辨证推理
+  | 'matching';      // 匹配针灸方案
+
 interface DiagnosisState {
   // 输入状态
   inputFeatures: InputFeatures;
@@ -34,6 +43,10 @@ interface DiagnosisState {
   diagnosisResult: DiagnosisOutput | null;
   isAnalyzing: boolean;
   error: string | null;
+  
+  // 进度状态
+  currentStep: DiagnosisStep;
+  stepProgress: number; // 0-100
   
   // 病例列表
   caseList: CaseRecord[];
@@ -59,6 +72,10 @@ interface DiagnosisState {
   setIsAnalyzing: (isAnalyzing: boolean) => void;
   setError: (error: string | null) => void;
   
+  // 进度方法
+  setCurrentStep: (step: DiagnosisStep, progress?: number) => void;
+  resetProgress: () => void;
+  
   resetInput: () => void;
   getDiagnosisInput: () => DiagnosisInput;
   
@@ -78,6 +95,10 @@ export const useDiagnosisStore = create<DiagnosisState>()(
       isAnalyzing: false,
       error: null,
       caseList: [],
+      
+      // 进度状态
+      currentStep: 'idle',
+      stepProgress: 0,
       
       // 设置舌象特征
       setInputFeatures: (features) =>
@@ -183,6 +204,13 @@ export const useDiagnosisStore = create<DiagnosisState>()(
       setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
       setError: (error) => set({ error }),
       
+      // 进度方法
+      setCurrentStep: (step, progress) => set({ 
+        currentStep: step, 
+        stepProgress: progress ?? (step === 'idle' ? 0 : 100) 
+      }),
+      resetProgress: () => set({ currentStep: 'idle', stepProgress: 0 }),
+      
       // 重置输入
       resetInput: () =>
         set({
@@ -191,6 +219,8 @@ export const useDiagnosisStore = create<DiagnosisState>()(
           patientInfo: initialPatientInfo,
           diagnosisResult: null,
           error: null,
+          currentStep: 'idle',
+          stepProgress: 0,
         }),
       
       // 获取完整输入数据
