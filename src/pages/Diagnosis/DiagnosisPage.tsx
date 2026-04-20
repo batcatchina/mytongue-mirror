@@ -20,6 +20,7 @@ import { submitDiagnosis } from '@/services/api';
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
+  const [compressionStatus, setCompressionStatus] = useState<string | null>(null);
   
   const {
     inputFeatures,
@@ -47,6 +48,11 @@ const DiagnosisPage: React.FC = () => {
     getDiagnosisInput,
     saveCase,
   } = useDiagnosisStore();
+
+  // 处理压缩状态更新
+  const handleCompressionProgress = (status: string) => {
+    setCompressionStatus(status);
+  };
 
   // 提交辨证
   const handleSubmit = async () => {
@@ -106,6 +112,7 @@ const DiagnosisPage: React.FC = () => {
       toast.error(message);
     } finally {
       setIsAnalyzing(false);
+      setCompressionStatus(null);
       resetProgress();
     }
   };
@@ -123,6 +130,7 @@ const DiagnosisPage: React.FC = () => {
   // 清空输入
   const handleReset = () => {
     resetInput();
+    setCompressionStatus(null);
     toast.success('已清空所有输入');
   };
 
@@ -141,7 +149,10 @@ const DiagnosisPage: React.FC = () => {
               
               {/* 图片上传 */}
               <div className="mb-6">
-                <ImageUpload onChange={(imageData) => setImageData(imageData)} />
+                <ImageUpload 
+                  onChange={(imageData) => setImageData(imageData)} 
+                  onCompressionProgress={handleCompressionProgress}
+                />
               </div>
               
               <div className="tcm-divider" />
@@ -242,6 +253,14 @@ const DiagnosisPage: React.FC = () => {
                 )}
               </button>
             </div>
+
+            {/* 压缩状态显示 */}
+            {compressionStatus && !isAnalyzing && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg text-sm text-blue-700">
+                <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                <span>{compressionStatus}</span>
+              </div>
+            )}
 
             {/* 分步进度显示 */}
             {isAnalyzing && (

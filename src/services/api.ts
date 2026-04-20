@@ -5,6 +5,44 @@ const API_BASE_URL = 'https://api.coze.cn';
 const BOT_ID = '7630373624734236672';
 const API_TOKEN = 'pat_RpduRPvBPQIbpRLtAXy9NBFruewZlVKN4gH4aLgby6z2MgjNEejR2E7X8PV1L2iJ';
 
+// ============================================
+// 统一错误关键词定义（核心配置）
+// ============================================
+export const ERROR_PATTERNS = [
+  '非舌象图片',
+  '不是舌象图片',
+  '图片不是舌象',
+  '请重新上传舌象',
+  'INVALID_IMAGE',
+  'LOW_QUALITY_IMAGE',
+  '非舌象照片',
+  '不是舌头照片',
+];
+
+export const ERROR_KEYWORDS = [
+  '非舌象',
+  '不是舌象',
+  '请重新上传',
+  'INVALID_IMAGE',
+  '请上传舌象',
+];
+
+// API错误码映射
+export const API_ERROR_CODES: Record<number, { message: string; suggestion: string }> = {
+  4010: { message: '请求超时', suggestion: '图片可能过大，建议重新压缩后上传' },
+  4001: { message: '认证失败', suggestion: '服务配置异常，请稍后重试' },
+  4002: { message: '参数错误', suggestion: '请检查输入内容后重试' },
+  4003: { message: '请求频率超限', suggestion: '操作过于频繁，请稍后重试' },
+  5000: { message: '服务器内部错误', suggestion: '服务繁忙，请稍后重试' },
+  5001: { message: '服务暂时不可用', suggestion: '服务维护中，请稍后重试' },
+};
+
+// Coze API错误事件类型
+export const ERROR_EVENTS = [
+  'conversation.chat.failed',
+  'error',
+];
+
 function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
   const primaryMatch = markdown.match(/\*\*主要证型\*\*[：:]\s*([^\n]+)/);
   const primarySyndrome = primaryMatch ? primaryMatch[1].trim() : '辨证分析完成';
@@ -125,6 +163,94 @@ function generateUserId(): string {
   return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// ============================================
+// 错误检测工具函数
+// ============================================
+function detectErrorInContent(content: string): string | null {
+  // 检查ERROR_PATTERNS（完整短语匹配）
+  for (const pattern of ERROR_PATTERNS) {
+    if (content.includes(pattern)) {
+      return '请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。';
+    }
+  }
+  
+  // 检查ERROR_KEYWORDS（关键词匹配）
+  for (const keyword of ERROR_KEYWORDS) {
+    if (content.includes(keyword)) {
+      return '请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。';
+    }
+  }
+  
+  return null;
+}
+
+function parseAPIErrorCode(errorData: any): { message: string; code: number } | null {
+  // 从各种可能的错误格式中提取错误码
+  const code = errorData?.code || errorData?.error_code || errorData?.err_code;
+  if (code && API_ERROR_CODES[code]) {
+    return { message: API_ERROR_CODES[code].message, code: Number(code) };
+  }
+  return null;
+}
+
+function getUserFriendlyError(error: any, context: string = ''): Error {
+  // 1. 检查是否是API错误码
+  const apiError = parseAPIErrorCode(error);
+  if (apiError) {
+    const errorConfig = API_ERROR_CODES[apiError.code];
+    const suggestion = errorConfig?.suggestion || '请稍后重试';
+    return new Error(`${apiError.message}${context ? ` (${context})` : ''}，${suggestion}`);
+  }
+  
+  // 2. 检查错误消息中的错误码（如 "error_code: 4010"）
+  if (typeof error === 'string') {
+    const codeMatch = error.match(/error_code[:\s]*(\d+)/i);
+    if (codeMatch) {
+      const code = parseInt(codeMatch[1]);
+      if (API_ERROR_CODES[code]) {
+        return new Error(`${API_ERROR_CODES[code].message}，${API_ERROR_CODES[code].suggestion}`);
+      }
+    }
+    
+    // 检查内容中的错误关键词
+    const contentError = detectErrorInContent(error);
+    if (contentError) return new Error(contentError);
+  }
+  
+  // 3. 检查error对象的message
+  if (error?.message) {
+    const contentError = detectErrorInContent(error.message);
+    if (contentError) return new Error(contentError);
+    
+    // 检查消息中的错误码
+    const codeMatch = error.message.match(/error_code[:\s]*(\d+)/i);
+    if (codeMatch) {
+      const code = parseInt(codeMatch[1]);
+      if (API_ERROR_CODES[code]) {
+        return new Error(`${API_ERROR_CODES[code].message}，${API_ERROR_CODES[code].suggestion}`);
+      }
+    }
+  }
+  
+  // 4. 检查error对象的其他字段
+  if (error?.error) {
+    const contentError = detectErrorInContent(String(error.error));
+    if (contentError) return new Error(contentError);
+  }
+  
+  // 5. 返回原始错误或通用错误
+  const originalMessage = error?.message || error?.msg || String(error);
+  if (originalMessage.includes('timeout') || originalMessage.includes('超时')) {
+    return new Error('请求超时，图片可能过大，请尝试压缩后重新上传');
+  }
+  
+  if (originalMessage) {
+    return new Error(`${originalMessage}${context ? ` (${context})` : ''}`);
+  }
+  
+  return new Error('服务繁忙，请稍后重试');
+}
+
 export type DiagnosisProgressStep = 'recognizing' | 'analyzing' | 'reasoning' | 'matching';
 
 export async function submitDiagnosis(
@@ -177,16 +303,27 @@ export async function submitDiagnosis(
     }]
   };
 
-  const response = await fetch(`${API_BASE_URL}/v3/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_TOKEN}`,
-    },
-    body: JSON.stringify(requestPayload),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/v3/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_TOKEN}`,
+      },
+      body: JSON.stringify(requestPayload),
+    });
+  } catch (networkError) {
+    throw getUserFriendlyError(networkError, '网络连接');
+  }
 
-  if (!response.ok) throw new Error(`API请求失败: ${response.status}`);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw getUserFriendlyError({
+      code: response.status,
+      message: `HTTP ${response.status}: ${errorText || response.statusText}`
+    }, 'API请求');
+  }
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('无法读取响应流');
@@ -194,33 +331,23 @@ export async function submitDiagnosis(
   let result = '';
   const decoder = new TextDecoder();
   let messageCount = 0;
-  // 更精确的错误关键词检测，避免误判
-  const errorPatterns = [
-    '非舌象图片',
-    '不是舌象图片', 
-    '图片不是舌象',
-    '请重新上传舌象',
-    'INVALID_IMAGE',
-    'LOW_QUALITY_IMAGE',
-    '非舌象照片'
-  ];
   
-  // 设置超时（60秒）
-  const TIMEOUT = 60000;
+  // 设置超时（90秒，考虑到图片处理可能需要更长时间）
+  const TIMEOUT = 90000;
   const startTime = Date.now();
   
   while (true) {
     // 检查超时
     if (Date.now() - startTime > TIMEOUT) {
-      throw new Error('辨证分析超时，请稍后重试。如果是图片问题，请确保上传的是舌象照片。');
+      throw new Error('辨证分析超时（90秒），图片可能过大，请尝试压缩后重新上传');
     }
     
     const { done, value } = await reader.read();
     if (done) break;
     result += decoder.decode(value, { stream: true });
     
-    // 精确检测错误关键词（完整短语匹配）
-    for (const pattern of errorPatterns) {
+    // 检测错误关键词（完整短语匹配）
+    for (const pattern of ERROR_PATTERNS) {
       if (result.includes(pattern)) {
         throw new Error('请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。');
       }
@@ -241,11 +368,12 @@ export async function submitDiagnosis(
     }
   }
 
-  // 解析SSE，只收集type="answer"的reasoning_content
+  // 解析SSE，收集所有事件和数据
   const lines = result.split('\n');
   let answerContent = '';
   let currentEvent = '';
-  
+  let errorEventData: any = null;
+  let chatFailedData: any = null;
   
   for (const line of lines) {
     const trimmed = line.trim();
@@ -257,6 +385,18 @@ export async function submitDiagnosis(
         if (jsonStr === '[DONE]') continue;
         const data = JSON.parse(jsonStr);
         
+        // 捕获错误事件
+        if (currentEvent === 'error' || currentEvent === 'conversation.chat.failed') {
+          console.error(`[API错误事件] ${currentEvent}:`, JSON.stringify(data));
+          
+          if (currentEvent === 'conversation.chat.failed') {
+            chatFailedData = data;
+          }
+          if (currentEvent === 'error') {
+            errorEventData = data;
+          }
+        }
+        
         // 只收集type="answer"的消息
         if (data.type === 'answer' && data.reasoning_content) {
           answerContent += data.reasoning_content;
@@ -266,17 +406,42 @@ export async function submitDiagnosis(
         if (currentEvent === 'conversation.message.completed' && data.type === 'answer' && data.content) {
           answerContent = data.content;
         }
-      } catch {}
+      } catch (parseError) {
+        // 忽略解析错误，继续处理其他行
+      }
+    }
+  }
+
+  // 处理conversation.chat.failed错误
+  if (chatFailedData) {
+    const failedReason = chatFailedData?.reason || chatFailedData?.failed_reason || chatFailedData?.err_msg;
+    const failedCode = chatFailedData?.code || chatFailedData?.error_code;
+    
+    if (failedCode) {
+      throw getUserFriendlyError({ code: failedCode, message: failedReason }, '会话失败');
+    }
+    if (failedReason) {
+      throw getUserFriendlyError({ message: failedReason }, '会话失败');
     }
   }
   
-  if (!answerContent) throw new Error('未获取到辨证结果');
+  // 处理error事件
+  if (errorEventData) {
+    throw getUserFriendlyError(errorEventData, 'API错误');
+  }
+
+  if (!answerContent) {
+    // 如果没有answer内容但有chat失败数据，给出友好提示
+    if (chatFailedData) {
+      throw new Error('服务处理失败，图片可能不符合要求，请尝试更换舌象图片或移除图片后重试');
+    }
+    throw new Error('未获取到辨证结果，请稍后重试');
+  }
 
   // 检测文本中的错误提示（非舌象图片等）
-  for (const keyword of errorKeywords) {
-    if (answerContent.includes(keyword)) {
-      throw new Error('请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。');
-    }
+  const contentError = detectErrorInContent(answerContent);
+  if (contentError) {
+    throw new Error(contentError);
   }
 
   // 检测JSON格式的错误响应
@@ -350,9 +515,8 @@ export async function validateTongueImage(imageBase64: string): Promise<{ valid:
     const data = await response.json();
     const content = data?.data?.content || '';
     
-    // 检测错误关键词
-    const errorKeywords = ['非舌象', '不是舌象', '请重新上传', 'INVALID_IMAGE'];
-    for (const keyword of errorKeywords) {
+    // 使用统一的错误关键词检测
+    for (const keyword of ERROR_KEYWORDS) {
       if (content.includes(keyword)) {
         return { valid: false, message: '请上传舌象图片，图片中应清晰显示舌头表面特征。' };
       }
