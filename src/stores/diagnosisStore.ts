@@ -9,12 +9,12 @@ import type {
   Symptom
 } from '@/types';
 
-// 初始舌象特征 - 使用合法的联合类型值
+// 初始舌象特征 - 所有值初始化为空，强制用户主动选择
 const initialFeatures: InputFeatures = {
   tongueColor: { value: '' as const },
-  tongueShape: { value: '正常' as const },
-  tongueState: { value: '正常' as const },
-  coating: { color: '薄白' as const, texture: '薄' as const, moisture: '润' as const },
+  tongueShape: { value: '' as const },
+  tongueState: { value: '' as const },
+  coating: { color: '' as const, texture: '' as const, moisture: '' as const },
 };
 
 // 初始患者信息
