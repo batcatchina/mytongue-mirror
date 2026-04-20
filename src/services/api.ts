@@ -199,7 +199,15 @@ export async function submitDiagnosis(
   
   if (!answerContent) throw new Error('未获取到辨证结果');
 
-  // 检测错误响应（非舌象图片等）
+  // 检测文本中的错误提示（非舌象图片等）
+  const errorKeywords = ['非舌象', '请重新上传', 'INVALID_IMAGE', '不是舌象'];
+  for (const keyword of errorKeywords) {
+    if (answerContent.includes(keyword)) {
+      throw new Error('请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。');
+    }
+  }
+
+  // 检测JSON格式的错误响应
   try {
     const parsed = typeof answerContent === 'string' ? JSON.parse(answerContent) : answerContent;
     if (parsed.error) {
@@ -207,13 +215,8 @@ export async function submitDiagnosis(
     }
     return parsed;
   } catch (e) {
-    // 如果是错误类型，重新抛出
-    if (e instanceof Error && e.message.includes('上传')) {
+    if (e instanceof Error && (e.message.includes('上传') || e.message.includes('舌象'))) {
       throw e;
-    }
-    // 否则按Markdown解析
-    if (answerContent.includes('error') && answerContent.includes('INVALID_IMAGE')) {
-      throw new Error('请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。');
     }
     return parseMarkdownDiagnosis(answerContent);
   }
@@ -237,3 +240,46 @@ export async function getDiagnosisModes() {
 
 export async function healthCheck(): Promise<boolean> { return !!BOT_ID && !!API_TOKEN; }
 export function getApiConfig() { return { baseUrl: API_BASE_URL, botId: BOT_ID.slice(0,8)+'...', hasToken: !!API_TOKEN }; }
+
+// 验证图片是否为舌象
+export async function validateTongueImage(imageBase64: string): Promise<{ valid: boolean; message?: string }> {
+  const requestPayload = {
+    bot_id: BOT_ID,
+    user_id: generateUserId(),
+    stream: false,
+    additional_messages: [{
+      role: 'user',
+      content: '请验证这张图片是否为舌象图片。如果是舌象，返回 {"valid": true}；如果不是舌象（如花草、风景、人脸等），返回 {"valid": false, "message": "请上传舌象图片"}。',
+      content_type: 'text'
+    }, {
+      role: 'user',
+      content: imageBase64,
+      content_type: 'image'
+    }]
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/v3/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_TOKEN}`,
+      },
+      body: JSON.stringify(requestPayload),
+    });
+
+    if (!response.ok) return { valid: true }; // 验证失败时默认允许通过
+
+    const data = await response.json();
+    const content = data?.data?.content || '';
+    
+    // 解析验证结果
+    if (content.includes('"valid": false') || content.includes('不是舌象')) {
+      return { valid: false, message: '请上传舌象图片，图片中应清晰显示舌头表面特征。' };
+    }
+    
+    return { valid: true };
+  } catch {
+    return { valid: true }; // 验证失败时默认允许通过
+  }
+}
