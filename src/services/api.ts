@@ -199,9 +199,22 @@ export async function submitDiagnosis(
   
   if (!answerContent) throw new Error('未获取到辨证结果');
 
+  // 检测错误响应（非舌象图片等）
   try {
-    return typeof answerContent === 'string' ? JSON.parse(answerContent) : answerContent;
-  } catch {
+    const parsed = typeof answerContent === 'string' ? JSON.parse(answerContent) : answerContent;
+    if (parsed.error) {
+      throw new Error(parsed.message || '输入验证失败，请重新上传舌象图片');
+    }
+    return parsed;
+  } catch (e) {
+    // 如果是错误类型，重新抛出
+    if (e instanceof Error && e.message.includes('上传')) {
+      throw e;
+    }
+    // 否则按Markdown解析
+    if (answerContent.includes('error') && answerContent.includes('INVALID_IMAGE')) {
+      throw new Error('请上传舌象图片，图片中应清晰显示舌头表面特征（舌苔、舌色等）。');
+    }
     return parseMarkdownDiagnosis(answerContent);
   }
 }
