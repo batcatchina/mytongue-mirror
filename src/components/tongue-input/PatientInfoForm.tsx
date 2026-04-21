@@ -16,16 +16,21 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
       <h3 className="tcm-section-title">患者信息</h3>
       
       <div className="grid grid-cols-2 gap-4">
-        {/* 姓名 */}
+        {/* 年龄 */}
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1.5">姓名</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1.5">
+            年龄 <span className="text-red-500">*</span>
+          </label>
           <input
-            type="text"
+            type="number"
+            min="0"
+            max="150"
             value={patientInfo.age || ''}
             onChange={(e) => onChange({ age: parseInt(e.target.value) || 0 })}
-            placeholder="年龄"
+            placeholder="请输入年龄"
             className="tcm-input"
           />
+          <p className="mt-1 text-xs text-stone-400">年龄是辨证的关键要素</p>
         </div>
         
         {/* 性别 */}
