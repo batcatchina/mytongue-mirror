@@ -233,8 +233,14 @@ function generateUserId(): string {
 // 错误检测工具函数
 // ============================================
 function detectErrorInContent(content: string): string | null {
-  // 首先检查是否是有效的辨证结果（包含关键诊断字段）
-  // 如果是有效的辨证结果，直接返回null（不认为是错误）
+  // 【最高优先级】检查INVALID_IMAGE标记
+  // Bot返回INVALID_IMAGE时，无论后续内容如何，都必须报错
+  if (content.includes('INVALID_IMAGE')) {
+    console.log('[错误检测] 检测到INVALID_IMAGE标记，拒绝辨证');
+    return '当前图片不是舌象照片，无法进行辨证分析。请删除当前图片或上传清晰的舌象照片。';
+  }
+  
+  // 检查是否是有效的辨证结果（包含关键诊断字段）
   const successIndicators = [
     '主要证型',
     '病机分析',
@@ -250,7 +256,7 @@ function detectErrorInContent(content: string): string | null {
     return null;
   }
   
-  // 检查ERROR_PATTERNS（完整短语匹配）
+  // 检查ERROR_PATTERNS
   for (const pattern of ERROR_PATTERNS) {
     if (content.includes(pattern)) {
       console.log(`[错误检测] 检测到错误模式: ${pattern}`);
@@ -258,7 +264,7 @@ function detectErrorInContent(content: string): string | null {
     }
   }
   
-  // 检查ERROR_KEYWORDS（关键词匹配）
+  // 检查ERROR_KEYWORDS
   for (const keyword of ERROR_KEYWORDS) {
     if (content.includes(keyword)) {
       console.log(`[错误检测] 检测到错误关键词: ${keyword}`);
@@ -438,8 +444,13 @@ export async function submitDiagnosis(
     if (done) break;
     result += decoder.decode(value, { stream: true });
     
+    // 【最高优先级】检测INVALID_IMAGE标记
+    if (result.includes('INVALID_IMAGE')) {
+      console.log('[流式错误检测] 检测到INVALID_IMAGE标记，拒绝辨证');
+      throw new Error('当前图片不是舌象照片，无法进行辨证分析。请删除当前图片或上传清晰的舌象照片。');
+    }
+    
     // 检测错误关键词（只在真正的错误模式下抛出）
-    // 如果已经检测到有效的辨证结果，跳过错误检测
     const successIndicators = ['主要证型', '病机分析', '针灸方案', '主穴', '配穴'];
     const hasSuccessIndicator = successIndicators.some(indicator => result.includes(indicator));
     
