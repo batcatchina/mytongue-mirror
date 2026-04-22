@@ -233,30 +233,34 @@ function generateUserId(): string {
 // 错误检测工具函数
 // ============================================
 function detectErrorInContent(content: string): string | null {
+  console.log('[detectErrorInContent] 开始检测，内容长度:', content.length);
+  console.log('[detectErrorInContent] 内容前100字符:', content.substring(0, 100));
+  
   // 检查是否是有效的辨证结果
   const successIndicators = ['主要证型', '病机分析', '针灸方案', '主穴', '配穴'];
   const hasSuccessIndicator = successIndicators.some(indicator => content.includes(indicator));
   
   // 如果已有辨证结果，不报错
   if (hasSuccessIndicator) {
-    console.log('[错误检测] 检测到有效的辨证结果');
+    console.log('[detectErrorInContent] 检测到有效的辨证结果，跳过错误检测');
     return null;
   }
   
   // 检查INVALID_IMAGE标记（Bot明确拒绝非舌象图片）
   if (content.includes('INVALID_IMAGE')) {
-    console.log('[错误检测] 检测到INVALID_IMAGE标记');
+    console.log('[detectErrorInContent] ✅ 检测到INVALID_IMAGE标记！');
     return '当前图片不是舌象照片，无法进行辨证分析。请上传舌象图片或删除图片后手动输入舌象特征。';
   }
   
   // 检查其他错误模式
   for (const pattern of ERROR_PATTERNS) {
     if (content.includes(pattern)) {
-      console.log(`[错误检测] 检测到错误模式: ${pattern}`);
+      console.log(`[detectErrorInContent] 检测到错误模式: ${pattern}`);
       return '图片识别失败，请确保上传的是清晰的舌象照片。';
     }
   }
   
+  console.log('[detectErrorInContent] 未检测到错误');
   return null;
 }
 
@@ -414,6 +418,7 @@ export async function submitDiagnosis(
   let result = '';
   const decoder = new TextDecoder();
   let messageCount = 0;
+  let earlyErrorDetected = false;
   
   // 设置超时（90秒，考虑到图片处理可能需要更长时间）
   const TIMEOUT = 90000;
@@ -429,26 +434,14 @@ export async function submitDiagnosis(
     if (done) break;
     result += decoder.decode(value, { stream: true });
     
-    // 检测是否已有有效辨证结果
-    const successIndicators = ['主要证型', '病机分析', '针灸方案', '主穴', '配穴'];
-    const hasSuccessIndicator = successIndicators.some(indicator => result.includes(indicator));
-    
-    // 如果已有辨证结果，跳过错误检测
-    if (hasSuccessIndicator) {
-      // 继续处理
-    } else {
-      // 检查INVALID_IMAGE标记
-      if (result.includes('INVALID_IMAGE')) {
+    // 尝试解析SSE数据流中的错误标记
+    // 因为INVALID_IMAGE在JSON中可能被编码，需要解析后检测
+    const lines = result.split('\n');
+    for (const line of lines) {
+      if (line.includes('"content"') && line.includes('INVALID_IMAGE')) {
         console.log('[流式错误检测] 检测到INVALID_IMAGE标记');
-        throw new Error('当前图片不是舌象照片，无法进行辨证分析。请上传舌象图片或删除图片后手动输入舌象特征。');
-      }
-      
-      // 检查其他错误模式
-      for (const pattern of ERROR_PATTERNS) {
-        if (result.includes(pattern)) {
-          console.log(`[流式错误检测] 检测到错误模式: ${pattern}`);
-          throw new Error('图片识别失败，请确保上传的是清晰的舌象照片。');
-        }
+        earlyErrorDetected = true;
+        break;
       }
     }
     
@@ -504,6 +497,8 @@ export async function submitDiagnosis(
         // conversation.message.completed事件可能有完整content
         if (currentEvent === 'conversation.message.completed' && data.type === 'answer' && data.content) {
           answerContent = data.content;
+          console.log('[API] 获取到完整answer内容，长度:', answerContent.length);
+          console.log('[API] answer内容前200字符:', answerContent.substring(0, 200));
         }
       } catch (parseError) {
         // 忽略解析错误，继续处理其他行
@@ -529,7 +524,14 @@ export async function submitDiagnosis(
     throw getUserFriendlyError(errorEventData, 'API错误');
   }
 
+  // 优先检查流式过程中检测到的错误
+  if (earlyErrorDetected) {
+    console.log('[API] 流式检测到INVALID_IMAGE，抛出错误');
+    throw new Error('当前图片不是舌象照片，无法进行辨证分析。请上传舌象图片或删除图片后手动输入舌象特征。');
+  }
+
   if (!answerContent) {
+    console.log('[API] 未获取到answer内容');
     // 如果没有answer内容但有chat失败数据，给出友好提示
     if (chatFailedData) {
       throw new Error('服务处理失败，图片可能不符合要求，请尝试更换舌象图片或移除图片后重试');
@@ -538,8 +540,10 @@ export async function submitDiagnosis(
   }
 
   // 检测文本中的错误提示（非舌象图片等）
+  console.log('[API] 开始检测answerContent中的错误...');
   const contentError = detectErrorInContent(answerContent);
   if (contentError) {
+    console.log('[API] detectErrorInContent返回错误:', contentError);
     throw new Error(contentError);
   }
 
