@@ -61,6 +61,7 @@ export interface InputFeatures {
   coating: TongueCoating;
   tongueSurface?: TongueSurface;
   ecchymosis?: Ecchymosis;
+  distributionFeatures?: { part: string; feature: string; degree: string }[]; // 区域诊断
 }
 
 // 伴随症状类型

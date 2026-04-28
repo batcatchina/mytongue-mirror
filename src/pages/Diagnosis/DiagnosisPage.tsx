@@ -7,6 +7,7 @@ import {
   TongueShapeSelector,
   TongueCoatingSelector,
   TongueStateSelector,
+  TongueColorDistribution,
 } from '@/components/tongue-input/TongueFeatureSelectors';
 import ImageUpload from '@/components/tongue-input/ImageUpload';
 import SymptomInput from '@/components/tongue-input/SymptomInput';
@@ -34,6 +35,7 @@ const DiagnosisPage: React.FC = () => {
     setTongueShape,
     setTongueState,
     setCoating,
+    setDistributionFeatures,
     addSymptom,
     removeSymptom,
     updateSymptom,
@@ -210,10 +212,19 @@ const DiagnosisPage: React.FC = () => {
               <div className="tcm-divider" />
               
               {/* 舌态选择 */}
-              <div>
+              <div className="mb-6">
                 <TongueStateSelector
                   value={inputFeatures.tongueState.value}
                   onChange={setTongueState}
+                />
+              </div>
+              
+              <div className="tcm-divider" />
+              
+              {/* 区域诊断 - 舌色分布特征（核心功能） */}
+              <div>
+                <TongueColorDistribution
+                  onChange={setDistributionFeatures}
                 />
               </div>
             </div>

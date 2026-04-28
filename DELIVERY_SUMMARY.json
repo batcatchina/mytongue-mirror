@@ -1,0 +1,82 @@
+{
+  "对接完成": true,
+  "生成时间": "2026-04-27",
+  "文件清单": {
+    "核心接口": [
+      {
+        "path": "./tongue-mirror-frontend/src/services/zhenghe.ts",
+        "description": "正和API客户端封装，包含账户查询、服务订单、推荐关系、资金池等接口"
+      },
+      {
+        "path": "./tongue-mirror-frontend/src/services/diagnosisCredit.ts",
+        "description": "舌诊服务消费模块，管理诊断流程中的积分消费"
+      }
+    ],
+    "Hooks": [
+      {
+        "path": "./tongue-mirror-frontend/src/hooks/useCredits.ts",
+        "description": "积分管理React Hook，提供余额查询、余额检查、订单创建等功能"
+      }
+    ],
+    "集成组件": [
+      {
+        "path": "./tongue-mirror-frontend/src/components/credits/CreditsIntegration.tsx",
+        "description": "积分模块集成示例，包含余额显示、费用预览、订单状态等组件"
+      }
+    ],
+    "测试用例": [
+      {
+        "path": "./tongue-mirror-frontend/src/__tests__/zhenghe.test.ts",
+        "description": "对接测试用例，覆盖10个测试场景"
+      }
+    ],
+    "配置文件": [
+      {
+        "path": "./tongue-mirror-frontend/.env.example",
+        "description": "环境变量示例文件"
+      }
+    ],
+    "文档": [
+      {
+        "path": "./tongue-mirror-frontend/INTEGRATION_GUIDE.md",
+        "description": "完整对接指南"
+      }
+    ]
+  },
+  "对接功能": {
+    "已实现": [
+      "✅ 正和API客户端封装（签名、请求、错误处理）",
+      "✅ 账户余额查询与自动刷新",
+      "✅ 资金池价格查询",
+      "✅ 服务订单创建/查询/取消",
+      "✅ 推荐关系绑定",
+      "✅ 积分消费流程管理",
+      "✅ 积分计算工具（销毁积分、消费奖励）",
+      "✅ React Hook封装",
+      "✅ 对接测试用例",
+      "✅ 环境变量配置模板"
+    ],
+    "待配置": [
+      "⚠️ 需要配置 VITE_ZHENGHE_AGENT_ID（舌镜Agent ID）",
+      "⚠️ 需要配置测试账户的 API Key/Secret",
+      "⚠️ 需要在正和系统注册舌镜Agent"
+    ]
+  },
+  "使用方式": {
+    "快速集成": {
+      "step1": "复制 .env.example 为 .env.local 并配置",
+      "step2": "使用 zhengheClient.configure() 初始化",
+      "step3": "使用 useCredits() Hook 获取积分状态"
+    },
+    "诊断流程集成": {
+      "step1": "调用 checkAndCreateOrder() 创建服务订单",
+      "step2": "执行舌诊分析",
+      "step3": "诊断完成后自动确认"
+    }
+  },
+  "注意事项": [
+    "签名实现为简化版本，生产环境需使用Web Crypto API",
+    "API Secret 仅在Agent注册时返回一次，请妥善保存",
+    "运行测试前需配置 .env.local 中的测试参数"
+  ]
+}
