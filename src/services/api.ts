@@ -337,7 +337,7 @@ export async function submitDiagnosis(
   input: DiagnosisInput, 
   onProgress?: (step: DiagnosisProgressStep) => void
 ): Promise<DiagnosisOutput> {
-  // 构建消息内容
+  // 构建消息内容 - 包含凹凸形态
   const textContent = JSON.stringify({
     tongue_color: input.input_features.tongueColor.value,
     tongue_shape: input.input_features.tongueShape.value,
@@ -347,6 +347,8 @@ export async function submitDiagnosis(
     crack: input.input_features.crack?.value === '是',
     teeth_mark: input.input_features.teethMark?.value === '是',
     spots: input.input_features.ecchymosis?.value === '是',
+    shape_distribution: input.input_features.shapeDistribution || { depression: [], bulge: [] },  // 凹凸形态
+    distribution_features: input.input_features.distributionFeatures || [],  // 舌色分布特征
     patient_age: input.patientInfo?.age,
     patient_gender: input.patientInfo?.gender,
     chief_complaint: input.patientInfo?.chiefComplaint,
