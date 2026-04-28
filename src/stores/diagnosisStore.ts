@@ -16,6 +16,7 @@ const initialFeatures: InputFeatures = {
   tongueState: { value: '' as const },
   coating: { color: '' as const, texture: '' as const, moisture: '' as const },
   distributionFeatures: [], // 舌色分布特征（区域诊断）
+  shapeDistribution: { depression: [], bulge: [] }, // 凹凸形态
 };
 
 // 初始患者信息
@@ -65,6 +66,7 @@ interface DiagnosisState {
   setTongueSurface: (value: '是' | '否', degree?: string) => void;
   setEcchymosis: (value: '是' | '否', part?: string, size?: string, count?: string) => void;
   setDistributionFeatures: (features: { part: string; feature: string; degree: string }[]) => void; // 区域诊断
+  setShapeDistribution: (value: { depression: string[]; bulge: string[] }) => void; // 凹凸形态
   
   addSymptom: (symptom: Symptom) => void;
   removeSymptom: (index: number) => void;
@@ -189,6 +191,15 @@ export const useDiagnosisStore = create<DiagnosisState>()(
           inputFeatures: {
             ...state.inputFeatures,
             distributionFeatures: features,
+          },
+        })),
+      
+      // 凹凸形态
+      setShapeDistribution: (value) =>
+        set((state) => ({
+          inputFeatures: {
+            ...state.inputFeatures,
+            shapeDistribution: value,
           },
         })),
       

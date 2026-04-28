@@ -164,15 +164,50 @@ export const TongueCoatingSelector: React.FC<TongueCoatingSelectorProps> = ({
   );
 };
 
-// 舌态选择器
+// 舌体凹凸形态类型
+export interface TongueShapeValue {
+  depression: string[]; // 凹陷区域
+  bulge: string[];      // 鼓胀区域
+}
+
 interface TongueStateSelectorProps {
   value: string;
   onChange: (value: string, degree?: string) => void;
+  shapeValue?: TongueShapeValue;
+  onShapeChange?: (value: TongueShapeValue) => void;
 }
 
-export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({ value, onChange }) => {
+const SHAPE_PARTS = [
+  { key: 'tip', label: '舌尖' },
+  { key: 'middle', label: '舌中' },
+  { key: 'sides', label: '舌边' },
+  { key: 'root', label: '舌根' },
+];
+
+export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({ 
+  value, 
+  onChange,
+  shapeValue = { depression: [], bulge: [] },
+  onShapeChange 
+}) => {
+  // 切换凹陷
+  const toggleDepression = (part: string) => {
+    const newDepression = shapeValue.depression.includes(part)
+      ? shapeValue.depression.filter(p => p !== part)
+      : [...shapeValue.depression, part];
+    onShapeChange?.({ ...shapeValue, depression: newDepression });
+  };
+
+  // 切换鼓胀
+  const toggleBulge = (part: string) => {
+    const newBulge = shapeValue.bulge.includes(part)
+      ? shapeValue.bulge.filter(p => p !== part)
+      : [...shapeValue.bulge, part];
+    onShapeChange?.({ ...shapeValue, bulge: newBulge });
+  };
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <label className="block text-sm font-medium text-stone-700">舌态</label>
       <div className="flex flex-wrap gap-2">
         {TONGUE_STATES.map((state) => (
@@ -191,8 +226,9 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({ value,
           </button>
         ))}
       </div>
-      {/* 瘀斑 */}
-      <div className="flex gap-4 mt-2">
+      
+      {/* 瘀斑、水滑 */}
+      <div className="flex gap-4">
         <label className="flex items-center gap-2 text-sm text-stone-600">
           <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
           瘀斑
@@ -201,6 +237,79 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({ value,
           <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
           水滑
         </label>
+      </div>
+
+      {/* 凹凸形态 */}
+      <div className="space-y-3 pt-2 border-t border-stone-100">
+        <span className="text-sm text-stone-600">舌体凹凸</span>
+        
+        {/* 凹陷 */}
+        <div className="space-y-1.5">
+          <span className="text-xs text-stone-500">凹陷</span>
+          <div className="flex flex-wrap gap-1.5">
+            {SHAPE_PARTS.map(({ key, label }) => (
+              <button
+                key={`depression-${key}`}
+                type="button"
+                onClick={() => toggleDepression(key)}
+                className={clsx(
+                  'px-2.5 py-1 rounded-full text-xs transition-all',
+                  shapeValue.depression.includes(key)
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                )}
+              >
+                {label}凹陷
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => onShapeChange?.({ ...shapeValue, depression: [] })}
+              className={clsx(
+                'px-2.5 py-1 rounded-full text-xs transition-all',
+                shapeValue.depression.length === 0
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              )}
+            >
+              正常
+            </button>
+          </div>
+        </div>
+
+        {/* 鼓胀 */}
+        <div className="space-y-1.5">
+          <span className="text-xs text-stone-500">鼓胀</span>
+          <div className="flex flex-wrap gap-1.5">
+            {SHAPE_PARTS.map(({ key, label }) => (
+              <button
+                key={`bulge-${key}`}
+                type="button"
+                onClick={() => toggleBulge(key)}
+                className={clsx(
+                  'px-2.5 py-1 rounded-full text-xs transition-all',
+                  shapeValue.bulge.includes(key)
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                )}
+              >
+                {label}鼓胀
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => onShapeChange?.({ ...shapeValue, bulge: [] })}
+              className={clsx(
+                'px-2.5 py-1 rounded-full text-xs transition-all',
+                shapeValue.bulge.length === 0
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              )}
+            >
+              正常
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

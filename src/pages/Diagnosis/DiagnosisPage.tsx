@@ -36,6 +36,7 @@ const DiagnosisPage: React.FC = () => {
     setTongueState,
     setCoating,
     setDistributionFeatures,
+    setShapeDistribution,
     addSymptom,
     removeSymptom,
     updateSymptom,
@@ -216,6 +217,8 @@ const DiagnosisPage: React.FC = () => {
                 <TongueStateSelector
                   value={inputFeatures.tongueState.value}
                   onChange={setTongueState}
+                  shapeValue={inputFeatures.shapeDistribution}
+                  onShapeChange={setShapeDistribution}
                 />
               </div>
               

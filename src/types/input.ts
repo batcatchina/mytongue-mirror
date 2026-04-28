@@ -52,6 +52,12 @@ export interface Ecchymosis {
   count?: '单个' | '2-3个' | '多个' | '散在';
 }
 
+// 舌体凹凸形态
+export interface TongueShapeDistribution {
+  depression: string[];  // 凹陷区域：['tip', 'middle', 'sides', 'root']
+  bulge: string[];       // 鼓胀区域
+}
+
 export interface InputFeatures {
   tongueColor: TongueColor;
   tongueShape: TongueShape;
@@ -62,6 +68,7 @@ export interface InputFeatures {
   tongueSurface?: TongueSurface;
   ecchymosis?: Ecchymosis;
   distributionFeatures?: { part: string; feature: string; degree: string }[]; // 区域诊断
+  shapeDistribution?: TongueShapeDistribution; // 凹凸形态
 }
 
 // 伴随症状类型
