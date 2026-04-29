@@ -476,15 +476,65 @@ const DiagnosisPage: React.FC = () => {
               </div>
             </div>
             
-            {/* 舌象特征 - 默认折叠，辨证后自动展开 */}
-            <details className="tcm-card" open={!!diagnosisResult}>
-              <summary className="p-4 cursor-pointer text-base font-medium text-stone-700 hover:text-stone-800 flex items-center gap-2">
-                <span>👅</span> 舌象特征
-                {isAIRecognized && (
-                  <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">AI已识别</span>
+            {/* 🔍 识别结果 - 用户关注点1：我舌头怎么了 */}
+            <div className="tcm-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-base font-medium text-stone-700 flex items-center gap-2">
+                  <span>🔍</span> 识别结果
+                  {isAIRecognized && (
+                    <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">AI</span>
+                  )}
+                </h2>
+                <button 
+                  onClick={() => {
+                    const el = document.getElementById('feature-edit');
+                    if (el) el.classList.toggle('hidden');
+                  }}
+                  className="text-xs text-stone-400 hover:text-stone-600"
+                >
+                  修改
+                </button>
+              </div>
+
+              {/* 识别结果一览 - 彩色标签 */}
+              <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+                {inputFeatures.tongueColor.value ? (
+                  <span className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
+                    {inputFeatures.tongueColor.value}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
+                  </span>
+                ) : (
+                  <span className="text-xs text-stone-400">未识别</span>
                 )}
-              </summary>
-              <div className="px-4 pb-4">
+                {inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">
+                    {inputFeatures.tongueShape.value}
+                  </span>
+                )}
+                {inputFeatures.coating.color && (
+                  <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded-full border border-green-200">
+                    {inputFeatures.coating.color}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
+                  </span>
+                )}
+                {inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">
+                    {inputFeatures.coating.moisture}
+                  </span>
+                )}
+                {inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-purple-50 text-purple-600 rounded-full border border-purple-200">
+                    {inputFeatures.tongueState.value}
+                  </span>
+                )}
+                {inputFeatures.teethMark?.value === '是' && (
+                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">齿痕</span>
+                )}
+                {inputFeatures.crack?.value === '是' && (
+                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">裂纹</span>
+                )}
+              </div>
+
+              {/* 识别详情编辑 - 默认隐藏，点"修改"才出现 */}
+              <div id="feature-edit" className="hidden mt-3 pt-3 border-t border-stone-200 space-y-1">
 
               {/* 当前特征一览 - 彩色标签一行看完 */}
               <div className="flex flex-wrap gap-1.5 mb-3">
@@ -581,7 +631,7 @@ const DiagnosisPage: React.FC = () => {
                 <div className="mt-2"><TongueColorDistribution onChange={setDistributionFeatures} /></div>
               </details>
               </div>
-            </details>
+            </div>
 
 
             {/* 伴随症状 - 可折叠 */}
@@ -675,7 +725,7 @@ const DiagnosisPage: React.FC = () => {
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
             {diagnosisResult ? (
               <div className="space-y-3">
-                {/* 分析结果 - 核心结论 */}
+                {/* 📋 辨证结果 - 用户关注点2：怎么了+怎么办 */}
                 <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
                 
                 {/* 针灸+调护 横排并排 */}
