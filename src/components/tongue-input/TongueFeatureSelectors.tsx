@@ -25,23 +25,26 @@ interface TongueColorSelectorProps {
 
 export const TongueColorSelector: React.FC<TongueColorSelectorProps> = ({ value, onChange }) => {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <label className="block text-sm font-medium text-stone-700">舌色</label>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {tongueColorOptions.map((option) => (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value, 0.9)}
             className={clsx(
-              'flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200',
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200',
               value === option.value
-                ? `${option.border} ${option.color} ring-2 ring-primary-300`
+                ? 'border-primary-400 bg-primary-50 shadow-sm'
                 : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50'
             )}
           >
-            <span className={clsx('w-8 h-8 rounded-full', option.color)} />
-            <span className="mt-1 text-sm font-medium text-stone-700">{option.text}</span>
+            <span className={clsx('w-3 h-3 rounded-full shrink-0', option.color)} />
+            <span className={clsx(
+              'text-xs font-medium',
+              value === option.value ? 'text-primary-700' : 'text-stone-600'
+            )}>{option.text}</span>
           </button>
         ))}
       </div>
