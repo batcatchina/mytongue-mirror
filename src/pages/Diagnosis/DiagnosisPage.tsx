@@ -113,21 +113,13 @@ const DiagnosisPage: React.FC = () => {
 
       // 舌色映射
       const colorVal = mapToEnum(result.tongue_color?.value || '', ['淡红', '淡白', '红', '绛', '紫', '青紫']);
-      if (colorVal) {
-        console.log('[AI识别] 舌色:', result.tongue_color?.value, '→', colorVal);
-        setTongueColor(colorVal);
-      } else {
-        console.warn('[AI识别] 舌色映射失败:', result.tongue_color?.value);
-      }
+      console.log('[AI识别] 舌色映射结果:', result.tongue_color?.value, '→', colorVal, '是否有效:', !!colorVal);
+      setTongueColor(colorVal || '淡红');
 
       // 舌形映射
       const shapeVal = mapToEnum(result.tongue_shape?.value || '', ['胖大', '瘦薄', '正常']);
-      if (shapeVal) {
-        console.log('[AI识别] 舌形:', result.tongue_shape?.value, '→', shapeVal);
-        setTongueShape(shapeVal);
-      } else {
-        console.warn('[AI识别] 舌形映射失败:', result.tongue_shape?.value);
-      }
+      console.log('[AI识别] 舌形映射结果:', result.tongue_shape?.value, '→', shapeVal, '是否有效:', !!shapeVal);
+      setTongueShape(shapeVal || '正常');
 
       // 齿痕回填
       if (result.tongue_shape?.teeth_mark?.has) {
@@ -151,20 +143,13 @@ const DiagnosisPage: React.FC = () => {
       const coatColor = mapToEnum(result.tongue_coating?.color || '', ['薄白', '白厚', '黄', '灰黑', '剥落']);
       const coatTexture = mapToEnum(result.tongue_coating?.texture || '', ['薄', '厚', '正常']);
       const coatMoisture = mapToEnum(result.tongue_coating?.moisture || '', ['润', '燥', '正常']);
-      console.log('[AI识别] 苔色:', result.tongue_coating?.color, '→', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
-      // 即使coatColor为空也要回填苔质和润燥
+      console.log('[AI识别] 苔色映射:', result.tongue_coating?.color, '→', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
       setCoating(coatColor || '薄白', coatTexture || '薄', coatMoisture || '润');
-      if (!coatColor) console.warn('[AI识别] 苔色映射失败:', result.tongue_coating?.color);
 
       // 舌态映射（"正常"也必须回填，否则提交验证不通过）
       const stateVal = mapToEnum(result.tongue_state?.value || '', ['强硬', '痿软', '歪斜', '颤动', '正常']);
-      if (stateVal) {
-        console.log('[AI识别] 舌态:', result.tongue_state?.value, '→', stateVal);
-        setTongueState(stateVal);
-      } else {
-        console.warn('[AI识别] 舌态映射失败，默认设为正常:', result.tongue_state?.value);
-        setTongueState('正常');
-      }
+      console.log('[AI识别] 舌态映射结果:', result.tongue_state?.value, '→', stateVal, '是否有效:', !!stateVal);
+      setTongueState(stateVal || '正常');
 
       toast.success('AI识别完成，已自动填入舌象特征');
     } catch (error) {
