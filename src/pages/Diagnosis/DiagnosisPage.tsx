@@ -327,17 +327,16 @@ const DiagnosisPage: React.FC = () => {
         setCurrentStep('matching', 50);
         
         console.log('[辨证] 即将调用handleLocalDiagnosis...');
-        const localResult = await handleLocalDiagnosis();
-        console.log('[辨证] handleLocalDiagnosis返回成功:', localResult?.diagnosisResult?.syndrome);
+        const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = await handleLocalDiagnosis();
+        console.log('[辨证] handleLocalDiagnosis返回成功:', diagResult?.syndrome);
         
         setCurrentStep('matching', 95);
-        // 直接调用setDiagnosisResult，不使用类型断言
         setDiagnosisResult({ 
           diagnosisResult: diagResult, 
           acupuncturePlan, 
           lifeCareAdvice 
         } as any);
-        toast.success(`辨证完成！匹配规则：${diagResult.matchedRule}`);
+        toast.success(`辨证完成！匹配规则：${diagResult?.matchedRule || '未知'}`);
       } else {
         // 使用原有Bot API辨证
         const input = getDiagnosisInput();
