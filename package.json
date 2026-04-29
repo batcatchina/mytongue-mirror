@@ -1,6 +1,6 @@
 {
   "name": "tongue-mirror-frontend",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "description": "舌诊辅助系统前端界面",
   "private": true,
   "type": "module",
