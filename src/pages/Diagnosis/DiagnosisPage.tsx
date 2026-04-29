@@ -634,48 +634,25 @@ const DiagnosisPage: React.FC = () => {
             </div>
 
 
-            {/* 伴随症状 - 可折叠 */}
-            <div className="tcm-card p-4">
-              <details className="group">
-                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
-                  <span>伴随症状（选填）</span>
-                  <div className="flex items-center gap-2">
-                    {symptoms.length > 0 && (
-                      <span className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{symptoms.length}项</span>
-                    )}
-                    <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </summary>
-                <div className="mt-3">
-                  <SymptomInput
-                    symptoms={symptoms}
-                    onAdd={addSymptom}
-                    onRemove={removeSymptom}
-                    onUpdate={updateSymptom}
-                  />
+            {/* 补充信息 - 合并折叠 */}
+            <details className="tcm-card group">
+              <summary className="p-4 flex items-center justify-between cursor-pointer text-sm text-stone-500 hover:text-stone-700">
+                <span>补充信息（选填）</span>
+                <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="px-4 pb-4 space-y-4">
+                <div>
+                  <span className="text-xs text-stone-500 block mb-2">患者信息</span>
+                  <PatientInfoForm patientInfo={patientInfo} onChange={setPatientInfo} />
                 </div>
-              </details>
-            </div>
-
-            {/* 患者信息 - 可折叠 */}
-            <div className="tcm-card p-4">
-              <details className="group">
-                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
-                  <span>患者信息（选填）</span>
-                  <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </summary>
-                <div className="mt-3">
-                  <PatientInfoForm
-                    patientInfo={patientInfo}
-                    onChange={setPatientInfo}
-                  />
+                <div className="border-t border-stone-100 pt-3">
+                  <span className="text-xs text-stone-500 block mb-2">伴随症状 {symptoms.length > 0 && <span className="text-stone-400">({symptoms.length}项)</span>}</span>
+                  <SymptomInput symptoms={symptoms} onAdd={addSymptom} onRemove={removeSymptom} onUpdate={updateSymptom} />
                 </div>
-              </details>
-            </div>
+              </div>
+            </details>
 
             {/* 提交按钮 - 大而醒目 */}
             <button
