@@ -447,17 +447,29 @@ export async function submitDiagnosis(
       }
     }
     
-    // 每收到一条消息触发一次进度更新
+    // 基于SSE事件类型更新真实进度
     messageCount++;
-    if (onProgress && messageCount > 0) {
-      if (messageCount <= 2) {
+    if (onProgress) {
+      const chunkStr = decoder.decode(value, { stream: true });
+      const chunkLines = chunkStr.split('\n');
+      for (const cl of chunkLines) {
+        if (cl.startsWith('event:')) {
+          const evt = cl.slice(6).trim();
+          if (evt === 'conversation.message.delta') {
+            // AI正在输出内容 - 分析阶段
+            onProgress('analyzing');
+          } else if (evt === 'conversation.message.completed') {
+            // 消息完成 - 推理阶段
+            onProgress('reasoning');
+          } else if (evt === 'conversation.chat.completed') {
+            // 对话完成 - 匹配阶段
+            onProgress('matching');
+          }
+        }
+      }
+      // 首次收到数据说明已连接
+      if (messageCount === 1) {
         onProgress('recognizing');
-      } else if (messageCount <= 4) {
-        onProgress('analyzing');
-      } else if (messageCount <= 6) {
-        onProgress('reasoning');
-      } else {
-        onProgress('matching');
       }
     }
   }

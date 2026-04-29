@@ -64,39 +64,62 @@ const DiagnosisPage: React.FC = () => {
   const isInServiceTime = isServiceTime();
 
 
+  // 前端侧值映射（兜底，确保Bot返回的值能匹配前端枚举）
+  const mapToEnum = (raw: string, validValues: string[]): string => {
+    if (!raw) return '';
+    const trimmed = raw.trim();
+    // 精确匹配
+    if (validValues.includes(trimmed)) return trimmed;
+    // 包含匹配（如"淡红色"包含"淡红"）
+    for (const v of validValues) {
+      if (trimmed.includes(v) || v.includes(trimmed)) return v;
+    }
+    // 模糊匹配：去掉"色""苔"等后缀再试
+    const cleaned = trimmed.replace(/[色苔舌体面]/g, '');
+    for (const v of validValues) {
+      if (cleaned.includes(v) || v.includes(cleaned)) return v;
+    }
+    console.warn('[AI映射] 无法匹配:', trimmed, '有效值:', validValues);
+    return '';
+  };
+
   // AI识别结果回填
   const handleRecognize = (result: TongueRecognitionResult) => {
     try {
       console.log('[AI识别] 原始结果:', JSON.stringify(result, null, 2));
-      // 舌色
-      const colorVal = result.tongue_color?.value;
-      console.log('[AI识别] 舌色:', colorVal);
+
+      // 舌色映射
+      const colorVal = mapToEnum(result.tongue_color?.value || '', ['淡红', '淡白', '红', '绛', '紫', '青紫']);
       if (colorVal) {
+        console.log('[AI识别] 舌色:', result.tongue_color?.value, '→', colorVal);
         setTongueColor(colorVal);
       }
-      // 舌形
-      const shapeVal = result.tongue_shape?.value;
-      console.log('[AI识别] 舌形:', shapeVal);
+
+      // 舌形映射
+      const shapeVal = mapToEnum(result.tongue_shape?.value || '', ['胖大', '瘦薄', '正常']);
       if (shapeVal) {
+        console.log('[AI识别] 舌形:', result.tongue_shape?.value, '→', shapeVal);
         setTongueShape(shapeVal);
       }
+
       // 齿痕
       if (result.tongue_shape?.teeth_mark?.has) {
         console.log('[AI识别] 齿痕: true');
-        setTongueState('齿痕');
       }
-      // 舌苔
-      const coatColor = result.tongue_coating?.color;
-      const coatTexture = result.tongue_coating?.texture || '';
-      const coatMoisture = result.tongue_coating?.moisture || '';
-      console.log('[AI识别] 苔色:', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
+
+      // 舌苔映射
+      const coatColor = mapToEnum(result.tongue_coating?.color || '', ['薄白', '白厚', '黄', '灰黑', '剥落']);
+      const coatTexture = mapToEnum(result.tongue_coating?.texture || '', ['薄', '厚', '正常']);
+      const coatMoisture = mapToEnum(result.tongue_coating?.moisture || '', ['润', '燥', '正常']);
       if (coatColor) {
-        setCoating(coatColor, coatTexture, coatMoisture);
+        console.log('[AI识别] 苔色:', result.tongue_coating?.color, '→', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
+        setCoating(coatColor, coatTexture || '', coatMoisture || '');
       }
-      // 舌态
-      const stateVal = result.tongue_state?.value;
-      console.log('[AI识别] 舌态:', stateVal);
+
+      // 舌态映射
+      const stateVal = mapToEnum(result.tongue_state?.value || '', ['强硬', '痿软', '歪斜', '颤动', '正常']);
       if (stateVal && stateVal !== '正常') {
+        console.log('[AI识别] 舌态:', result.tongue_state?.value, '→', stateVal);
         setTongueState(stateVal);
       }
 
@@ -147,16 +170,16 @@ const DiagnosisPage: React.FC = () => {
       const result = await submitDiagnosis(input, (step) => {
         switch (step) {
           case 'recognizing':
-            setCurrentStep('recognizing', 40);
+            setCurrentStep('recognizing', 25);
             break;
           case 'analyzing':
-            setCurrentStep('analyzing', 55);
+            setCurrentStep('analyzing', 50);
             break;
           case 'reasoning':
-            setCurrentStep('reasoning', 70);
+            setCurrentStep('reasoning', 75);
             break;
           case 'matching':
-            setCurrentStep('matching', 85);
+            setCurrentStep('matching', 90);
             break;
         }
       });
@@ -187,7 +210,7 @@ const DiagnosisPage: React.FC = () => {
   // 清空输入
   const handleReset = () => {
     resetInput();
-    setCompressionStatus(null);
+
     toast.success('已清空所有输入');
   };
 
