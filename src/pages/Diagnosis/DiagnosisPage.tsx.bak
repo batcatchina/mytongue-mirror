@@ -18,16 +18,10 @@ import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import { submitDiagnosis } from '@/services/api';
 import { TongueRecognitionResult } from '@/services/tongueAI';
-import { 
-  diagnose as localDiagnose, 
-  DiagnosisInput,
-  getRuleStatistics,
-} from '@/services/diagnosisEngine';
 
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
-  const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
   
   const {
     inputFeatures,
@@ -135,133 +129,6 @@ const DiagnosisPage: React.FC = () => {
     }
   };
 
-  /**
-   * 本地规则引擎辨证（核心功能）
-   * 100%基于主人辨证规则树，不依赖AI猜测
-   */
-  const handleLocalDiagnosis = async (): Promise<{
-    diagnosisResult: any;
-    acupuncturePlan: any;
-    lifeCareAdvice: any;
-  }> => {
-    console.log('[本地规则引擎] 开始辨证...');
-    
-    // 检查齿痕和裂纹
-    const shapeDist = inputFeatures.shapeDistribution;
-    const hasTeethMark = shapeDist?.depression?.includes('齿痕') || 
-                          shapeDist?.bulge?.includes('齿痕') || false;
-    const hasCrack = shapeDist?.depression?.includes('裂纹') || 
-                     shapeDist?.bulge?.includes('裂纹') || false;
-    
-    // 构建输入
-    const input: DiagnosisInput = {
-      tongueColor: inputFeatures.tongueColor.value,
-      tongueShape: inputFeatures.tongueShape.value,
-      tongueState: inputFeatures.tongueState.value,
-      coatingColor: inputFeatures.coating.color,
-      coatingTexture: inputFeatures.coating.texture || '正常',
-      coatingMoisture: inputFeatures.coating.moisture || '正常',
-      teethMark: hasTeethMark,
-      crack: hasCrack,
-      regionFeatures: inputFeatures.distributionFeatures?.map(item => ({
-        region: item.part,
-        color: item.feature,
-      })),
-    };
-    
-    // 调用本地规则引擎
-    const result = localDiagnose(input, true);
-    
-    // 打印规则统计
-    const stats = getRuleStatistics();
-    console.log(`[本地规则引擎] 规则统计: 共${stats.totalRules}条规则`);
-    console.log(`[本地规则引擎] 主要结果: ${result.primaryResult.syndrome}`);
-    console.log(`[本地规则引擎] 匹配规则: ${result.primaryResult.matchedRuleName}`);
-    
-    // 构建诊断结果格式（兼容现有系统）
-    const diagnosisResultOut = {
-      syndrome: result.primaryResult.syndrome,
-      pathogenesis: result.primaryResult.pathogenesis,
-      treatment: result.primaryResult.treatment,
-      mainPoints: result.primaryResult.mainPoints,
-      secondaryPoints: result.primaryResult.secondaryPoints,
-      organLocation: result.primaryResult.organLocation,
-      confidence: result.primaryResult.confidence,
-      matchedRule: result.primaryResult.matchedRuleName,
-      priority: result.primaryResult.priority,
-      alternativeDiagnoses: result.alternativeResults.map((r: any) => ({
-        syndrome: r.syndrome,
-        pathogenesis: r.pathogenesis,
-        confidence: r.confidence,
-      })),
-      clinicalNotes: result.clinicalNotes,
-      isLocalRuleBased: true,
-    };
-    
-    // 构建针灸方案
-    const acupuncturePlan = {
-      mainPoints: result.acupointSelection.mainPoints,
-      secondaryPoints: result.acupointSelection.secondaryPoints,
-      huiPoint: result.acupointSelection.huiPoint,
-      xiPoint: result.acupointSelection.xiPoint,
-      method: result.acupointSelection.method.technique,
-      needleRetention: `${result.acupointSelection.method.needleRetention}分钟`,
-      moxibustion: result.acupointSelection.method.moxibustion,
-      frequency: result.acupointSelection.method.frequency,
-      course: result.acupointSelection.method.course,
-      notes: result.acupointSelection.method.notes,
-    };
-    
-    // 构建生活调护建议
-    const lifeCareAdvice = generateLifeCareAdvice(result);
-    
-    return { diagnosisResult: diagnosisResultOut, acupuncturePlan, lifeCareAdvice };
-  };
-  
-  /**
-   * 根据辨证结果生成生活调护建议
-   */
-  const generateLifeCareAdvice = (result: any): any => {
-    const advice: string[] = [];
-    const syndrome = result.primaryResult.syndrome;
-    
-    // 饮食建议
-    if (syndrome.includes('阴虚') || syndrome.includes('热')) {
-      advice.push('宜食滋阴清热食物，如银耳、百合、梨、绿豆等');
-      advice.push('忌食辛辣刺激、温热燥性食物');
-    } else if (syndrome.includes('阳虚') || syndrome.includes('寒')) {
-      advice.push('宜食温阳散寒食物，如羊肉、桂圆、生姜等');
-      advice.push('忌食生冷寒凉食物');
-    } else if (syndrome.includes('湿') || syndrome.includes('痰')) {
-      advice.push('宜食健脾祛湿食物，如薏米、赤小豆、冬瓜等');
-      advice.push('忌食甜腻厚味食物');
-    } else if (syndrome.includes('气血两虚')) {
-      advice.push('宜食补益气血食物，如红枣、枸杞、山药等');
-      advice.push('忌食生冷油腻食物');
-    } else {
-      advice.push('饮食清淡，规律进餐');
-      advice.push('避免暴饮暴食');
-    }
-    
-    // 情志建议
-    if (syndrome.includes('肝')) {
-      advice.push('保持心情舒畅，避免情绪抑郁');
-      advice.push('适度运动，如散步、太极拳');
-    } else {
-      advice.push('保持规律作息，避免过度劳累');
-    }
-    
-    // 起居建议
-    advice.push('保证充足睡眠，规律作息');
-    advice.push('适度锻炼，增强体质');
-    
-    return {
-      dietAdvice: advice.filter((_, i) => i < 3).join('；'),
-      lifestyleAdvice: advice.filter((_, i) => i >= 3).join('；'),
-      precautions: result.clinicalNotes || [],
-    };
-  };
-
   // 提交辨证
   const handleSubmit = async () => {
     // 检查服务时间
@@ -297,49 +164,29 @@ const DiagnosisPage: React.FC = () => {
     setCurrentStep('validating', 10);
 
     try {
+      const input = getDiagnosisInput();
       setCurrentStep('recognizing', 25);
       
-      if (useLocalEngine) {
-        // 使用本地规则引擎辨证
-        console.log('[辨证] 使用本地规则引擎');
-        setCurrentStep('matching', 50);
-        
-        const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = await handleLocalDiagnosis();
-        
-        setCurrentStep('matching', 95);
-        // 直接调用setDiagnosisResult，不使用类型断言
-        setDiagnosisResult({ 
-          diagnosisResult: diagResult, 
-          acupuncturePlan, 
-          lifeCareAdvice 
-        } as any);
-        toast.success(`辨证完成！匹配规则：${diagResult.matchedRule}`);
-      } else {
-        // 使用原有Bot API辨证
-        const input = getDiagnosisInput();
-        setCurrentStep('analyzing', 35);
-        
-        const result = await submitDiagnosis(input, (step) => {
-          switch (step) {
-            case 'recognizing':
-              setCurrentStep('recognizing', 25);
-              break;
-            case 'analyzing':
-              setCurrentStep('analyzing', 50);
-              break;
-            case 'reasoning':
-              setCurrentStep('reasoning', 75);
-              break;
-            case 'matching':
-              setCurrentStep('matching', 90);
-              break;
-          }
-        });
-        
-        setCurrentStep('matching', 95);
-        setDiagnosisResult(result);
-        toast.success('辨证分析完成！');
-      }
+      const result = await submitDiagnosis(input, (step) => {
+        switch (step) {
+          case 'recognizing':
+            setCurrentStep('recognizing', 25);
+            break;
+          case 'analyzing':
+            setCurrentStep('analyzing', 50);
+            break;
+          case 'reasoning':
+            setCurrentStep('reasoning', 75);
+            break;
+          case 'matching':
+            setCurrentStep('matching', 90);
+            break;
+        }
+      });
+      
+      setCurrentStep('matching', 95);
+      setDiagnosisResult(result);
+      toast.success('辨证分析完成！');
     } catch (error) {
       const message = error instanceof Error ? error.message : '辨证分析失败';
       setError(message);
@@ -363,6 +210,7 @@ const DiagnosisPage: React.FC = () => {
   // 清空输入
   const handleReset = () => {
     resetInput();
+
     toast.success('已清空所有输入');
   };
 
@@ -379,50 +227,12 @@ const DiagnosisPage: React.FC = () => {
             <div className="tcm-card p-5">
               <h2 className="tcm-section-title">舌象特征输入</h2>
               
-              {/* 辨证引擎选择 */}
-              <div className="mb-4 p-3 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-lg border border-primary-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🎯</span>
-                    <span className="text-sm font-medium text-stone-700">辨证引擎</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setUseLocalEngine(true)}
-                      className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
-                        useLocalEngine
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
-                      }`}
-                    >
-                      本地规则引擎 ✓
-                    </button>
-                    <button
-                      onClick={() => setUseLocalEngine(false)}
-                      className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
-                        !useLocalEngine
-                          ? 'bg-secondary-500 text-white'
-                          : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
-                      }`}
-                    >
-                      AI Bot推理
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-stone-500">
-                  {useLocalEngine 
-                    ? '✅ 基于主人辨证规则树的精确匹配，100%临床规则，不依赖AI猜测'
-                    : '🤖 使用AI Bot进行推理，可作为补充参考'
-                  }
-                </p>
-              </div>
-              
               {/* 图片上传 */}
               <div className="mb-6">
                 <ImageUpload 
                   onChange={(imageData) => setImageData(imageData)} 
                   onRecognize={handleRecognize}
-                />
+                  />
               </div>
               
               <div className="tcm-divider" />
@@ -703,3 +513,4 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ label, step, currentStep 
 };
 
 export default DiagnosisPage;
+
