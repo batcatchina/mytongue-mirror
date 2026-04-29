@@ -165,11 +165,11 @@ const DiagnosisPage: React.FC = () => {
    * 本地规则引擎辨证（核心功能）
    * 100%基于主人辨证规则树，不依赖AI猜测
    */
-  const handleLocalDiagnosis = async (): Promise<{
+  const handleLocalDiagnosis = (): {
     diagnosisResult: any;
     acupuncturePlan: any;
     lifeCareAdvice: any;
-  }> => {
+  } => {
     console.log('[本地规则引擎] 开始辨证...');
     
     // 检查齿痕和裂纹
@@ -345,31 +345,16 @@ const DiagnosisPage: React.FC = () => {
     setIsAnalyzing(true);
     setError(null);
     setDiagnosisResult(null);
-    setCurrentStep('validating', 10);
-    console.log('[辨证提交] isAnalyzing已设为true，进度10%');
-    console.log('[辨证提交] 开始，输入:', JSON.stringify({
-      tongueColor: inputFeatures.tongueColor.value,
-      tongueShape: inputFeatures.tongueShape.value,
-      tongueState: inputFeatures.tongueState.value,
-      coatingColor: inputFeatures.coating.color,
-      coatingTexture: inputFeatures.coating.texture,
-      coatingMoisture: inputFeatures.coating.moisture,
-      useLocalEngine,
-    }));
+    console.log('[辨证提交] isAnalyzing=true, 开始处理');
 
     try {
-      setCurrentStep('recognizing', 25);
-      
       if (useLocalEngine) {
-        // 使用本地规则引擎辨证
-        console.log('[辨证] 使用本地规则引擎');
-        setCurrentStep('matching', 50);
+        // 本地规则引擎：同步执行，不需要分步进度
+        console.log('[辨证] 使用本地规则引擎（同步）');
         
-        console.log('[辨证] 即将调用handleLocalDiagnosis...');
-        const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = await handleLocalDiagnosis();
-        console.log('[辨证] handleLocalDiagnosis返回成功:', diagResult?.primarySyndrome);
+        const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
+        console.log('[辨证] 返回成功:', diagResult?.primarySyndrome);
         
-        setCurrentStep('matching', 95);
         setDiagnosisResult({ 
           diagnosisResult: diagResult, 
           acupuncturePlan, 
