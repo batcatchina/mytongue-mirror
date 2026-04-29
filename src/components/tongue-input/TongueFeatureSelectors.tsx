@@ -8,6 +8,16 @@ import {
   MOISTURE_LEVELS
 } from '@/types';
 
+interface AIIdentifyBadgeProps {
+  className?: string;
+}
+
+const AIIdentifyBadge: React.FC<AIIdentifyBadgeProps> = ({ className = '' }) => (
+  <span className={clsx('text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium', className)}>
+    AI
+  </span>
+);
+
 // 舌色选项
 const tongueColorOptions = [
   { value: '淡红', color: 'bg-red-100', border: 'border-red-300', text: '淡红' },
@@ -21,12 +31,16 @@ const tongueColorOptions = [
 interface TongueColorSelectorProps {
   value: string;
   onChange: (value: string, confidence?: number) => void;
+  isAI?: boolean; // 是否由AI识别
 }
 
-export const TongueColorSelector: React.FC<TongueColorSelectorProps> = ({ value, onChange }) => {
+export const TongueColorSelector: React.FC<TongueColorSelectorProps> = ({ value, onChange, isAI }) => {
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-stone-700">舌色</label>
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-stone-700">舌色</label>
+        {isAI && value && <AIIdentifyBadge />}
+      </div>
       <div className="flex flex-wrap gap-1.5">
         {tongueColorOptions.map((option) => (
           <button
@@ -56,12 +70,16 @@ export const TongueColorSelector: React.FC<TongueColorSelectorProps> = ({ value,
 interface TongueShapeSelectorProps {
   value: string;
   onChange: (value: string, confidence?: number) => void;
+  isAI?: boolean;
 }
 
-export const TongueShapeSelector: React.FC<TongueShapeSelectorProps> = ({ value, onChange }) => {
+export const TongueShapeSelector: React.FC<TongueShapeSelectorProps> = ({ value, onChange, isAI }) => {
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-stone-700">舌形</label>
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-stone-700">舌形</label>
+        {isAI && value && <AIIdentifyBadge />}
+      </div>
       <div className="flex flex-wrap gap-2">
         {TONGUE_SHAPES.map((shape) => (
           <button
@@ -79,17 +97,26 @@ export const TongueShapeSelector: React.FC<TongueShapeSelectorProps> = ({ value,
           </button>
         ))}
       </div>
-      {/* 齿痕和裂纹 */}
-      <div className="flex gap-4 mt-3">
-        <label className="flex items-center gap-2 text-sm text-stone-600">
-          <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
-          齿痕
-        </label>
-        <label className="flex items-center gap-2 text-sm text-stone-600">
-          <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
-          裂纹
-        </label>
-      </div>
+      {/* 齿痕和裂纹 - 默认折叠 */}
+      <details className="group">
+        <summary className="flex items-center gap-2 text-xs text-stone-500 cursor-pointer hover:text-stone-700">
+          <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <span>齿痕 / 裂纹</span>
+          {isAI && <AIIdentifyBadge className="ml-auto" />}
+        </summary>
+        <div className="flex gap-4 mt-2 pl-4">
+          <label className="flex items-center gap-2 text-sm text-stone-600">
+            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            齿痕
+          </label>
+          <label className="flex items-center gap-2 text-sm text-stone-600">
+            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            裂纹
+          </label>
+        </div>
+      </details>
     </div>
   );
 };
@@ -102,6 +129,7 @@ interface TongueCoatingSelectorProps {
   onColorChange: (color: string) => void;
   onTextureChange: (texture: string) => void;
   onMoistureChange: (moisture: string) => void;
+  isAI?: boolean;
 }
 
 export const TongueCoatingSelector: React.FC<TongueCoatingSelectorProps> = ({
@@ -111,11 +139,15 @@ export const TongueCoatingSelector: React.FC<TongueCoatingSelectorProps> = ({
   onColorChange,
   onTextureChange,
   onMoistureChange,
+  isAI,
 }) => {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-stone-700 mb-2">苔色</label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-stone-700">苔色</label>
+          {isAI && color && <AIIdentifyBadge />}
+        </div>
         <div className="flex flex-wrap gap-2">
           {COATING_COLORS.map((c) => (
             <button
@@ -137,11 +169,14 @@ export const TongueCoatingSelector: React.FC<TongueCoatingSelectorProps> = ({
       
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-2">苔质</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-stone-700">苔质</label>
+            {isAI && texture && <AIIdentifyBadge className="text-xs" />}
+          </div>
           <select
             value={texture}
             onChange={(e) => onTextureChange(e.target.value)}
-            className="tcm-select"
+            className="tcm-select text-sm"
           >
             <option value="">请选择</option>
             {COATING_TEXTURES.map((t) => (
@@ -150,11 +185,14 @@ export const TongueCoatingSelector: React.FC<TongueCoatingSelectorProps> = ({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-2">润燥</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-stone-700">润燥</label>
+            {isAI && moisture && <AIIdentifyBadge className="text-xs" />}
+          </div>
           <select
             value={moisture}
             onChange={(e) => onMoistureChange(e.target.value)}
-            className="tcm-select"
+            className="tcm-select text-sm"
           >
             <option value="">请选择</option>
             {MOISTURE_LEVELS.map((m) => (
@@ -178,6 +216,7 @@ interface TongueStateSelectorProps {
   onChange: (value: string, degree?: string) => void;
   shapeValue?: TongueShapeValue;
   onShapeChange?: (value: TongueShapeValue) => void;
+  isAI?: boolean;
 }
 
 const SHAPE_PARTS = [
@@ -191,7 +230,8 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({
   value, 
   onChange,
   shapeValue = { depression: [], bulge: [] },
-  onShapeChange 
+  onShapeChange,
+  isAI,
 }) => {
   // 切换凹陷
   const toggleDepression = (part: string) => {
@@ -211,7 +251,10 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({
 
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium text-stone-700">舌态</label>
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-stone-700">舌态</label>
+        {isAI && value && <AIIdentifyBadge />}
+      </div>
       <div className="flex flex-wrap gap-2">
         {TONGUE_STATES.map((state) => (
           <button
@@ -230,90 +273,106 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({
         ))}
       </div>
       
-      {/* 瘀斑、水滑 */}
-      <div className="flex gap-4">
-        <label className="flex items-center gap-2 text-sm text-stone-600">
-          <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
-          瘀斑
-        </label>
-        <label className="flex items-center gap-2 text-sm text-stone-600">
-          <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
-          水滑
-        </label>
-      </div>
+      {/* 瘀斑、水滑 - 折叠 */}
+      <details className="group">
+        <summary className="flex items-center gap-2 text-xs text-stone-500 cursor-pointer hover:text-stone-700">
+          <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <span>瘀斑 / 水滑</span>
+        </summary>
+        <div className="flex gap-4 mt-2 pl-4">
+          <label className="flex items-center gap-2 text-sm text-stone-600">
+            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            瘀斑
+          </label>
+          <label className="flex items-center gap-2 text-sm text-stone-600">
+            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            水滑
+          </label>
+        </div>
+      </details>
 
-      {/* 凹凸形态 */}
-      <div className="space-y-3 pt-2 border-t border-stone-100">
-        <span className="text-sm text-stone-600">舌体凹凸</span>
+      {/* 凹凸形态 - 折叠 */}
+      <details className="group">
+        <summary className="flex items-center gap-2 text-xs text-stone-500 cursor-pointer hover:text-stone-700">
+          <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <span>舌体凹凸</span>
+          {isAI && <AIIdentifyBadge className="ml-auto" />}
+        </summary>
         
-        {/* 凹陷 */}
-        <div className="space-y-1.5">
-          <span className="text-xs text-stone-500">凹陷</span>
-          <div className="flex flex-wrap gap-1.5">
-            {SHAPE_PARTS.map(({ key, label }) => (
+        <div className="space-y-3 pt-2 pl-4">
+          {/* 凹陷 */}
+          <div className="space-y-1.5">
+            <span className="text-xs text-stone-500">凹陷</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SHAPE_PARTS.map(({ key, label }) => (
+                <button
+                  key={`depression-${key}`}
+                  type="button"
+                  onClick={() => toggleDepression(key)}
+                  className={clsx(
+                    'px-2.5 py-1 rounded-full text-xs transition-all',
+                    shapeValue.depression.includes(key)
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  )}
+                >
+                  {label}凹陷
+                </button>
+              ))}
               <button
-                key={`depression-${key}`}
                 type="button"
-                onClick={() => toggleDepression(key)}
+                onClick={() => onShapeChange?.({ ...shapeValue, depression: [] })}
                 className={clsx(
                   'px-2.5 py-1 rounded-full text-xs transition-all',
-                  shapeValue.depression.includes(key)
-                    ? 'bg-blue-500 text-white'
+                  shapeValue.depression.length === 0
+                    ? 'bg-green-100 text-green-700'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                 )}
               >
-                {label}凹陷
+                正常
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => onShapeChange?.({ ...shapeValue, depression: [] })}
-              className={clsx(
-                'px-2.5 py-1 rounded-full text-xs transition-all',
-                shapeValue.depression.length === 0
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-              )}
-            >
-              正常
-            </button>
+            </div>
           </div>
-        </div>
 
-        {/* 鼓胀 */}
-        <div className="space-y-1.5">
-          <span className="text-xs text-stone-500">鼓胀</span>
-          <div className="flex flex-wrap gap-1.5">
-            {SHAPE_PARTS.map(({ key, label }) => (
+          {/* 鼓胀 */}
+          <div className="space-y-1.5">
+            <span className="text-xs text-stone-500">鼓胀</span>
+            <div className="flex flex-wrap gap-1.5">
+              {SHAPE_PARTS.map(({ key, label }) => (
+                <button
+                  key={`bulge-${key}`}
+                  type="button"
+                  onClick={() => toggleBulge(key)}
+                  className={clsx(
+                    'px-2.5 py-1 rounded-full text-xs transition-all',
+                    shapeValue.bulge.includes(key)
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  )}
+                >
+                  {label}鼓胀
+                </button>
+              ))}
               <button
-                key={`bulge-${key}`}
                 type="button"
-                onClick={() => toggleBulge(key)}
+                onClick={() => onShapeChange?.({ ...shapeValue, bulge: [] })}
                 className={clsx(
                   'px-2.5 py-1 rounded-full text-xs transition-all',
-                  shapeValue.bulge.includes(key)
-                    ? 'bg-orange-500 text-white'
+                  shapeValue.bulge.length === 0
+                    ? 'bg-green-100 text-green-700'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                 )}
               >
-                {label}鼓胀
+                正常
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => onShapeChange?.({ ...shapeValue, bulge: [] })}
-              className={clsx(
-                'px-2.5 py-1 rounded-full text-xs transition-all',
-                shapeValue.bulge.length === 0
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-              )}
-            >
-              正常
-            </button>
+            </div>
           </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 };

@@ -26,11 +26,15 @@ import {
 
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
-  // 版本标记 - 方便确认线上部署版本
-  console.log('[舌镜] 版本: v1.2.7');
+  // 版本标记 - v1.3.0 UI优化版
+  console.log('[舌镜] 版本: v1.3.0');
 
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
   const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
+  const [showEngineSwitch, setShowEngineSwitch] = useState(false); // 引擎切换默认折叠
+  
+  // AI识别状态 - 用于判断是否已通过AI识别填入数据
+  const [isAIRecognized, setIsAIRecognized] = useState(false);
   
   const {
     inputFeatures,
@@ -38,8 +42,6 @@ const DiagnosisPage: React.FC = () => {
     patientInfo,
     diagnosisResult,
     isAnalyzing,
-    currentStep,
-    stepProgress,
     setTongueColor,
     setTongueShape,
     setTongueState,
@@ -62,11 +64,6 @@ const DiagnosisPage: React.FC = () => {
     getDiagnosisInput,
     saveCase,
   } = useDiagnosisStore();
-
-
-  // 本地规则引擎已上线，取消服务时间限制
-  const isInServiceTime = true;
-
 
   // 前端侧值映射（关键词包含匹配 + 语义映射，Bot返回值千变万化）
   const mapToEnum = (raw: string, validValues: string[]): string => {
@@ -161,7 +158,9 @@ const DiagnosisPage: React.FC = () => {
       setTongueState(stateVal || '正常');
     } catch (e) { console.error('[AI识别] 舌态回填异常:', e); }
 
-    toast.success('AI识别完成，已自动填入舌象特征');
+    // 标记AI已识别
+    setIsAIRecognized(true);
+    toast.success('AI识别完成，已自动填入舌象特征 ✓');
   };
 
   /**
@@ -310,24 +309,41 @@ const DiagnosisPage: React.FC = () => {
     };
   };
 
-  // 提交辨证
+  // 提交辨证 - 简化必填验证
   const handleSubmit = async () => {
-    // 验证必填项
-    if (!inputFeatures.tongueColor.value) {
-      toast.error('请选择舌色'); return;
+    // ========== 简化必填验证 ==========
+    // 有AI识别数据时：只要求舌色+苔色（其他已有默认值或AI填入）
+    // 无AI识别数据时：只要求舌色+苔色
+    
+    const hasTongueColor = !!inputFeatures.tongueColor.value;
+    const hasCoatingColor = !!inputFeatures.coating.color;
+    
+    // 舌色必填
+    if (!hasTongueColor) {
+      toast.error('请选择舌色');
+      return;
     }
+    
+    // 苔色必填
+    if (!hasCoatingColor) {
+      toast.error('请选择苔色');
+      return;
+    }
+    
+    // 其他字段使用默认值（无值时自动填充）
     if (!inputFeatures.tongueShape.value) {
-      toast.error('请选择舌形'); return;
+      setTongueShape('正常');
     }
     if (!inputFeatures.tongueState.value) {
-      toast.error('请选择舌态'); return;
+      setTongueState('正常');
     }
-    if (!inputFeatures.coating.color) {
-      toast.error('请选择苔色'); return;
+    if (!inputFeatures.coating.texture) {
+      setCoating(inputFeatures.coating.color, '薄', '润');
     }
-    if (!patientInfo.chiefComplaint) {
-      toast.error('请填写主诉'); return;
+    if (!inputFeatures.coating.moisture) {
+      setCoating(inputFeatures.coating.color, inputFeatures.coating.texture || '薄', '润');
     }
+    // 主诉改为选填，不阻断流程
 
     setIsAnalyzing(true);
     setError(null);
@@ -360,7 +376,6 @@ const DiagnosisPage: React.FC = () => {
     try {
       // ========== 路径B：远程Bot API（异步，需要进度指示） ==========
       {
-        // ========== 路径B：远程Bot API（异步，需要进度指示） ==========
         const input = getDiagnosisInput();
         setCurrentStep('analyzing', 35);
         
@@ -401,6 +416,7 @@ const DiagnosisPage: React.FC = () => {
   // 清空输入
   const handleReset = () => {
     resetInput();
+    setIsAIRecognized(false);
     toast.success('已清空所有输入');
   };
 
@@ -410,63 +426,73 @@ const DiagnosisPage: React.FC = () => {
       <NavBar currentPath="/" onNavigate={(path) => navigate(path)} />
       
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 左侧：输入区域 */}
-          <div className="space-y-6">
-            {/* 舌象特征输入 */}
-            <div className="tcm-card p-5">
-              <h2 className="tcm-section-title">舌象特征输入</h2>
-              
-              {/* 辨证引擎选择 */}
-              <div className="mb-4 p-3 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-lg border border-primary-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🎯</span>
-                    <span className="text-sm font-medium text-stone-700">辨证引擎</span>
-                  </div>
-                  <div className="flex gap-2">
+        {/* ========== 移动端单列流布局 ========== */}
+        <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-4 lg:space-y-0">
+          
+          {/* ========== 左侧：输入区域 ========== */}
+          <div className="space-y-4">
+            {/* 核心入口：拍照/上传 - 最醒目 */}
+            <div className="tcm-card p-4 bg-gradient-to-br from-primary-50 to-secondary-50 border-2 border-primary-200">
+              <ImageUpload 
+                onChange={(imageData) => setImageData(imageData)} 
+                onRecognize={handleRecognize}
+              />
+              {/* 引擎切换按钮 - 折叠到设置入口 */}
+              <div className="mt-3 pt-3 border-t border-primary-100">
+                <button
+                  onClick={() => setShowEngineSwitch(!showEngineSwitch)}
+                  className="flex items-center gap-2 text-xs text-stone-500 hover:text-stone-700 transition-colors"
+                >
+                  <span className="text-sm">⚙️</span>
+                  <span>{showEngineSwitch ? '收起' : '切换辨证引擎'}</span>
+                  <svg className={`w-3 h-3 transition-transform ${showEngineSwitch ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showEngineSwitch && (
+                  <div className="mt-2 flex gap-2">
                     <button
                       onClick={() => setUseLocalEngine(true)}
-                      className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                      className={`flex-1 px-3 py-2 text-xs rounded-lg transition-colors ${
                         useLocalEngine
                           ? 'bg-primary-500 text-white'
-                          : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                       }`}
                     >
                       本地规则引擎 ✓
                     </button>
                     <button
                       onClick={() => setUseLocalEngine(false)}
-                      className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                      className={`flex-1 px-3 py-2 text-xs rounded-lg transition-colors ${
                         !useLocalEngine
                           ? 'bg-secondary-500 text-white'
-                          : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                       }`}
                     >
                       AI Bot推理
                     </button>
                   </div>
-                </div>
-                <p className="mt-2 text-xs text-stone-500">
-                  {useLocalEngine 
-                    ? '✅ 基于主人辨证规则树的精确匹配，100%临床规则，不依赖AI猜测'
-                    : '🤖 使用AI Bot进行推理，可作为补充参考'
-                  }
-                </p>
+                )}
               </div>
-              
-              {/* 图片上传 */}
-              <div className="mb-6">
-                <ImageUpload 
-                  onChange={(imageData) => setImageData(imageData)} 
-                  onRecognize={handleRecognize}
-                />
-              </div>
-              
-              <div className="tcm-divider" />
+            </div>
+            
+            {/* 舌象特征输入 - 紧凑布局 */}
+            <div className="tcm-card p-4 space-y-3">
+              <h2 className="text-base font-medium text-stone-700 flex items-center gap-2">
+                <span>👅</span> 舌象特征
+                {isAIRecognized && (
+                  <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">AI已识别</span>
+                )}
+              </h2>
               
               {/* 舌色选择 */}
-              <div className="mb-6">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-stone-600">舌色</span>
+                  {isAIRecognized && inputFeatures.tongueColor.value && (
+                    <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
+                  )}
+                </div>
                 <TongueColorSelector
                   value={inputFeatures.tongueColor.value}
                   onChange={setTongueColor}
@@ -475,19 +501,14 @@ const DiagnosisPage: React.FC = () => {
               
               <div className="tcm-divider" />
               
-              {/* 舌形选择 */}
-              <div className="mb-6">
-                <TongueShapeSelector
-                  value={inputFeatures.tongueShape.value}
-                  onChange={setTongueShape}
-                />
-              </div>
-              
-              <div className="tcm-divider" />
-              
               {/* 舌苔选择 */}
-              <div className="mb-6">
-                <h3 className="block text-sm font-medium text-stone-700 mb-3">舌苔</h3>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-stone-600">舌苔</span>
+                  {isAIRecognized && inputFeatures.coating.color && (
+                    <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
+                  )}
+                </div>
                 <TongueCoatingSelector
                   color={inputFeatures.coating.color}
                   texture={inputFeatures.coating.texture}
@@ -500,149 +521,195 @@ const DiagnosisPage: React.FC = () => {
               
               <div className="tcm-divider" />
               
-              {/* 舌态选择 */}
-              <div className="mb-6">
-                <TongueStateSelector
-                  value={inputFeatures.tongueState.value}
-                  onChange={setTongueState}
-                  shapeValue={inputFeatures.shapeDistribution}
-                  onShapeChange={setShapeDistribution}
-                />
-              </div>
+              {/* 舌形 - 可折叠 */}
+              <details className="group">
+                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                  <span>舌形</span>
+                  <div className="flex items-center gap-2">
+                    {inputFeatures.tongueShape.value && (
+                      <span className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{inputFeatures.tongueShape.value}</span>
+                    )}
+                    {isAIRecognized && inputFeatures.tongueShape.value && (
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
+                    )}
+                    <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </summary>
+                <div className="mt-3">
+                  <TongueShapeSelector
+                    value={inputFeatures.tongueShape.value}
+                    onChange={setTongueShape}
+                  />
+                </div>
+              </details>
               
               <div className="tcm-divider" />
               
-              {/* 区域诊断 - 舌色分布特征（核心功能） */}
-              <div>
-                <TongueColorDistribution
-                  onChange={setDistributionFeatures}
-                />
-              </div>
-            </div>
-
-            {/* 伴随症状 */}
-            <div className="tcm-card p-5">
-              <SymptomInput
-                symptoms={symptoms}
-                onAdd={addSymptom}
-                onRemove={removeSymptom}
-                onUpdate={updateSymptom}
-              />
-            </div>
-
-            {/* 患者信息 */}
-            <div className="tcm-card p-5">
-              <PatientInfoForm
-                patientInfo={patientInfo}
-                onChange={setPatientInfo}
-              />
-            </div>
-
-            {/* 操作按钮 */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleReset}
-                className="tcm-btn-secondary flex-1 flex items-center justify-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                清空
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isAnalyzing}
-                className="tcm-btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              {/* 舌态 - 可折叠 */}
+              <details className="group">
+                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                  <span>舌态</span>
+                  <div className="flex items-center gap-2">
+                    {inputFeatures.tongueState.value && (
+                      <span className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{inputFeatures.tongueState.value}</span>
+                    )}
+                    {isAIRecognized && inputFeatures.tongueState.value && (
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
+                    )}
+                    <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                    分析中...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    提交辨证
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* 进度显示：本地引擎显示简洁提示，Bot API显示详细进度 */}
-            {isAnalyzing && (
-              useLocalEngine ? (
-                /* 本地引擎：简洁等待提示 */
-                <div className="tcm-card p-4 bg-gradient-to-r from-primary-50 to-secondary-50 text-center">
-                  <div className="animate-spin w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto mb-2" />
-                  <p className="text-sm text-stone-600">规则引擎分析中...</p>
-                </div>
-              ) : (
-                /* Bot API：详细四步进度 */
-                <div className="tcm-card p-4 bg-gradient-to-r from-primary-50 to-secondary-50">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-stone-700">辨证分析进度</span>
-                      <span className="text-primary-600 font-medium">{stepProgress}%</span>
-                    </div>
-                    <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${stepProgress}%` }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-3">
-                      <StepIndicator label="识别舌象特征" step="recognizing" currentStep={currentStep} />
-                      <StepIndicator label="分析舌色舌苔" step="analyzing" currentStep={currentStep} />
-                      <StepIndicator label="辨证推理" step="reasoning" currentStep={currentStep} />
-                      <StepIndicator label="匹配针灸方案" step="matching" currentStep={currentStep} />
-                    </div>
                   </div>
+                </summary>
+                <div className="mt-3">
+                  <TongueStateSelector
+                    value={inputFeatures.tongueState.value}
+                    onChange={setTongueState}
+                    shapeValue={inputFeatures.shapeDistribution}
+                    onShapeChange={setShapeDistribution}
+                  />
                 </div>
-              )
+              </details>
+              
+              {/* 区域诊断 - 可折叠，默认隐藏 */}
+              <details className="group">
+                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                  <span>区域诊断</span>
+                  <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="mt-3">
+                  <TongueColorDistribution
+                    onChange={setDistributionFeatures}
+                  />
+                </div>
+              </details>
+            </div>
+
+            {/* 伴随症状 - 可折叠 */}
+            <div className="tcm-card p-4">
+              <details className="group">
+                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                  <span>伴随症状（选填）</span>
+                  <div className="flex items-center gap-2">
+                    {symptoms.length > 0 && (
+                      <span className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{symptoms.length}项</span>
+                    )}
+                    <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </summary>
+                <div className="mt-3">
+                  <SymptomInput
+                    symptoms={symptoms}
+                    onAdd={addSymptom}
+                    onRemove={removeSymptom}
+                    onUpdate={updateSymptom}
+                  />
+                </div>
+              </details>
+            </div>
+
+            {/* 患者信息 - 可折叠 */}
+            <div className="tcm-card p-4">
+              <details className="group">
+                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                  <span>患者信息（选填）</span>
+                  <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="mt-3">
+                  <PatientInfoForm
+                    patientInfo={patientInfo}
+                    onChange={setPatientInfo}
+                  />
+                </div>
+              </details>
+            </div>
+
+            {/* 提交按钮 - 大而醒目 */}
+            <button
+              onClick={handleSubmit}
+              disabled={isAnalyzing}
+              className="w-full py-4 rounded-xl text-base font-medium transition-all disabled:opacity-50 bg-gradient-to-r from-primary-500 to-secondary-500 text-white hover:from-primary-600 hover:to-secondary-600 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              {isAnalyzing ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  分析中...
+                </>
+              ) : (
+                <>
+                  <span className="text-xl">🔍</span>
+                  开始辨证分析
+                </>
+              )}
+            </button>
+
+            {/* 清空按钮 */}
+            <button
+              onClick={handleReset}
+              className="w-full py-2.5 rounded-xl text-sm text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+            >
+              清空重填
+            </button>
+
+            {/* 进度显示 - 极简 */}
+            {isAnalyzing && (
+              <div className="text-center py-3 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-xl">
+                <div className="animate-pulse flex items-center justify-center gap-2 text-sm text-stone-600">
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {useLocalEngine ? '规则引擎分析中...' : 'AI分析中...'}
+                </div>
+              </div>
             )}
           </div>
 
-          {/* 右侧：结果展示 */}
-          <div className="space-y-6">
-            {/* Tab切换 */}
-            <div className="tcm-card p-1">
-              <div className="flex">
-                <button
-                  onClick={() => setActiveTab('diagnosis')}
-                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === 'diagnosis'
-                      ? 'bg-primary-500 text-white'
-                      : 'text-stone-600 hover:bg-stone-100'
-                  }`}
-                >
-                  辨证结果
-                </button>
-                <button
-                  onClick={() => setActiveTab('acupuncture')}
-                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === 'acupuncture'
-                      ? 'bg-primary-500 text-white'
-                      : 'text-stone-600 hover:bg-stone-100'
-                  }`}
-                >
-                  针灸方案
-                </button>
-                <button
-                  onClick={() => setActiveTab('care')}
-                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === 'care'
-                      ? 'bg-primary-500 text-white'
-                      : 'text-stone-600 hover:bg-stone-100'
-                  }`}
-                >
-                  生活调护
-                </button>
-              </div>
+          {/* ========== 右侧：结果展示 ========== */}
+          <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            {/* Tab切换 - 更紧凑 */}
+            <div className="tcm-card p-1 flex">
+              <button
+                onClick={() => setActiveTab('diagnosis')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'diagnosis'
+                    ? 'bg-primary-500 text-white'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                辨证结果
+              </button>
+              <button
+                onClick={() => setActiveTab('acupuncture')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'acupuncture'
+                    ? 'bg-primary-500 text-white'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                针灸
+              </button>
+              <button
+                onClick={() => setActiveTab('care')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'care'
+                    ? 'bg-primary-500 text-white'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                调护
+              </button>
             </div>
 
             {/* 结果内容 */}
@@ -661,7 +728,7 @@ const DiagnosisPage: React.FC = () => {
                 {/* 保存按钮 */}
                 <button
                   onClick={handleSaveCase}
-                  className="w-full tcm-btn-secondary flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -670,61 +737,19 @@ const DiagnosisPage: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="tcm-card p-12 flex flex-col items-center justify-center text-center">
-                <div className="text-6xl mb-4">🔍</div>
-                <h3 className="text-lg font-medium text-stone-600 mb-2">
+              <div className="tcm-card p-8 flex flex-col items-center justify-center text-center">
+                <div className="text-5xl mb-3">🔍</div>
+                <h3 className="text-base font-medium text-stone-600 mb-1">
                   等待辨证分析
                 </h3>
-                <p className="text-sm text-stone-400">
-                  请填写左侧的舌象特征和症状信息，然后点击"提交辨证"开始分析
+                <p className="text-xs text-stone-400">
+                  拍照上传或填写舌象特征，点击开始辨证
                 </p>
               </div>
             )}
           </div>
         </div>
       </main>
-    </div>
-  );
-};
-
-// 分步进度指示器组件
-interface StepIndicatorProps {
-  label: string;
-  step: string;
-  currentStep: string;
-}
-
-const StepIndicator: React.FC<StepIndicatorProps> = ({ label, step, currentStep }) => {
-  const stepOrder = ['recognizing', 'analyzing', 'reasoning', 'matching'];
-  const currentIndex = stepOrder.indexOf(currentStep);
-  const stepIndex = stepOrder.indexOf(step);
-  
-  const isCompleted = stepIndex < currentIndex;
-  const isCurrent = stepIndex === currentIndex;
-  
-  return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
-      isCompleted 
-        ? 'bg-green-100 text-green-700' 
-        : isCurrent 
-          ? 'bg-primary-100 text-primary-700' 
-          : 'bg-stone-100 text-stone-400'
-    }`}>
-      {isCompleted ? (
-        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-      ) : isCurrent ? (
-        <svg className="w-4 h-4 flex-shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-      ) : (
-        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      )}
-      <span className="truncate">{label}</span>
     </div>
   );
 };
