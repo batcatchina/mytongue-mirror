@@ -4,6 +4,55 @@ const COZE_CONFIG = {
   token: 'pat_cT0kGwXPwioWz69z65sLufTqcr1PJNorzO4EJbymAfbMM7uWC2W2qDCvdEqiK1l6'
 };
 
+// 前端枚举值映射表
+const VALUE_MAP = {
+  tongue_color: {
+    '淡红': '淡红', '淡红色': '淡红', '粉红': '淡红', '粉红色': '淡红',
+    '淡白': '淡白', '淡白色': '淡白', '苍白': '淡白', '苍白色': '淡白',
+    '红': '红', '红色': '红', '鲜红': '红', '鲜红色': '红',
+    '绛': '绛', '绛红': '绛', '深红': '绛', '暗红': '绛', '绛红色': '绛',
+    '紫': '紫', '紫色': '紫', '紫暗': '紫',
+    '青紫': '青紫', '青紫色': '青紫', '青': '青紫',
+  },
+  tongue_shape: {
+    '胖大': '胖大', '胖': '胖大', '胖大舌': '胖大', '肿胀': '胖大',
+    '瘦薄': '瘦薄', '瘦': '瘦薄', '瘦薄舌': '瘦薄', '瘦小': '瘦薄',
+    '正常': '正常',
+  },
+  tongue_state: {
+    '强硬': '强硬', '强': '强硬',
+    '痿软': '痿软', '软': '痿软', '痿': '痿软',
+    '歪斜': '歪斜', '歪': '歪斜',
+    '颤动': '颤动', '颤': '颤动', '颤抖': '颤动',
+    '正常': '正常',
+  },
+  coating_color: {
+    '薄白': '薄白', '白': '薄白', '白色': '薄白', '白苔': '薄白',
+    '白厚': '白厚', '厚白': '白厚',
+    '黄': '黄', '黄色': '黄', '黄苔': '黄', '薄黄': '黄',
+    '灰黑': '灰黑', '灰': '灰黑', '黑': '灰黑', '灰黑苔': '灰黑',
+    '剥落': '剥落', '剥': '剥落', '无苔': '剥落', '镜面': '剥落',
+  },
+  coating_texture: {
+    '薄': '薄', '薄苔': '薄',
+    '厚': '厚', '厚苔': '厚',
+    '正常': '正常',
+  },
+  coating_moisture: {
+    '润': '润', '湿润': '润', '润泽': '润',
+    '燥': '燥', '干燥': '燥',
+    '正常': '正常',
+  }
+};
+
+function mapValue(category, rawValue) {
+  if (!rawValue || typeof rawValue !== 'string') return rawValue;
+  const trimmed = rawValue.trim();
+  const map = VALUE_MAP[category];
+  if (!map) return trimmed;
+  return map[trimmed] || trimmed;
+}
+
 function parseTongueResult(content) {
   try {
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -28,13 +77,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: '缺少参数' });
     }
 
-    // 查询对话状态
     const statusRes = await fetch(
       `https://api.coze.cn/v3/chat/retrieve?chat_id=${chat_id}&conversation_id=${conversation_id}`,
-      {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${COZE_CONFIG.token}` }
-      }
+      { method: 'GET', headers: { 'Authorization': `Bearer ${COZE_CONFIG.token}` } }
     );
     const statusData = await statusRes.json();
 
@@ -43,19 +88,13 @@ export default async function handler(req, res) {
     }
 
     const chatStatus = statusData.data.status;
-
-    // 还没完成
     if (chatStatus !== 'completed') {
       return res.json({ success: true, status: chatStatus });
     }
 
-    // 完成了，获取回答
     const msgRes = await fetch(
       `https://api.coze.cn/v3/chat/message/list?chat_id=${chat_id}&conversation_id=${conversation_id}`,
-      {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${COZE_CONFIG.token}` }
-      }
+      { method: 'GET', headers: { 'Authorization': `Bearer ${COZE_CONFIG.token}` } }
     );
     const msgData = await msgRes.json();
 
@@ -69,11 +108,27 @@ export default async function handler(req, res) {
     }
 
     const parsed = parseTongueResult(answer.content);
-    
-    // Bot返回了error字段（如非舌象图片）
+
+    // Bot返回了error（如非舌象图片）
     if (parsed.error) {
       const errMsg = parsed.message || (typeof parsed.error === 'string' ? parsed.error : '识别失败');
-      return res.json({ success: true, status: 'completed', error: errMsg, data: parsed });
+      return res.json({ success: true, status: 'completed', error: typeof errMsg === 'string' ? errMsg : '识别失败', data: parsed });
+    }
+
+    // 值映射：把Bot返回的值映射到前端枚举值
+    if (parsed.tongue_color?.value) {
+      parsed.tongue_color.value = mapValue('tongue_color', parsed.tongue_color.value);
+    }
+    if (parsed.tongue_shape?.value) {
+      parsed.tongue_shape.value = mapValue('tongue_shape', parsed.tongue_shape.value);
+    }
+    if (parsed.tongue_state?.value) {
+      parsed.tongue_state.value = mapValue('tongue_state', parsed.tongue_state.value);
+    }
+    if (parsed.tongue_coating) {
+      if (parsed.tongue_coating.color) parsed.tongue_coating.color = mapValue('coating_color', parsed.tongue_coating.color);
+      if (parsed.tongue_coating.texture) parsed.tongue_coating.texture = mapValue('coating_texture', parsed.tongue_coating.texture);
+      if (parsed.tongue_coating.moisture) parsed.tongue_coating.moisture = mapValue('coating_moisture', parsed.tongue_coating.moisture);
     }
 
     res.json({ success: true, status: 'completed', data: parsed });
