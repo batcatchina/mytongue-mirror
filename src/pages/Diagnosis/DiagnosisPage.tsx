@@ -67,25 +67,37 @@ const DiagnosisPage: React.FC = () => {
   // AI识别结果回填
   const handleRecognize = (result: TongueRecognitionResult) => {
     try {
+      console.log('[AI识别] 原始结果:', JSON.stringify(result, null, 2));
       // 舌色
-      if (result.tongue_color?.value) {
-        setTongueColor(result.tongue_color.value);
+      const colorVal = result.tongue_color?.value;
+      console.log('[AI识别] 舌色:', colorVal);
+      if (colorVal) {
+        setTongueColor(colorVal);
       }
       // 舌形
-      if (result.tongue_shape?.value) {
-        setTongueShape(result.tongue_shape.value);
+      const shapeVal = result.tongue_shape?.value;
+      console.log('[AI识别] 舌形:', shapeVal);
+      if (shapeVal) {
+        setTongueShape(shapeVal);
       }
       // 齿痕
       if (result.tongue_shape?.teeth_mark?.has) {
+        console.log('[AI识别] 齿痕: true');
         setTongueState('齿痕');
       }
       // 舌苔
-      if (result.tongue_coating?.color) {
-        setCoating(result.tongue_coating.color, result.tongue_coating.texture || '', result.tongue_coating.moisture || '');
+      const coatColor = result.tongue_coating?.color;
+      const coatTexture = result.tongue_coating?.texture || '';
+      const coatMoisture = result.tongue_coating?.moisture || '';
+      console.log('[AI识别] 苔色:', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
+      if (coatColor) {
+        setCoating(coatColor, coatTexture, coatMoisture);
       }
       // 舌态
-      if (result.tongue_state?.value && result.tongue_state.value !== '正常') {
-        setTongueState(result.tongue_state.value);
+      const stateVal = result.tongue_state?.value;
+      console.log('[AI识别] 舌态:', stateVal);
+      if (stateVal && stateVal !== '正常') {
+        setTongueState(stateVal);
       }
 
       toast.success('AI识别完成，已自动填入舌象特征');
