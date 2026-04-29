@@ -307,53 +307,31 @@ const DiagnosisPage: React.FC = () => {
 
   // 提交辨证
   const handleSubmit = async () => {
-    console.log('[辨证提交] handleSubmit被调用');
-    console.log('[辨证提交] 当前状态:', {
-      tongueColor: inputFeatures.tongueColor.value,
-      tongueShape: inputFeatures.tongueShape.value,
-      tongueState: inputFeatures.tongueState.value,
-      coatingColor: inputFeatures.coating.color,
-      coatingTexture: inputFeatures.coating.texture,
-      coatingMoisture: inputFeatures.coating.moisture,
-      chiefComplaint: patientInfo.chiefComplaint,
-      useLocalEngine,
-    });
-
     // 验证必填项
     if (!inputFeatures.tongueColor.value) {
-      toast.error('请选择舌色');
-      return;
+      toast.error('请选择舌色'); return;
     }
     if (!inputFeatures.tongueShape.value) {
-      toast.error('请选择舌形');
-      return;
+      toast.error('请选择舌形'); return;
     }
     if (!inputFeatures.tongueState.value) {
-      toast.error('请选择舌态');
-      return;
+      toast.error('请选择舌态'); return;
     }
     if (!inputFeatures.coating.color) {
-      toast.error('请选择苔色');
-      return;
+      toast.error('请选择苔色'); return;
     }
     if (!patientInfo.chiefComplaint) {
-      toast.error('请填写主诉');
-      return;
+      toast.error('请填写主诉'); return;
     }
 
-    console.log('[辨证提交] 验证通过，开始分析');
     setIsAnalyzing(true);
     setError(null);
     setDiagnosisResult(null);
-    console.log('[辨证提交] isAnalyzing=true, 开始处理');
 
     try {
       if (useLocalEngine) {
-        // 本地规则引擎：同步执行，不需要分步进度
-        console.log('[辨证] 使用本地规则引擎（同步）');
-        
+        // ========== 路径A：本地规则引擎（同步，瞬间完成） ==========
         const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
-        console.log('[辨证] 返回成功:', diagResult?.primarySyndrome);
         
         setDiagnosisResult({ 
           diagnosisResult: diagResult, 
@@ -362,24 +340,16 @@ const DiagnosisPage: React.FC = () => {
         } as any);
         toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
       } else {
-        // 使用原有Bot API辨证
+        // ========== 路径B：远程Bot API（异步，需要进度指示） ==========
         const input = getDiagnosisInput();
         setCurrentStep('analyzing', 35);
         
         const result = await submitDiagnosis(input, (step) => {
           switch (step) {
-            case 'recognizing':
-              setCurrentStep('recognizing', 25);
-              break;
-            case 'analyzing':
-              setCurrentStep('analyzing', 50);
-              break;
-            case 'reasoning':
-              setCurrentStep('reasoning', 75);
-              break;
-            case 'matching':
-              setCurrentStep('matching', 90);
-              break;
+            case 'recognizing': setCurrentStep('recognizing', 25); break;
+            case 'analyzing': setCurrentStep('analyzing', 50); break;
+            case 'reasoning': setCurrentStep('reasoning', 75); break;
+            case 'matching': setCurrentStep('matching', 90); break;
           }
         });
         
@@ -393,7 +363,6 @@ const DiagnosisPage: React.FC = () => {
       setError(message);
       toast.error(message);
     } finally {
-      console.log('[辨证提交] 完成，重置isAnalyzing');
       setIsAnalyzing(false);
       resetProgress();
     }
@@ -584,48 +553,37 @@ const DiagnosisPage: React.FC = () => {
               </button>
             </div>
 
-            {/* 分步进度显示 */}
+            {/* 进度显示：本地引擎显示简洁提示，Bot API显示详细进度 */}
             {isAnalyzing && (
-              <div className="tcm-card p-4 bg-gradient-to-r from-primary-50 to-secondary-50">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-stone-700">辨证分析进度</span>
-                    <span className="text-primary-600 font-medium">{stepProgress}%</span>
-                  </div>
-                  
-                  {/* 进度条 */}
-                  <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${stepProgress}%` }}
-                    />
-                  </div>
-                  
-                  {/* 步骤列表 */}
-                  <div className="grid grid-cols-2 gap-2 mt-3">
-                    <StepIndicator 
-                      label="识别舌象特征" 
-                      step="recognizing" 
-                      currentStep={currentStep} 
-                    />
-                    <StepIndicator 
-                      label="分析舌色舌苔" 
-                      step="analyzing" 
-                      currentStep={currentStep} 
-                    />
-                    <StepIndicator 
-                      label="辨证推理" 
-                      step="reasoning" 
-                      currentStep={currentStep} 
-                    />
-                    <StepIndicator 
-                      label="匹配针灸方案" 
-                      step="matching" 
-                      currentStep={currentStep} 
-                    />
+              useLocalEngine ? (
+                /* 本地引擎：简洁等待提示 */
+                <div className="tcm-card p-4 bg-gradient-to-r from-primary-50 to-secondary-50 text-center">
+                  <div className="animate-spin w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto mb-2" />
+                  <p className="text-sm text-stone-600">规则引擎分析中...</p>
+                </div>
+              ) : (
+                /* Bot API：详细四步进度 */
+                <div className="tcm-card p-4 bg-gradient-to-r from-primary-50 to-secondary-50">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-stone-700">辨证分析进度</span>
+                      <span className="text-primary-600 font-medium">{stepProgress}%</span>
+                    </div>
+                    <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${stepProgress}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <StepIndicator label="识别舌象特征" step="recognizing" currentStep={currentStep} />
+                      <StepIndicator label="分析舌色舌苔" step="analyzing" currentStep={currentStep} />
+                      <StepIndicator label="辨证推理" step="reasoning" currentStep={currentStep} />
+                      <StepIndicator label="匹配针灸方案" step="matching" currentStep={currentStep} />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )
             )}
           </div>
 
