@@ -26,6 +26,9 @@ import {
 
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
+  // 版本标记 - 方便确认线上部署版本
+  console.log('[舌镜] 版本: v1.2.6-20260430b');
+
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
   const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
   
@@ -330,24 +333,27 @@ const DiagnosisPage: React.FC = () => {
 
     if (useLocalEngine) {
       // ========== 路径A：本地规则引擎 ==========
-      // 用setTimeout确保React先渲染"分析中"状态，再执行引擎逻辑
-      setTimeout(() => {
-        try {
-          const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
-          setDiagnosisResult({ 
-            diagnosisResult: diagResult, 
-            acupuncturePlan, 
-            lifeCareAdvice 
-          } as any);
-          toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : '规则引擎分析失败';
-          setError(message);
-          toast.error(message);
-        } finally {
-          setIsAnalyzing(false);
-        }
-      }, 50);
+      // 用双rAF确保React完成"分析中"渲染后再执行引擎逻辑
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          try {
+            const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
+            setDiagnosisResult({ 
+              diagnosisResult: diagResult, 
+              acupuncturePlan, 
+              lifeCareAdvice 
+            } as any);
+            toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
+          } catch (error) {
+            console.error('[本地引擎] 异常:', error);
+            const message = error instanceof Error ? error.message : '规则引擎分析失败';
+            setError(message);
+            toast.error(message);
+          } finally {
+            setIsAnalyzing(false);
+          }
+        });
+      });
       return; // 提前返回，不走下面的try/catch/finally
     }
 
