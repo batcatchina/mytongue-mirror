@@ -29,7 +29,7 @@ const DiagnosisPage: React.FC = () => {
   // 版本标记 - v1.3.0 UI优化版
   console.log('[舌镜] 版本: v1.3.0');
 
-  // activeTab removed - single flow
+  const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
   const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
   const [showEngineSwitch, setShowEngineSwitch] = useState(false); // 引擎切换默认折叠
   
@@ -726,58 +726,77 @@ const DiagnosisPage: React.FC = () => {
             {diagnosisResult ? (
               <div className="space-y-3">
                 {/* 📋 辨证结果 - 用户关注点2：怎么了+怎么办 */}
+                
+                {/* 证型结论 - 最醒目 */}
                 <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
                 
-                {/* 针灸+调护 横排并排 */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* 针灸方案 */}
-                  <details className="tcm-card">
-                    <summary className="p-3 cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
-                      🪡 针灸方案
-                    </summary>
-                    <div className="px-3 pb-3">
-                      <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
-                    </div>
-                  </details>
-
-                  {/* 调理建议 */}
-                  <details className="tcm-card" open>
-                    <summary className="p-3 cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
-                      💡 调理建议
-                    </summary>
-                    <div className="px-3 pb-3 space-y-2">
-                      {diagnosisResult.lifeCareAdvice?.dietSuggestions?.slice(0, 2).map((item: string, i: number) => (
-                        <div key={i} className="text-sm text-stone-600 flex items-start gap-2">
-                          <span className="text-green-500 mt-0.5">•</span>{item}
-                        </div>
-                      ))}
-                      {diagnosisResult.lifeCareAdvice?.dailyRoutine?.slice(0, 2).map((item: string, i: number) => (
-                        <div key={i} className="text-sm text-stone-600 flex items-start gap-2">
-                          <span className="text-blue-500 mt-0.5">•</span>{item}
-                        </div>
-                      ))}
-                      {diagnosisResult.lifeCareAdvice?.precautions?.length > 0 && (
-                        <div className="pt-2 border-t border-stone-100">
-                          {diagnosisResult.lifeCareAdvice.precautions.slice(0, 2).map((item: string, i: number) => (
-                            <div key={i} className="text-xs text-amber-600 flex items-start gap-1">
-                              <span>⚠</span>{item}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </details>
+                {/* Tab切换：病机 | 针灸 | 调理 */}
+                <div className="flex border-b border-stone-200">
+                  <button
+                    onClick={() => setResultTab('pathogenesis')}
+                    className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                      resultTab === 'pathogenesis'
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-stone-500 hover:text-stone-700'
+                    }`}
+                  >
+                    病机分析
+                  </button>
+                  <button
+                    onClick={() => setResultTab('acupuncture')}
+                    className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                      resultTab === 'acupuncture'
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-stone-500 hover:text-stone-700'
+                    }`}
+                  >
+                    针灸方案
+                  </button>
+                  <button
+                    onClick={() => setResultTab('care')}
+                    className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                      resultTab === 'care'
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-stone-500 hover:text-stone-700'
+                    }`}
+                  >
+                    生活调理
+                  </button>
                 </div>
 
-                {/* 完整调护 - 次要信息折叠 */}
-                <details className="tcm-card">
-                  <summary className="p-3 cursor-pointer text-xs text-stone-500 hover:text-stone-700">
-                    🍃 完整调护方案
-                  </summary>
-                  <div className="px-3 pb-3">
-                    <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
+                {/* Tab内容 */}
+                {resultTab === 'pathogenesis' && (
+                  <div className="tcm-card p-4 space-y-3 animate-in">
+                    <div>
+                      <span className="text-xs text-stone-500 block mb-1">病机</span>
+                      <p className="text-sm text-primary-700 font-medium">{diagnosisResult.diagnosisResult?.pathogenesis || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-stone-500 block mb-1">脏腑定位</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {diagnosisResult.diagnosisResult?.organLocation?.map((organ: string, i: number) => (
+                          <span key={i} className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
+                            {organ}{i === 0 && <span className="ml-0.5 opacity-60">(主)</span>}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {diagnosisResult.diagnosisResult?.secondarySyndromes?.length > 0 && (
+                      <div>
+                        <span className="text-xs text-stone-500 block mb-1">也需关注</span>
+                        {diagnosisResult.diagnosisResult.secondarySyndromes.slice(0, 2).map((s: any, i: number) => (
+                          <span key={i} className="text-sm text-stone-600 mr-2">· {s.syndrome}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </details>
+                )}
+                {resultTab === 'acupuncture' && (
+                  <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
+                )}
+                {resultTab === 'care' && (
+                  <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
+                )}
                 
                 <button
                   onClick={handleSaveCase}
