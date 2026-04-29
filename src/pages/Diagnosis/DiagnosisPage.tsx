@@ -328,18 +328,32 @@ const DiagnosisPage: React.FC = () => {
     setError(null);
     setDiagnosisResult(null);
 
+    if (useLocalEngine) {
+      // ========== 路径A：本地规则引擎 ==========
+      // 用setTimeout确保React先渲染"分析中"状态，再执行引擎逻辑
+      setTimeout(() => {
+        try {
+          const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
+          setDiagnosisResult({ 
+            diagnosisResult: diagResult, 
+            acupuncturePlan, 
+            lifeCareAdvice 
+          } as any);
+          toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '规则引擎分析失败';
+          setError(message);
+          toast.error(message);
+        } finally {
+          setIsAnalyzing(false);
+        }
+      }, 50);
+      return; // 提前返回，不走下面的try/catch/finally
+    }
+
     try {
-      if (useLocalEngine) {
-        // ========== 路径A：本地规则引擎（同步，瞬间完成） ==========
-        const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
-        
-        setDiagnosisResult({ 
-          diagnosisResult: diagResult, 
-          acupuncturePlan, 
-          lifeCareAdvice 
-        } as any);
-        toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
-      } else {
+      // ========== 路径B：远程Bot API（异步，需要进度指示） ==========
+      {
         // ========== 路径B：远程Bot API（异步，需要进度指示） ==========
         const input = getDiagnosisInput();
         setCurrentStep('analyzing', 35);
