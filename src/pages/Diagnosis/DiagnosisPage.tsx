@@ -307,7 +307,17 @@ const DiagnosisPage: React.FC = () => {
 
   // 提交辨证
   const handleSubmit = async () => {
-
+    console.log('[辨证提交] handleSubmit被调用');
+    console.log('[辨证提交] 当前状态:', {
+      tongueColor: inputFeatures.tongueColor.value,
+      tongueShape: inputFeatures.tongueShape.value,
+      tongueState: inputFeatures.tongueState.value,
+      coatingColor: inputFeatures.coating.color,
+      coatingTexture: inputFeatures.coating.texture,
+      coatingMoisture: inputFeatures.coating.moisture,
+      chiefComplaint: patientInfo.chiefComplaint,
+      useLocalEngine,
+    });
 
     // 验证必填项
     if (!inputFeatures.tongueColor.value) {
@@ -331,10 +341,12 @@ const DiagnosisPage: React.FC = () => {
       return;
     }
 
+    console.log('[辨证提交] 验证通过，开始分析');
     setIsAnalyzing(true);
     setError(null);
     setDiagnosisResult(null);
     setCurrentStep('validating', 10);
+    console.log('[辨证提交] isAnalyzing已设为true，进度10%');
     console.log('[辨证提交] 开始，输入:', JSON.stringify({
       tongueColor: inputFeatures.tongueColor.value,
       tongueShape: inputFeatures.tongueShape.value,
@@ -355,7 +367,7 @@ const DiagnosisPage: React.FC = () => {
         
         console.log('[辨证] 即将调用handleLocalDiagnosis...');
         const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = await handleLocalDiagnosis();
-        console.log('[辨证] handleLocalDiagnosis返回成功:', diagResult?.syndrome);
+        console.log('[辨证] handleLocalDiagnosis返回成功:', diagResult?.primarySyndrome);
         
         setCurrentStep('matching', 95);
         setDiagnosisResult({ 
@@ -363,7 +375,7 @@ const DiagnosisPage: React.FC = () => {
           acupuncturePlan, 
           lifeCareAdvice 
         } as any);
-        toast.success(`辨证完成！匹配规则：${diagResult?.matchedRule || '未知'}`);
+        toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
       } else {
         // 使用原有Bot API辨证
         const input = getDiagnosisInput();
@@ -391,10 +403,12 @@ const DiagnosisPage: React.FC = () => {
         toast.success('辨证分析完成！');
       }
     } catch (error) {
+      console.error('[辨证提交] 异常:', error);
       const message = error instanceof Error ? error.message : '辨证分析失败';
       setError(message);
       toast.error(message);
     } finally {
+      console.log('[辨证提交] 完成，重置isAnalyzing');
       setIsAnalyzing(false);
       resetProgress();
     }

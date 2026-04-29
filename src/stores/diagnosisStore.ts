@@ -288,7 +288,7 @@ export const useDiagnosisStore = create<DiagnosisState>()(
     }),
     {
       name: 'tongue-diagnosis-storage',
-      version: 3, // 版本升级，清除isAnalyzing脏缓存
+      version: 4, // 版本升级，修复数据格式不匹配
       migrate: (persistedState: any, version: number) => {
         // 版本<2：重置为初始状态
         if (version < 2) {
@@ -305,6 +305,17 @@ export const useDiagnosisStore = create<DiagnosisState>()(
         if (version < 3 && persistedState) {
           return {
             ...persistedState,
+            isAnalyzing: false,
+            currentStep: 'idle',
+            stepProgress: 0,
+            error: null,
+          };
+        }
+        // 版本<4：清除旧的diagnosisResult（格式不兼容）
+        if (version < 4 && persistedState) {
+          return {
+            ...persistedState,
+            diagnosisResult: null,
             isAnalyzing: false,
             currentStep: 'idle',
             stepProgress: 0,
