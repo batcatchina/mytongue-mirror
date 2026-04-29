@@ -77,7 +77,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       console.log(`[图片上传] 成功，大小: ${Math.round(file.size / 1024)}KB`);
     } catch (error) {
       console.error('图片处理失败:', error);
-      alert('图片处理失败，请尝试其他图片');
+      // 不弹alert，静默处理——手机上FileReader偶发瞬态错误但图片已加载
     }
   }, [onChange]);
 
