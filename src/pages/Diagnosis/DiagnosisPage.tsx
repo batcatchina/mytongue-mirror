@@ -204,41 +204,55 @@ const DiagnosisPage: React.FC = () => {
     console.log(`[本地规则引擎] 主要结果: ${result.primaryResult.syndrome}`);
     console.log(`[本地规则引擎] 匹配规则: ${result.primaryResult.matchedRuleName}`);
     
-    // 构建诊断结果格式（兼容现有系统）
+    // 构建诊断结果（严格匹配 DiagnosisResult 类型）
+    const priorityMap: Record<string, '高' | '中' | '低'> = { high: '高', medium: '中', low: '低' };
     const diagnosisResultOut = {
-      syndrome: result.primaryResult.syndrome,
-      pathogenesis: result.primaryResult.pathogenesis,
-      treatment: result.primaryResult.treatment,
-      mainPoints: result.primaryResult.mainPoints,
-      secondaryPoints: result.primaryResult.secondaryPoints,
-      organLocation: result.primaryResult.organLocation,
-      confidence: result.primaryResult.confidence,
-      matchedRule: result.primaryResult.matchedRuleName,
-      priority: result.primaryResult.priority,
-      alternativeDiagnoses: result.alternativeResults.map((r: any) => ({
+      primarySyndrome: result.primaryResult.syndrome,
+      syndromeScore: result.primaryResult.confidence || 0,
+      confidence: (result.primaryResult.confidence || 0) / 100, // 0-100 → 0-1
+      secondarySyndromes: (result.alternativeResults || []).map((r: any) => ({
         syndrome: r.syndrome,
-        pathogenesis: r.pathogenesis,
-        confidence: r.confidence,
+        score: r.confidence || 0,
+        confidence: (r.confidence || 0) / 100,
+        matchedFeatures: [],
       })),
-      clinicalNotes: result.clinicalNotes,
-      isLocalRuleBased: true,
+      pathogenesis: result.primaryResult.pathogenesis || '',
+      organLocation: Array.isArray(result.primaryResult.organLocation) 
+        ? result.primaryResult.organLocation : [result.primaryResult.organLocation || ''],
+      diagnosisEvidence: [], // 本地引擎不提供详细依据表
+      priority: priorityMap[result.primaryResult.priority] || '中',
+      diagnosisTime: new Date().toLocaleTimeString('zh-CN'),
     };
     
-    // 构建针灸方案
+    // 构建针灸方案（严格匹配 AcupuncturePlan 类型）
+    const mainPointNames: string[] = result.acupointSelection.mainPoints || [];
+    const secondaryPointNames: string[] = result.acupointSelection.secondaryPoints || [];
     const acupuncturePlan = {
-      mainPoints: result.acupointSelection.mainPoints,
-      secondaryPoints: result.acupointSelection.secondaryPoints,
-      huiPoint: result.acupointSelection.huiPoint,
-      xiPoint: result.acupointSelection.xiPoint,
-      method: result.acupointSelection.method.technique,
-      needleRetention: `${result.acupointSelection.method.needleRetention}分钟`,
-      moxibustion: result.acupointSelection.method.moxibustion,
-      frequency: result.acupointSelection.method.frequency,
-      course: result.acupointSelection.method.course,
-      notes: result.acupointSelection.method.notes,
+      treatmentPrinciple: result.primaryResult.treatment || '',
+      mainPoints: mainPointNames.map((name: string) => ({
+        point: name,
+        meridian: '',
+        effect: '',
+        technique: result.acupointSelection.method?.technique || '泻法',
+      })),
+      secondaryPoints: secondaryPointNames.map((name: string) => ({
+        point: name,
+        meridian: '',
+        effect: '',
+        technique: '补法',
+      })),
+      contraindications: [],
+      treatmentAdvice: {
+        techniquePrinciple: result.acupointSelection.method?.technique || '',
+        needleRetentionTime: `${result.acupointSelection.method?.needleRetention || 20}分钟`,
+        treatmentFrequency: result.acupointSelection.method?.frequency || '每日1次',
+        treatmentSessions: result.acupointSelection.method?.course || '5次为一疗程',
+        sessionInterval: '1-2天',
+        moxibustionSuggestion: result.acupointSelection.method?.moxibustion || '',
+      },
     };
     
-    // 构建生活调护建议
+    // 构建生活调护建议（严格匹配 LifeCareAdvice 类型）
     const lifeCareAdvice = generateLifeCareAdvice(result);
     
     return { diagnosisResult: diagnosisResultOut, acupuncturePlan, lifeCareAdvice };
@@ -281,10 +295,13 @@ const DiagnosisPage: React.FC = () => {
     advice.push('保证充足睡眠，规律作息');
     advice.push('适度锻炼，增强体质');
     
+    // 严格匹配 LifeCareAdvice 类型: dietSuggestions / dailyRoutine / precautions
+    const dietItems = advice.filter((_, i) => i < 3);
+    const routineItems = advice.filter((_, i) => i >= 3);
     return {
-      dietAdvice: advice.filter((_, i) => i < 3).join('；'),
-      lifestyleAdvice: advice.filter((_, i) => i >= 3).join('；'),
-      precautions: result.clinicalNotes || [],
+      dietSuggestions: dietItems,
+      dailyRoutine: routineItems,
+      precautions: Array.isArray(result.clinicalNotes) ? result.clinicalNotes : [],
     };
   };
 
