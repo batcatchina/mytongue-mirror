@@ -27,7 +27,7 @@ import {
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   // 版本标记 - 方便确认线上部署版本
-  console.log('[舌镜] 版本: v1.2.6-20260430b');
+  console.log('[舌镜] 版本: v1.2.7');
 
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
   const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
@@ -175,11 +175,13 @@ const DiagnosisPage: React.FC = () => {
   } => {
     console.log('[本地规则引擎] 开始辨证...');
     
-    // 检查齿痕和裂纹
+    // 检查齿痕和裂纹（同时兼容AI回填的teethMark/crack和手动选择的shapeDistribution）
     const shapeDist = inputFeatures.shapeDistribution;
-    const hasTeethMark = shapeDist?.depression?.includes('齿痕') || 
-                          shapeDist?.bulge?.includes('齿痕') || false;
-    const hasCrack = shapeDist?.depression?.includes('裂纹') || 
+    const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
+                         shapeDist?.depression?.includes('齿痕') || 
+                         shapeDist?.bulge?.includes('齿痕') || false;
+    const hasCrack = inputFeatures.crack?.value === '是' ||
+                     shapeDist?.depression?.includes('裂纹') || 
                      shapeDist?.bulge?.includes('裂纹') || false;
     
     // 构建输入
@@ -333,9 +335,8 @@ const DiagnosisPage: React.FC = () => {
 
     if (useLocalEngine) {
       // ========== 路径A：本地规则引擎 ==========
-      // 用双rAF确保React完成"分析中"渲染后再执行引擎逻辑
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
+      // 用setTimeout让出主线程，确保"分析中"UI先渲染
+      setTimeout(() => {
           try {
             const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
             setDiagnosisResult({ 
@@ -353,7 +354,6 @@ const DiagnosisPage: React.FC = () => {
             setIsAnalyzing(false);
           }
         });
-      });
       return; // 提前返回，不走下面的try/catch/finally
     }
 

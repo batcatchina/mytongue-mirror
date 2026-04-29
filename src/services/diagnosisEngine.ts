@@ -248,7 +248,7 @@ export class DiagnosisEngine {
       mainPoints: rule.result.mainPoints,
       secondaryPoints: rule.result.secondaryPoints,
       organLocation: rule.result.organLocation,
-      confidence: Math.min(score / rule.result.weight, 1) * 100,
+      confidence: calculateSpecificity(rule),
       matchedRuleId: rule.id,
       matchedRuleName: rule.name,
       priority: rule.result.priority,
@@ -268,6 +268,30 @@ export class DiagnosisEngine {
     const results = this.diagnose(features, 1);
     return results.length > 0 ? results[0] : null;
   }
+}
+
+// ==================== 规则专一性计算 ====================
+
+/**
+ * 计算规则专一性得分（条件越多越可信）
+ * 单条件规则约47分，8条件规则约95分
+ */
+function calculateSpecificity(rule: DiagnosisRule): number {
+  const conditions = rule.conditions;
+  let definedCount = 0;
+  const maxConditions = 8; // 舌色/舌形/苔色/苔质/润燥/舌态/齿痕/裂纹
+  
+  if (conditions.tongueColor !== undefined) definedCount++;
+  if (conditions.tongueShape !== undefined) definedCount++;
+  if (conditions.coatingColor !== undefined) definedCount++;
+  if (conditions.coatingTexture !== undefined) definedCount++;
+  if (conditions.coatingMoisture !== undefined) definedCount++;
+  if (conditions.tongueState !== undefined) definedCount++;
+  if (conditions.teethMark !== undefined) definedCount++;
+  if (conditions.crack !== undefined) definedCount++;
+  
+  const specificity = definedCount / maxConditions;
+  return Math.min(Math.round(specificity * 55 + 40), 95);
 }
 
 // ==================== 选穴方案生成 ====================

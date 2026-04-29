@@ -288,7 +288,7 @@ export const useDiagnosisStore = create<DiagnosisState>()(
     }),
     {
       name: 'tongue-diagnosis-storage',
-      version: 4, // 版本升级，修复数据格式不匹配
+      version: 5, // 版本升级，修复数据格式不匹配
       migrate: (persistedState: any, version: number) => {
         // 版本<2：重置为初始状态
         if (version < 2) {
@@ -322,6 +322,14 @@ export const useDiagnosisStore = create<DiagnosisState>()(
             error: null,
           };
         }
+        // 版本<5：清除imageData（大base64字符串阻塞localStorage写入）
+        if (version < 5 && persistedState) {
+          return {
+            ...persistedState,
+            imageData: null,
+            isAnalyzing: false,
+          };
+        }
         return persistedState;
       },
       // 只持久化业务数据，不存临时UI状态
@@ -329,7 +337,6 @@ export const useDiagnosisStore = create<DiagnosisState>()(
         inputFeatures: state.inputFeatures,
         symptoms: state.symptoms,
         patientInfo: state.patientInfo,
-        imageData: state.imageData,
         diagnosisResult: state.diagnosisResult,
         caseList: state.caseList,
       }),
