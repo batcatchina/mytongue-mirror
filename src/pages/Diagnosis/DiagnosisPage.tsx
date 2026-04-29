@@ -106,55 +106,59 @@ const DiagnosisPage: React.FC = () => {
     return '';
   };
 
-  // AI识别结果回填（完整版：所有字段必须回填store）
+  // AI识别结果回填（每个字段独立try/catch，一个失败不影响其他）
   const handleRecognize = (result: TongueRecognitionResult) => {
+    console.log('[AI识别] 原始结果:', JSON.stringify(result, null, 2));
+
+    // 舌色
     try {
-      console.log('[AI识别] 原始结果:', JSON.stringify(result, null, 2));
-
-      // 舌色映射
       const colorVal = mapToEnum(result.tongue_color?.value || '', ['淡红', '淡白', '红', '绛', '紫', '青紫']);
-      console.log('[AI识别] 舌色映射结果:', result.tongue_color?.value, '→', colorVal, '是否有效:', !!colorVal);
+      console.log('[AI识别] 舌色:', result.tongue_color?.value, '→', colorVal);
       setTongueColor(colorVal || '淡红');
+    } catch (e) { console.error('[AI识别] 舌色回填异常:', e); }
 
-      // 舌形映射
+    // 舌形
+    try {
       const shapeVal = mapToEnum(result.tongue_shape?.value || '', ['胖大', '瘦薄', '正常']);
-      console.log('[AI识别] 舌形映射结果:', result.tongue_shape?.value, '→', shapeVal, '是否有效:', !!shapeVal);
+      console.log('[AI识别] 舌形:', result.tongue_shape?.value, '→', shapeVal);
       setTongueShape(shapeVal || '正常');
+    } catch (e) { console.error('[AI识别] 舌形回填异常:', e); }
 
-      // 齿痕回填
+    // 齿痕
+    try {
       if (result.tongue_shape?.teeth_mark?.has) {
-        console.log('[AI识别] 齿痕: 有, 程度:', result.tongue_shape.teeth_mark.degree);
         setTeethMark('是', result.tongue_shape.teeth_mark.degree || '轻度', result.tongue_shape.teeth_mark.position || '');
       } else {
-        console.log('[AI识别] 齿痕: 无');
         setTeethMark('否', '', '');
       }
+    } catch (e) { console.error('[AI识别] 齿痕回填异常:', e); }
 
-      // 裂纹回填
+    // 裂纹
+    try {
       if (result.tongue_shape?.crack?.has) {
-        console.log('[AI识别] 裂纹: 有, 程度:', result.tongue_shape.crack.degree);
         setCrack('是', result.tongue_shape.crack.degree || '轻度', result.tongue_shape.crack.position || '');
       } else {
-        console.log('[AI识别] 裂纹: 无');
         setCrack('否', '', '');
       }
+    } catch (e) { console.error('[AI识别] 裂纹回填异常:', e); }
 
-      // 舌苔映射（苔色、苔质、润燥都必须回填）
+    // 舌苔
+    try {
       const coatColor = mapToEnum(result.tongue_coating?.color || '', ['薄白', '白厚', '黄', '灰黑', '剥落']);
       const coatTexture = mapToEnum(result.tongue_coating?.texture || '', ['薄', '厚', '正常']);
       const coatMoisture = mapToEnum(result.tongue_coating?.moisture || '', ['润', '燥', '正常']);
-      console.log('[AI识别] 苔色映射:', result.tongue_coating?.color, '→', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
+      console.log('[AI识别] 苔色:', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
       setCoating(coatColor || '薄白', coatTexture || '薄', coatMoisture || '润');
+    } catch (e) { console.error('[AI识别] 舌苔回填异常:', e); }
 
-      // 舌态映射（"正常"也必须回填，否则提交验证不通过）
+    // 舌态
+    try {
       const stateVal = mapToEnum(result.tongue_state?.value || '', ['强硬', '痿软', '歪斜', '颤动', '正常']);
-      console.log('[AI识别] 舌态映射结果:', result.tongue_state?.value, '→', stateVal, '是否有效:', !!stateVal);
+      console.log('[AI识别] 舌态:', result.tongue_state?.value, '→', stateVal);
       setTongueState(stateVal || '正常');
+    } catch (e) { console.error('[AI识别] 舌态回填异常:', e); }
 
-      toast.success('AI识别完成，已自动填入舌象特征');
-    } catch (error) {
-      console.error('识别结果回填失败:', error);
-    }
+    toast.success('AI识别完成，已自动填入舌象特征');
   };
 
   /**
