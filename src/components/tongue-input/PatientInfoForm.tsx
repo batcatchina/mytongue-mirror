@@ -37,7 +37,7 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1.5">性别</label>
           <div className="flex gap-3">
-            {(['男', '女', '其他'] as const).map((gender) => (
+            {(['男', '女'] as const).map((gender) => (
               <label
                 key={gender}
                 className={clsx(
