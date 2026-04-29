@@ -280,7 +280,7 @@ export const tongueColorDistributionRules: DiagnosisRule[] = [
       treatment: '清热泻火/滋阴降火',
       mainPoints: ['大椎', '曲池'],
       secondaryPoints: ['合谷'],
-      organLocation: ['多脏腑'],
+      organLocation: ['心', '肝'],
       priority: 'high',
       weight: 35
     }
@@ -374,7 +374,7 @@ export const tongueShapeRules: DiagnosisRule[] = [
       treatment: '泻实攻邪',
       mainPoints: ['辨证选穴'],
       secondaryPoints: ['对症配穴'],
-      organLocation: ['多脏腑'],
+      organLocation: ['肝', '胃'],
       priority: 'medium',
       weight: 25
     }
@@ -389,7 +389,7 @@ export const tongueShapeRules: DiagnosisRule[] = [
       treatment: '补益正气',
       mainPoints: ['辨证选穴'],
       secondaryPoints: ['对症配穴'],
-      organLocation: ['多脏腑'],
+      organLocation: ['脾', '肾'],
       priority: 'medium',
       weight: 25
     }
@@ -562,7 +562,7 @@ export const coatingTextureRules: DiagnosisRule[] = [
       treatment: '辨证调理',
       mainPoints: ['辨证选穴'],
       secondaryPoints: ['对症配穴'],
-      organLocation: ['多脏腑'],
+      organLocation: ['肺', '胃'],
       priority: 'normal',
       weight: 10
     }
