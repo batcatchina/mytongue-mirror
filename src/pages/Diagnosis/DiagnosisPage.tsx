@@ -17,11 +17,11 @@ import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import { submitDiagnosis } from '@/services/api';
+import { TongueRecognitionResult } from '@/services/tongueAI';
 
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
-  const [compressionStatus, setCompressionStatus] = useState<string | null>(null);
   
   const {
     inputFeatures,
@@ -63,9 +63,35 @@ const DiagnosisPage: React.FC = () => {
   };
   const isInServiceTime = isServiceTime();
 
-  // 处理压缩状态更新
-  const handleCompressionProgress = (status: string) => {
-    setCompressionStatus(status);
+
+  // AI识别结果回填
+  const handleRecognize = (result: TongueRecognitionResult) => {
+    try {
+      // 舌色
+      if (result.tongue_color?.value) {
+        setTongueColor(result.tongue_color.value);
+      }
+      // 舌形
+      if (result.tongue_shape?.value) {
+        setTongueShape(result.tongue_shape.value);
+      }
+      // 齿痕
+      if (result.tongue_shape?.teeth_mark?.has) {
+        setTongueState('齿痕');
+      }
+      // 舌苔
+      if (result.tongue_coating?.color) {
+        setCoating(result.tongue_coating.color, result.tongue_coating.texture || '', result.tongue_coating.moisture || '');
+      }
+      // 舌态
+      if (result.tongue_state?.value && result.tongue_state.value !== '正常') {
+        setTongueState(result.tongue_state.value);
+      }
+
+      toast.success('AI识别完成，已自动填入舌象特征');
+    } catch (error) {
+      console.error('识别结果回填失败:', error);
+    }
   };
 
   // 提交辨证
@@ -132,7 +158,6 @@ const DiagnosisPage: React.FC = () => {
       toast.error(message);
     } finally {
       setIsAnalyzing(false);
-      setCompressionStatus(null);
       resetProgress();
     }
   };
@@ -171,8 +196,8 @@ const DiagnosisPage: React.FC = () => {
               <div className="mb-6">
                 <ImageUpload 
                   onChange={(imageData) => setImageData(imageData)} 
-                  onCompressionProgress={handleCompressionProgress}
-                />
+                  onRecognize={handleRecognize}
+                  />
               </div>
               
               <div className="tcm-divider" />
@@ -284,14 +309,6 @@ const DiagnosisPage: React.FC = () => {
                 )}
               </button>
             </div>
-
-            {/* 压缩状态显示 */}
-            {compressionStatus && !isAnalyzing && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg text-sm text-blue-700">
-                <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                <span>{compressionStatus}</span>
-              </div>
-            )}
 
             {/* 分步进度显示 */}
             {isAnalyzing && (
@@ -461,3 +478,4 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ label, step, currentStep 
 };
 
 export default DiagnosisPage;
+
