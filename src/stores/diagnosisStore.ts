@@ -288,9 +288,9 @@ export const useDiagnosisStore = create<DiagnosisState>()(
     }),
     {
       name: 'tongue-diagnosis-storage',
-      version: 2, // 版本升级，自动清除旧缓存
+      version: 3, // 版本升级，清除isAnalyzing脏缓存
       migrate: (persistedState: any, version: number) => {
-        // 版本0或1的数据迁移：重置为初始状态
+        // 版本<2：重置为初始状态
         if (version < 2) {
           return {
             inputFeatures: initialFeatures,
@@ -301,8 +301,27 @@ export const useDiagnosisStore = create<DiagnosisState>()(
             caseList: [],
           };
         }
+        // 版本<3：强制清除isAnalyzing和进度状态
+        if (version < 3 && persistedState) {
+          return {
+            ...persistedState,
+            isAnalyzing: false,
+            currentStep: 'idle',
+            stepProgress: 0,
+            error: null,
+          };
+        }
         return persistedState;
       },
+      // 只持久化业务数据，不存临时UI状态
+      partialize: (state) => ({
+        inputFeatures: state.inputFeatures,
+        symptoms: state.symptoms,
+        patientInfo: state.patientInfo,
+        imageData: state.imageData,
+        diagnosisResult: state.diagnosisResult,
+        caseList: state.caseList,
+      }),
     }
   )
 );
