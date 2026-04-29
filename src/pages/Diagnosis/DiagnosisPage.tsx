@@ -65,20 +65,42 @@ const DiagnosisPage: React.FC = () => {
   const isInServiceTime = true;
 
 
-  // 前端侧值映射（兜底，确保Bot返回的值能匹配前端枚举）
+  // 前端侧值映射（关键词包含匹配 + 语义映射，Bot返回值千变万化）
   const mapToEnum = (raw: string, validValues: string[]): string => {
     if (!raw) return '';
     const trimmed = raw.trim();
-    // 精确匹配
-    if (validValues.includes(trimmed)) return trimmed;
-    // 包含匹配（如"淡红色"包含"淡红"）
-    for (const v of validValues) {
-      if (trimmed.includes(v) || v.includes(trimmed)) return v;
+    // 0. 语义映射表（覆盖Bot常见的描述性表达）
+    const semanticMap: Record<string, string> = {
+      // 苔质
+      '细腻': '薄', '细腻均匀': '薄', '均匀': '薄', '薄腻': '薄',
+      '腻': '厚', '厚腻': '厚', '滑腻': '厚', '粗糙': '厚', '颗粒': '厚',
+      // 润燥
+      '湿润': '润', '津液充足': '润', '水滑': '润',
+      '干燥': '燥', '少津': '燥',
+      // 舌态描述
+      '舒展': '正常', '自然': '正常', '活动自如': '正常', '柔软': '正常',
+      '自如': '正常', '灵活': '正常',
+      // 舌形描述
+      '大小正常': '正常', '适中': '正常',
+    };
+    if (semanticMap[trimmed]) {
+      const mapped = semanticMap[trimmed];
+      if (validValues.includes(mapped)) return mapped;
     }
-    // 模糊匹配：去掉"色""苔"等后缀再试
-    const cleaned = trimmed.replace(/[色苔舌体面]/g, '');
-    for (const v of validValues) {
-      if (cleaned.includes(v) || v.includes(cleaned)) return v;
+    // 语义关键词扫描（trimmed包含某个key）
+    for (const [key, val] of Object.entries(semanticMap)) {
+      if (trimmed.includes(key) && validValues.includes(val)) return val;
+    }
+    // 1. 精确匹配
+    if (validValues.includes(trimmed)) return trimmed;
+    // 2. 关键词包含匹配（优先匹配更长的枚举值，如"胖大"优先于"胖"）
+    const sorted = [...validValues].sort((a, b) => b.length - a.length);
+    for (const v of sorted) {
+      if (trimmed.includes(v)) return v;
+    }
+    // 3. 反向包含
+    for (const v of sorted) {
+      if (v.includes(trimmed)) return v;
     }
     console.warn('[AI映射] 无法匹配:', trimmed, '有效值:', validValues);
     return '';

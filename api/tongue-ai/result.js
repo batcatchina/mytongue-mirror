@@ -53,7 +53,20 @@ function mapValue(category, rawValue) {
   const trimmed = rawValue.trim();
   const map = VALUE_MAP[category];
   if (!map) return trimmed;
-  return map[trimmed] || trimmed;
+  // 1. 精确匹配
+  if (map[trimmed]) return map[trimmed];
+  // 2. 关键词包含匹配（Bot返回值千变万化，必须用包含逻辑）
+  //    遍历VALUE_MAP的key，如果rawValue包含某个key，就返回对应value
+  //    优先匹配更长的key（如"胖大"优先于"胖"）
+  const keys = Object.keys(map).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (trimmed.includes(key)) return map[key];
+  }
+  // 3. 反向包含：key包含rawValue
+  for (const key of keys) {
+    if (key.includes(trimmed)) return map[key];
+  }
+  return trimmed;
 }
 
 function parseTongueResult(content) {
