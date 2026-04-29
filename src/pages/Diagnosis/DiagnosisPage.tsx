@@ -29,7 +29,7 @@ const DiagnosisPage: React.FC = () => {
   // 版本标记 - v1.3.0 UI优化版
   console.log('[舌镜] 版本: v1.3.0');
 
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
+  // activeTab removed - single flow
   const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
   const [showEngineSwitch, setShowEngineSwitch] = useState(false); // 引擎切换默认折叠
   
@@ -678,61 +678,61 @@ const DiagnosisPage: React.FC = () => {
 
           {/* ========== 右侧：结果展示 ========== */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            {/* Tab切换 - 更紧凑 */}
-            <div className="tcm-card p-1 flex">
-              <button
-                onClick={() => setActiveTab('diagnosis')}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'diagnosis'
-                    ? 'bg-primary-500 text-white'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                辨证结果
-              </button>
-              <button
-                onClick={() => setActiveTab('acupuncture')}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'acupuncture'
-                    ? 'bg-primary-500 text-white'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                针灸
-              </button>
-              <button
-                onClick={() => setActiveTab('care')}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'care'
-                    ? 'bg-primary-500 text-white'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                调护
-              </button>
-            </div>
-
-            {/* 结果内容 */}
             {diagnosisResult ? (
               <div className="space-y-4">
-                {activeTab === 'diagnosis' && (
-                  <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
-                )}
-                {activeTab === 'acupuncture' && (
-                  <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
-                )}
-                {activeTab === 'care' && (
-                  <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
-                )}
+                {/* 分析结果 - 用户最关心的：我怎么了 */}
+                <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
                 
-                {/* 保存按钮 */}
+                {/* 怎么办 - 紧跟结论 */}
+                <div className="tcm-card p-4">
+                  <h4 className="text-sm font-medium text-stone-700 mb-3">💡 怎么调理</h4>
+                  <div className="space-y-2">
+                    {diagnosisResult.lifeCareAdvice?.dietSuggestions?.slice(0, 2).map((item: string, i: number) => (
+                      <div key={i} className="text-sm text-stone-600 flex items-start gap-2">
+                        <span className="text-green-500 mt-0.5">•</span>{item}
+                      </div>
+                    ))}
+                    {diagnosisResult.lifeCareAdvice?.dailyRoutine?.slice(0, 2).map((item: string, i: number) => (
+                      <div key={i} className="text-sm text-stone-600 flex items-start gap-2">
+                        <span className="text-blue-500 mt-0.5">•</span>{item}
+                      </div>
+                    ))}
+                  </div>
+                  {diagnosisResult.lifeCareAdvice?.precautions?.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-stone-100">
+                      {diagnosisResult.lifeCareAdvice.precautions.slice(0, 2).map((item: string, i: number) => (
+                        <div key={i} className="text-xs text-amber-600 flex items-start gap-1">
+                          <span>⚠</span>{item}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 针灸方案 - 专业内容折叠 */}
+                <details className="tcm-card">
+                  <summary className="p-4 cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                    🪡 针灸方案
+                  </summary>
+                  <div className="px-4 pb-4">
+                    <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
+                  </div>
+                </details>
+
+                {/* 完整调护 - 折叠 */}
+                <details className="tcm-card">
+                  <summary className="p-4 cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                    🍃 完整调护方案
+                  </summary>
+                  <div className="px-4 pb-4">
+                    <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
+                  </div>
+                </details>
+                
                 <button
                   onClick={handleSaveCase}
-                  className="w-full py-3 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl text-xs font-medium bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                  </svg>
                   保存此病例
                 </button>
               </div>
