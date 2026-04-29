@@ -59,15 +59,8 @@ const DiagnosisPage: React.FC = () => {
   } = useDiagnosisStore();
 
 
-  // 服务时间检查（默认 8:00-22:00）
-  const isServiceTime = (): boolean => {
-    const now = new Date();
-    const hour = now.getHours();
-    const startHour = parseInt(import.meta.env.VITE_SERVICE_START_HOUR || '8');
-    const endHour = parseInt(import.meta.env.VITE_SERVICE_END_HOUR || '22');
-    return hour >= startHour && hour < endHour;
-  };
-  const isInServiceTime = isServiceTime();
+  // 本地规则引擎已上线，取消服务时间限制
+  const isInServiceTime = true;
 
 
   // 前端侧值映射（兜底，确保Bot返回的值能匹配前端枚举）
@@ -264,11 +257,7 @@ const DiagnosisPage: React.FC = () => {
 
   // 提交辨证
   const handleSubmit = async () => {
-    // 检查服务时间
-    if (!isInServiceTime) {
-      toast.error('服务时间：8:00-22:00，当前暂停服务');
-      return;
-    }
+
 
     // 验证必填项
     if (!inputFeatures.tongueColor.value) {
