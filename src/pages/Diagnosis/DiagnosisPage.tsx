@@ -316,7 +316,17 @@ const DiagnosisPage: React.FC = () => {
 
     setIsAnalyzing(true);
     setError(null);
+    setDiagnosisResult(null);
     setCurrentStep('validating', 10);
+    console.log('[辨证提交] 开始，输入:', JSON.stringify({
+      tongueColor: inputFeatures.tongueColor.value,
+      tongueShape: inputFeatures.tongueShape.value,
+      tongueState: inputFeatures.tongueState.value,
+      coatingColor: inputFeatures.coating.color,
+      coatingTexture: inputFeatures.coating.texture,
+      coatingMoisture: inputFeatures.coating.moisture,
+      useLocalEngine,
+    }));
 
     try {
       setCurrentStep('recognizing', 25);
