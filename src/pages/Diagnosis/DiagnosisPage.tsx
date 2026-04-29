@@ -476,14 +476,15 @@ const DiagnosisPage: React.FC = () => {
               </div>
             </div>
             
-            {/* 舌象特征输入 - 标签式一览+折叠编辑 */}
-            <div className="tcm-card p-4">
-              <h2 className="text-base font-medium text-stone-700 flex items-center gap-2 mb-3">
+            {/* 舌象特征 - 默认折叠，辨证后自动展开 */}
+            <details className="tcm-card" open={!!diagnosisResult}>
+              <summary className="p-4 cursor-pointer text-base font-medium text-stone-700 hover:text-stone-800 flex items-center gap-2">
                 <span>👅</span> 舌象特征
                 {isAIRecognized && (
                   <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">AI已识别</span>
                 )}
-              </h2>
+              </summary>
+              <div className="px-4 pb-4">
 
               {/* 当前特征一览 - 彩色标签一行看完 */}
               <div className="flex flex-wrap gap-1.5 mb-3">
@@ -579,7 +580,8 @@ const DiagnosisPage: React.FC = () => {
                 </summary>
                 <div className="mt-2"><TongueColorDistribution onChange={setDistributionFeatures} /></div>
               </details>
-            </div>
+              </div>
+            </details>
 
 
             {/* 伴随症状 - 可折叠 */}
@@ -677,7 +679,7 @@ const DiagnosisPage: React.FC = () => {
                 <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
                 
                 {/* 针灸+调护 横排并排 */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {/* 针灸方案 */}
                   <details className="tcm-card">
                     <summary className="p-3 cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
