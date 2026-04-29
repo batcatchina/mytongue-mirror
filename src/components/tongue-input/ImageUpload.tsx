@@ -31,11 +31,27 @@ function compressImage(dataUrl: string, maxWidth = 800, quality = 0.7): Promise<
   });
 }
 
+// 生成识别结果摘要
+function buildSummary(result: TongueRecognitionResult): string {
+  const parts: string[] = [];
+  if (result.tongue_color?.value) parts.push(`舌色:${result.tongue_color.value}`);
+  if (result.tongue_shape?.value && result.tongue_shape.value !== '正常') parts.push(`舌形:${result.tongue_shape.value}`);
+  if (result.tongue_coating?.color) parts.push(`苔色:${result.tongue_coating.color}`);
+  if (result.tongue_coating?.texture && result.tongue_coating.texture !== '正常') parts.push(`苔质:${result.tongue_coating.texture}`);
+  if (result.tongue_coating?.moisture && result.tongue_coating.moisture !== '正常') parts.push(`${result.tongue_coating.moisture}`);
+  if (result.tongue_shape?.teeth_mark?.has) parts.push('齿痕');
+  if (result.tongue_shape?.crack?.has) parts.push('裂纹');
+  if (result.tongue_state?.value && result.tongue_state.value !== '正常') parts.push(`舌态:${result.tongue_state.value}`);
+  if (result.overall_confidence) parts.push(`置信度:${Math.round(result.overall_confidence * 100)}%`);
+  return parts.join(' · ');
+}
+
 export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRecognize }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognizeStatus, setRecognizeStatus] = useState<string>('');
+  const [recognizeResult, setRecognizeResult] = useState<TongueRecognitionResult | null>(null);
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -57,6 +73,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       
       setPreview(imageData);
       onChange(imageData);
+      setRecognizeResult(null);
       console.log(`[图片上传] 成功，大小: ${Math.round(file.size / 1024)}KB`);
     } catch (error) {
       console.error('图片处理失败:', error);
@@ -71,10 +88,10 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
     }
 
     setIsRecognizing(true);
+    setRecognizeResult(null);
     setRecognizeStatus('正在压缩图片...');
 
     try {
-      // 先压缩图片，再传给API
       const compressed = await compressImage(preview, 800, 0.7);
       console.log(`[AI识别] 压缩后大小: ${Math.round(compressed.length / 1024)}KB`);
       
@@ -84,12 +101,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       });
 
       onRecognize?.(result);
+      setRecognizeResult(result);
       setRecognizeStatus('识别完成 ✓');
-      setTimeout(() => setRecognizeStatus(''), 3000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : '识别失败';
       setRecognizeStatus(`识别失败: ${msg}`);
-      setTimeout(() => setRecognizeStatus(''), 5000);
     } finally {
       setIsRecognizing(false);
     }
@@ -120,6 +136,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
     setPreview(null);
     onChange(null);
     setRecognizeStatus('');
+    setRecognizeResult(null);
   }, [onChange]);
 
   return (
@@ -184,12 +201,22 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
             )}
           </button>
 
-          {/* 识别状态 */}
-          {recognizeStatus && !isRecognizing && (
-            <div className={clsx(
-              'px-3 py-2 rounded-lg text-sm text-center',
-              recognizeStatus.includes('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-            )}>
+          {/* 识别结果摘要字条 */}
+          {recognizeResult && (
+            <div className="px-3 py-2.5 rounded-lg bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-200 text-xs text-stone-600 leading-relaxed">
+              <div className="flex items-center gap-1.5 mb-1">
+                <svg className="w-3.5 h-3.5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="font-medium text-primary-700">AI识别结果</span>
+              </div>
+              <p>{buildSummary(recognizeResult)}</p>
+            </div>
+          )}
+
+          {/* 识别状态（失败时显示） */}
+          {recognizeStatus && !isRecognizing && !recognizeStatus.includes('✓') && (
+            <div className="px-3 py-2 rounded-lg text-sm text-center bg-red-50 text-red-700">
               {recognizeStatus}
             </div>
           )}
