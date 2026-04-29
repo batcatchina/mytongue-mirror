@@ -327,20 +327,8 @@ const DiagnosisPage: React.FC = () => {
         setCurrentStep('matching', 50);
         
         console.log('[辨证] 即将调用handleLocalDiagnosis...');
-        let diagResult, acupuncturePlan, lifeCareAdvice;
-        try {
-          const localResult = await handleLocalDiagnosis();
-          console.log('[辨证] handleLocalDiagnosis返回成功:', localResult?.diagnosisResult?.syndrome);
-          diagResult = localResult.diagnosisResult;
-          acupuncturePlan = localResult.acupuncturePlan;
-          lifeCareAdvice = localResult.lifeCareAdvice;
-        } catch (e) {
-          console.error('[辨证] handleLocalDiagnosis异常:', e);
-          toast.error('辨证引擎出错: ' + (e instanceof Error ? e.message : String(e)));
-          setIsAnalyzing(false);
-          resetProgress();
-          return;
-        }
+        const localResult = await handleLocalDiagnosis();
+        console.log('[辨证] handleLocalDiagnosis返回成功:', localResult?.diagnosisResult?.syndrome);
         
         setCurrentStep('matching', 95);
         // 直接调用setDiagnosisResult，不使用类型断言
