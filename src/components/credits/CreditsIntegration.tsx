@@ -1,3 +1,4 @@
+
 /**
  * 舌诊页面积分模块集成示例
  * 
@@ -5,7 +6,7 @@
  * 实际使用时，请将相关代码整合到 DiagnosisPage.tsx 中
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { useCredits, formatCreditsInfo } from '@/hooks/useCredits';
 import {

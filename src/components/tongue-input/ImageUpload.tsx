@@ -8,6 +8,29 @@ interface ImageUploadProps {
   onRecognize?: (result: TongueRecognitionResult) => void;
 }
 
+// 压缩图片：最大宽度800px，质量0.7
+function compressImage(dataUrl: string, maxWidth = 800, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width;
+      let h = img.height;
+      if (w > maxWidth) {
+        h = Math.round(h * maxWidth / w);
+        w = maxWidth;
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = dataUrl;
+  });
+}
+
 export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRecognize }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
@@ -48,13 +71,15 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
     }
 
     setIsRecognizing(true);
-    setRecognizeStatus('正在识别...');
+    setRecognizeStatus('正在压缩图片...');
 
     try {
-      // 提取base64数据
-      const base64Data = preview.includes(',') ? preview.split(',')[1] : preview;
+      // 先压缩图片，再传给API
+      const compressed = await compressImage(preview, 800, 0.7);
+      console.log(`[AI识别] 压缩后大小: ${Math.round(compressed.length / 1024)}KB`);
       
-      const result = await recognizeTongue(base64Data, (status) => {
+      setRecognizeStatus('正在上传识别...');
+      const result = await recognizeTongue(compressed, (status) => {
         setRecognizeStatus(status);
       });
 
@@ -151,7 +176,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
               </>
             ) : (
               <>
-                <span className="text-lg">🤖</span>
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                </svg>
                 AI智能识别舌象
               </>
             )}

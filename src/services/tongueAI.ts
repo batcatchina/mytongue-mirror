@@ -1,29 +1,11 @@
-// 舌象AI识别服务 - 前端直调扣子API（国内链路）
-
-const COZE_CONFIG = {
-  botId: '7634049322782785572',
-  apiUrl: 'https://api.coze.cn/v3/chat',
-  token: 'pat_cT0kGwXPwioWz69z65sLufTqcr1PJNorzO4EJbymAfbMM7uWC2W2qDCvdEqiK1l6'
-};
-
-const TONGUE_PROMPT = '识别舌象输出JSON：{"tongue_color":{"value":"","confidence":0},"tongue_shape":{"value":"","teeth_mark":{"has":false,"degree":"","position":""},"crack":{"has":false,"degree":"","position":""}},"tongue_coating":{"color":"","texture":"","moisture":"","confidence":0},"tongue_state":{"value":""},"region_features":{"tip":{"color":"","features":[],"depression":false,"bulge":false},"sides":{"color":"","features":[],"depression":false,"bulge":false},"middle":{"color":"","features":[],"depression":false,"bulge":false},"root":{"color":"","features":[],"depression":false,"bulge":false}},"shape_distribution":{"depression":[],"bulge":[]},"overall_confidence":0,"notes":""}';
-
 export interface TongueRecognitionResult {
-  tongue_color: {
-    value: string;
-    confidence: number;
-  };
+  tongue_color: { value: string; confidence: number };
   tongue_shape: {
     value: string;
     teeth_mark: { has: boolean; degree: string; position: string };
     crack: { has: boolean; degree: string; position: string };
   };
-  tongue_coating: {
-    color: string;
-    texture: string;
-    moisture: string;
-    confidence: number;
-  };
+  tongue_coating: { color: string; texture: string; moisture: string; confidence: number };
   tongue_state: { value: string };
   region_features: {
     tip: { color: string; features: string[]; depression: boolean; bulge: boolean };
@@ -41,110 +23,60 @@ export interface TongueRecognitionResult {
   message?: string;
 }
 
-function parseResult(content: string): TongueRecognitionResult | null {
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]);
-  } catch {
-    return null;
-  }
-}
+const POLL_INTERVAL = 3000;
+const MAX_POLL = 20;
 
-/**
- * 识别舌象图片
- * @param imageBase64 图片的base64数据（不含data:image前缀）
- * @param onProgress 进度回调
- */
 export async function recognizeTongue(
-  imageBase64: string,
+  imageData: string,
   onProgress?: (status: string) => void
 ): Promise<TongueRecognitionResult> {
   onProgress?.('正在上传图片...');
 
-  const imageUrl = imageBase64.startsWith('data:') 
-    ? imageBase64 
-    : `data:image/jpeg;base64,${imageBase64}`;
-
-  onProgress?.('正在识别舌象...');
-
-  const response = await fetch(COZE_CONFIG.apiUrl, {
+  // Step 1: 上传图片 + 创建对话
+  const createRes = await fetch('/api/tongue-ai/tongue', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${COZE_CONFIG.token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      bot_id: COZE_CONFIG.botId,
-      user_id: `tongue_${Date.now()}`,
-      stream: true,
-      additional_messages: [{
-        role: 'user',
-        content_type: 'object_string',
-        content: JSON.stringify([
-          { type: 'text', text: TONGUE_PROMPT },
-          { type: 'image', file_url: imageUrl }
-        ])
-      }]
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: imageData })
   });
 
-  if (!response.ok) {
-    throw new Error(`API调用失败: ${response.status}`);
+  const createData = await createRes.json();
+  if (!createData.success) {
+    throw new Error(createData.error || '创建识别任务失败');
   }
 
-  // 流式读取
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('无法读取响应');
+  const { chat_id, conversation_id } = createData;
+  onProgress?.('正在识别舌象...');
 
-  const decoder = new TextDecoder();
-  let result = '';
-  let lastProgress = 0;
+  // Step 2: 轮询结果
+  for (let i = 0; i < MAX_POLL; i++) {
+    await new Promise(r => setTimeout(r, POLL_INTERVAL));
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    const pollRes = await fetch(
+      `/api/tongue-ai/result?chat_id=${chat_id}&conversation_id=${conversation_id}`
+    );
+    const pollData = await pollRes.json();
 
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('data:')) {
-        try {
-          const d = JSON.parse(line.slice(5));
-          
-          // 收集answer内容
-          if (d.type === 'answer' && d.content) {
-            result = d.content;
-          }
-          
-          // 更新进度
-          if (d.type === 'answer' && d.reasoning_content && onProgress) {
-            const now = Date.now();
-            if (now - lastProgress > 2000) {
-              onProgress('正在分析舌象特征...');
-              lastProgress = now;
-            }
-          }
-
-        } catch {}
-      }
+    if (!pollData.success && pollData.code === 4100) {
+      throw new Error('Token权限不足，需要添加chat:retrieve和message:list权限');
     }
+    if (!pollData.success) {
+      throw new Error(pollData.error || '查询结果失败');
+    }
+
+    if (pollData.status === 'completed') {
+      if (pollData.data) {
+        onProgress?.('识别完成');
+        return pollData.data;
+      }
+      if (pollData.error) {
+        throw new Error(pollData.error);
+      }
+      throw new Error('识别结果为空');
+    }
+
+    const progress = Math.min(90, 30 + (i + 1) * 5);
+    onProgress?.(`正在识别舌象... ${progress}%`);
   }
 
-  if (!result) {
-    throw new Error('识别结果为空，请重试');
-  }
-
-  const parsed = parseResult(result);
-  if (!parsed) {
-    throw new Error('识别结果解析失败');
-  }
-
-  if (parsed.error) {
-    throw new Error(parsed.message || '识别失败');
-  }
-
-  onProgress?.('识别完成');
-  return parsed;
+  throw new Error('识别超时，请重试');
 }

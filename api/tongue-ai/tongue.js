@@ -1,6 +1,5 @@
-export const config = {
-  runtime: 'edge',
-};
+// 舌象识别 Step1: 上传图片 + 创建对话
+// 快速返回chat_id，不等AI结果（避免超时）
 
 const COZE_CONFIG = {
   botId: '7634049322782785572',
@@ -11,67 +10,65 @@ const COZE_CONFIG = {
 
 const TONGUE_PROMPT = '识别舌象输出JSON：{"tongue_color":{"value":"","confidence":0},"tongue_shape":{"value":"","teeth_mark":{"has":false,"degree":"","position":""},"crack":{"has":false,"degree":"","position":""}},"tongue_coating":{"color":"","texture":"","moisture":"","confidence":0},"tongue_state":{"value":""},"region_features":{"tip":{"color":"","features":[],"depression":false,"bulge":false},"sides":{"color":"","features":[],"depression":false,"bulge":false},"middle":{"color":"","features":[],"depression":false,"bulge":false},"root":{"color":"","features":[],"depression":false,"bulge":false}},"shape_distribution":{"depression":[],"bulge":[]},"overall_confidence":0,"notes":""}';
 
-function parseTongueResult(content) {
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { error: '未找到JSON数据' };
-    return JSON.parse(jsonMatch[0]);
-  } catch (e) {
-    return { error: '解析失败', raw: content };
-  }
-}
+export default async function handler(req, res) {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 
-      'Content-Type': 'application/json', 
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+  if (req.method === 'OPTIONS') return res.status(200).json({ status: 'ok' });
+  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
+
+  try {
+    // 接收JSON body，里面是base64图片
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ success: false, error: '缺少图片数据' });
+
+    // 解析data URL
+    let mimeType = 'image/jpeg';
+    let pureBase64 = image;
+    if (image.startsWith('data:')) {
+      const commaIdx = image.indexOf(',');
+      if (commaIdx > 0) {
+        const meta = image.slice(0, commaIdx);
+        const mimeMatch = meta.match(/:(image\/[a-zA-Z0-9.+-]+)/);
+        if (mimeMatch) mimeType = mimeMatch[1];
+        pureBase64 = image.slice(commaIdx + 1);
+      }
     }
-  });
-}
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') {
-    return jsonResponse({ status: 'ok' });
-  }
-
-  if (req.method !== 'POST') {
-    return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
-  }
-
-  try {
-    // 接收FormData
-    const formData = await req.formData();
-    const file = formData.get('file');
+    // 清理base64
+    pureBase64 = pureBase64.replace(/\s/g, '');
     
-    if (!file) {
-      return jsonResponse({ success: false, error: '缺少图片文件' }, 400);
-    }
+    const buffer = Buffer.from(pureBase64, 'base64');
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const fileName = `tongue_${Date.now()}.${ext}`;
 
-    // 直接把文件转发给Coze上传API
-    const cozeFormData = new FormData();
-    cozeFormData.append('file', file);
+    // 上传图片到Coze（用multipart/form-data）
+    const boundary = '----CozeUpload' + Date.now().toString(36);
+    const header = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+    );
+    const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const payload = Buffer.concat([header, buffer, footer]);
 
     const uploadRes = await fetch(COZE_CONFIG.uploadApiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${COZE_CONFIG.token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`
       },
-      body: cozeFormData
+      body: payload
     });
 
     const uploadData = await uploadRes.json();
-    
-    if (uploadData.code !== 0 || !uploadData.data || !uploadData.data.id) {
-      return jsonResponse({ success: false, error: `上传失败: ${uploadData.msg || 'unknown'}` });
+    if (uploadData.code !== 0 || !uploadData.data?.id) {
+      return res.json({ success: false, error: `上传失败: ${uploadData.msg || 'unknown'}` });
     }
 
     const fileId = uploadData.data.id;
 
-    // 创建chat（流式）
+    // 创建非流式对话（不等结果返回）
     const chatRes = await fetch(COZE_CONFIG.chatApiUrl, {
       method: 'POST',
       headers: {
@@ -81,7 +78,7 @@ export default async function handler(req) {
       body: JSON.stringify({
         bot_id: COZE_CONFIG.botId,
         user_id: `tongue_${Date.now()}`,
-        stream: true,
+        stream: false,
         additional_messages: [{
           role: 'user',
           content_type: 'object_string',
@@ -93,39 +90,21 @@ export default async function handler(req) {
       })
     });
 
-    if (!chatRes.ok) {
-      return jsonResponse({ success: false, error: `Chat API错误: ${chatRes.status}` });
+    const chatData = await chatRes.json();
+    if (chatData.code !== 0) {
+      return res.json({ success: false, error: `创建对话失败: ${chatData.msg || 'unknown'}` });
     }
 
-    // 读取流式结果
-    let result = '';
-    const text = await chatRes.text();
-    const lines = text.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('data:')) {
-        try {
-          const d = JSON.parse(line.slice(5));
-          if (d.type === 'answer' && d.content) {
-            result = d.content;
-          }
-        } catch (e) {}
-      }
-    }
-
-    if (!result) {
-      return jsonResponse({ success: false, error: '识别结果为空' });
-    }
-
-    const parsed = parseTongueResult(result);
-    if (parsed.error) {
-      return jsonResponse({ success: false, error: parsed.error, raw: parsed.raw?.slice(0, 200) });
-    }
-
-    return jsonResponse({ success: true, data: parsed });
+    // 返回chat_id给前端，前端轮询获取结果
+    res.json({
+      success: true,
+      chat_id: chatData.data.id,
+      conversation_id: chatData.data.conversation_id,
+      status: chatData.data.status
+    });
 
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    return jsonResponse({ success: false, error: errMsg });
+    res.json({ success: false, error: errMsg });
   }
 }
