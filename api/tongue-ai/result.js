@@ -69,8 +69,11 @@ export default async function handler(req, res) {
     }
 
     const parsed = parseTongueResult(answer.content);
+    
+    // Bot返回了error字段（如非舌象图片）
     if (parsed.error) {
-      return res.json({ success: true, status: 'completed', error: parsed.error, raw: parsed.raw?.slice(0, 200) });
+      const errMsg = parsed.message || (typeof parsed.error === 'string' ? parsed.error : '识别失败');
+      return res.json({ success: true, status: 'completed', error: errMsg, data: parsed });
     }
 
     res.json({ success: true, status: 'completed', data: parsed });
