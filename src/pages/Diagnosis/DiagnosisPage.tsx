@@ -27,7 +27,6 @@ import {
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   // 版本标记 - v1.3.0 UI优化版
-  console.log('[舌镜] 版本: v1.3.0');
 
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
   const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
@@ -108,19 +107,16 @@ const DiagnosisPage: React.FC = () => {
 
   // AI识别结果回填（每个字段独立try/catch，一个失败不影响其他）
   const handleRecognize = (result: TongueRecognitionResult) => {
-    console.log('[AI识别] 原始结果:', JSON.stringify(result, null, 2));
 
     // 舌色
     try {
       const colorVal = mapToEnum(result.tongue_color?.value || '', ['淡红', '淡白', '红', '绛', '紫', '青紫']);
-      console.log('[AI识别] 舌色:', result.tongue_color?.value, '→', colorVal);
       setTongueColor(colorVal || '淡红');
     } catch (e) { console.error('[AI识别] 舌色回填异常:', e); }
 
     // 舌形
     try {
       const shapeVal = mapToEnum(result.tongue_shape?.value || '', ['胖大', '瘦薄', '正常']);
-      console.log('[AI识别] 舌形:', result.tongue_shape?.value, '→', shapeVal);
       setTongueShape(shapeVal || '正常');
     } catch (e) { console.error('[AI识别] 舌形回填异常:', e); }
 
@@ -147,14 +143,12 @@ const DiagnosisPage: React.FC = () => {
       const coatColor = mapToEnum(result.tongue_coating?.color || '', ['薄白', '白厚', '黄', '灰黑', '剥落']);
       const coatTexture = mapToEnum(result.tongue_coating?.texture || '', ['薄', '厚', '正常']);
       const coatMoisture = mapToEnum(result.tongue_coating?.moisture || '', ['润', '燥', '正常']);
-      console.log('[AI识别] 苔色:', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
       setCoating(coatColor || '薄白', coatTexture || '薄', coatMoisture || '润');
     } catch (e) { console.error('[AI识别] 舌苔回填异常:', e); }
 
     // 舌态
     try {
       const stateVal = mapToEnum(result.tongue_state?.value || '', ['强硬', '痿软', '歪斜', '颤动', '正常']);
-      console.log('[AI识别] 舌态:', result.tongue_state?.value, '→', stateVal);
       setTongueState(stateVal || '正常');
     } catch (e) { console.error('[AI识别] 舌态回填异常:', e); }
 
@@ -172,7 +166,6 @@ const DiagnosisPage: React.FC = () => {
     acupuncturePlan: any;
     lifeCareAdvice: any;
   } => {
-    console.log('[本地规则引擎] 开始辨证...');
     
     // 检查齿痕和裂纹（同时兼容AI回填的teethMark/crack和手动选择的shapeDistribution）
     const shapeDist = inputFeatures.shapeDistribution;
@@ -204,9 +197,6 @@ const DiagnosisPage: React.FC = () => {
     
     // 打印规则统计
     const stats = getRuleStatistics();
-    console.log(`[本地规则引擎] 规则统计: 共${stats.totalRules}条规则`);
-    console.log(`[本地规则引擎] 主要结果: ${result.primaryResult.syndrome}`);
-    console.log(`[本地规则引擎] 匹配规则: ${result.primaryResult.matchedRuleName}`);
     
     // 构建诊断结果（严格匹配 DiagnosisResult 类型）
     const priorityMap: Record<string, '高' | '中' | '低'> = { high: '高', medium: '中', low: '低' };

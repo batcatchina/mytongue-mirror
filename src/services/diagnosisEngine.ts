@@ -56,7 +56,6 @@ export class DiagnosisEngine {
       ...coatingTextureRules,             // 苔质单特征
     ];
     
-    console.log(`[规则引擎] 加载了 ${this.rules.length} 条辨证规则`);
   }
   
   /**
@@ -220,8 +219,6 @@ export class DiagnosisEngine {
    * 执行规则匹配
    */
   diagnose(features: TongueFeatures, maxResults: number = 3): SyndromeResult[] {
-    console.log('[规则引擎] 开始辨证分析...');
-    console.log('[规则引擎] 输入特征:', JSON.stringify(features, null, 2));
     
     const matchedRules: { rule: DiagnosisRule; score: number }[] = [];
     
@@ -230,7 +227,6 @@ export class DiagnosisEngine {
       if (this.matchRule(rule, features)) {
         const score = this.calculateMatchScore(rule, features);
         matchedRules.push({ rule, score });
-        console.log(`[规则引擎] 匹配规则: ${rule.name} (权重:${rule.result.weight}, 得分:${score.toFixed(2)})`);
       }
     }
     
@@ -255,8 +251,6 @@ export class DiagnosisEngine {
       isLocalRule: true,
     }));
     
-    console.log(`[规则引擎] 匹配完成，共找到 ${matchedRules.length} 条匹配规则`);
-    console.log('[规则引擎] 最终结果:', JSON.stringify(results, null, 2));
     
     return results;
   }
@@ -408,9 +402,6 @@ export function diagnose(
   useLocalEngine: boolean = true,
   botResult?: any
 ): DiagnosisOutput {
-  console.log('[辨证分析] 开始分析...');
-  console.log('[辨证分析] 输入:', JSON.stringify(input, null, 2));
-  console.log('[辨证分析] 使用本地规则引擎:', useLocalEngine);
   
   const features: TongueFeatures = {
     tongueColor: input.tongueColor,
@@ -502,8 +493,6 @@ export function diagnose(
     clinicalNotes.push('清热为主，忌用温灸');
   }
   
-  console.log('[辨证分析] 分析完成');
-  console.log('[辨证分析] 主要结果:', primaryResult.syndrome);
   
   return {
     primaryResult,
