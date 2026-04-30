@@ -12,7 +12,7 @@ import {
 import ImageUpload from '@/components/tongue-input/ImageUpload';
 import SymptomInput from '@/components/tongue-input/SymptomInput';
 import PatientInfoForm from '@/components/tongue-input/PatientInfoForm';
-import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
+import { HealthProfile } from '@/components/result-display/HealthProfile';
 import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
@@ -165,6 +165,7 @@ const DiagnosisPage: React.FC = () => {
     diagnosisResult: any;
     acupuncturePlan: any;
     lifeCareAdvice: any;
+    constitutionAssessment: any;
   } => {
     
     // 检查齿痕和裂纹（同时兼容AI回填的teethMark/crack和手动选择的shapeDistribution）
@@ -195,8 +196,7 @@ const DiagnosisPage: React.FC = () => {
     // 调用本地规则引擎
     const result = localDiagnose(input, true);
     
-    // 打印规则统计
-    const stats = getRuleStatistics();
+    
     
     // 构建诊断结果（严格匹配 DiagnosisResult 类型）
     const priorityMap: Record<string, '高' | '中' | '低'> = { high: '高', medium: '中', low: '低' };
@@ -249,7 +249,7 @@ const DiagnosisPage: React.FC = () => {
     // 构建生活调护建议（严格匹配 LifeCareAdvice 类型）
     const lifeCareAdvice = generateLifeCareAdvice(result);
     
-    return { diagnosisResult: diagnosisResultOut, acupuncturePlan, lifeCareAdvice };
+return { diagnosisResult: diagnosisResultOut, acupuncturePlan, lifeCareAdvice, constitutionAssessment: result.constitutionAssessment };
   };
   
   /**
@@ -344,11 +344,12 @@ const DiagnosisPage: React.FC = () => {
       // 用setTimeout让出主线程，确保"分析中"UI先渲染
       setTimeout(() => {
           try {
-            const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
+            const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice, constitutionAssessment } = handleLocalDiagnosis();
             setDiagnosisResult({ 
               diagnosisResult: diagResult, 
               acupuncturePlan, 
-              lifeCareAdvice 
+              lifeCareAdvice,
+              constitutionAssessment,
             } as any);
             toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
           } catch (error) {
@@ -694,8 +695,11 @@ const DiagnosisPage: React.FC = () => {
               <div className="space-y-3">
                 {/* 📋 辨证结果 - 用户关注点2：怎么了+怎么办 */}
                 
-                {/* 证型结论 - 最醒目 */}
-                <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
+                {/* 完整健康画像 - v2.0 融合体质+证型 */}
+                <HealthProfile 
+                  diagnosisResult={diagnosisResult.diagnosisResult} 
+                  constitutionAssessment={diagnosisResult.constitutionAssessment}
+                />
                 
                 {/* Tab切换：病机 | 针灸 | 调理 */}
                 <div className="flex border-b border-stone-200">

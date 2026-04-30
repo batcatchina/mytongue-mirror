@@ -1,7 +1,9 @@
 /**
- * 舌诊辨证本地规则引擎 v1.0
+ * 舌诊辨证本地规则引擎 v2.0
  * 基于主人的辨证规则树v2.0构建
  * 100%忠实于主人临床规则，不含AI自由发挥
+ * 
+ * v2.0 新增：基于舌象特征的八大体质判断
  */
 
 import {
@@ -24,6 +26,14 @@ import {
   allRuleCategories,
   getTotalRuleCount,
 } from './diagnosisRules';
+
+import {
+  assessConstitution,
+} from './constitutionAssessment';
+
+import {
+  ConstitutionAssessment,
+} from '@/types/output';
 
 // ==================== 规则匹配引擎核心 ====================
 
@@ -383,6 +393,8 @@ export interface DiagnosisInput {
   coatingMoisture: string;
   teethMark?: boolean;
   crack?: boolean;
+  ecchymosis?: boolean;
+  tongueShapeDetail?: string;
   regionFeatures?: TongueFeatures['regionFeatures'];
 }
 
@@ -391,11 +403,13 @@ export interface DiagnosisOutput {
   alternativeResults: SyndromeResult[];
   acupointSelection: AcupointSelection;
   clinicalNotes: string[];
+  constitutionAssessment: ConstitutionAssessment;
   isLocalRuleBased: boolean;
 }
 
 /**
- * 完整辨证分析（整合规则引擎）
+ * 完整辨证分析（整合规则引擎 + 体质评估）
+ * v2.0 新增：从舌象特征直接评估体质，而非从证型倒推
  */
 export function diagnose(
   input: DiagnosisInput,
@@ -455,6 +469,16 @@ export function diagnose(
           isLocalRule: false,
         }),
         clinicalNotes: ['本地规则未匹配，请结合临床实际判断'],
+        constitutionAssessment: assessConstitution({
+          tongueColor: input.tongueColor,
+          tongueShape: input.tongueShape,
+          coatingColor: input.coatingColor,
+          coatingTexture: input.coatingTexture,
+          teethMark: input.teethMark || false,
+          crack: input.crack || false,
+          ecchymosis: input.ecchymosis,
+          tongueShapeDetail: input.tongueShapeDetail,
+        }),
         isLocalRuleBased: false,
       };
     }
@@ -493,12 +517,25 @@ export function diagnose(
     clinicalNotes.push('清热为主，忌用温灸');
   }
   
-  
+  // ===== 体质评估（v2.0 核心功能）=====
+  // 从舌象特征直接评估，而非从证型倒推
+  const constitutionAssessment = assessConstitution({
+    tongueColor: input.tongueColor,
+    tongueShape: input.tongueShape,
+    coatingColor: input.coatingColor,
+    coatingTexture: input.coatingTexture,
+    teethMark: input.teethMark || false,
+    crack: input.crack || false,
+    ecchymosis: input.ecchymosis,
+    tongueShapeDetail: input.tongueShapeDetail,
+  });
+
   return {
     primaryResult,
     alternativeResults,
     acupointSelection,
     clinicalNotes,
+    constitutionAssessment,
     isLocalRuleBased: true,
   };
 }
