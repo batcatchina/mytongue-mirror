@@ -95,14 +95,10 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
 
     setIsRecognizing(true);
     setRecognizeResult(null);
-    setRecognizeStatus('正在压缩图片...');
+    setRecognizeStatus('正在上传识别...');
 
     try {
-      const compressed = await compressImage(dataToRecognize, 800, 0.7);
-      console.log(`[AI识别] 压缩后大小: ${Math.round(compressed.length / 1024)}KB`);
-      
-      setRecognizeStatus('正在上传识别...');
-      const result = await recognizeTongue(compressed, (status) => {
+      const result = await recognizeTongue(dataToRecognize, (status) => {
         setRecognizeStatus(status);
       });
 
