@@ -372,8 +372,8 @@ export const tongueShapeRules: DiagnosisRule[] = [
       syndrome: '实证',
       pathogenesis: '热结/痰凝/瘀阻',
       treatment: '泻实攻邪',
-      mainPoints: ['辨证选穴'],
-      secondaryPoints: ['对症配穴'],
+      mainPoints: ['合谷', '太冲'],
+      secondaryPoints: ['曲池', '丰隆'],
       organLocation: ['肝', '胃'],
       priority: 'medium',
       weight: 25
@@ -387,8 +387,8 @@ export const tongueShapeRules: DiagnosisRule[] = [
       syndrome: '虚证',
       pathogenesis: '气虚/阳虚/血虚',
       treatment: '补益正气',
-      mainPoints: ['辨证选穴'],
-      secondaryPoints: ['对症配穴'],
+      mainPoints: ['足三里', '关元'],
+      secondaryPoints: ['脾俞', '肾俞'],
       organLocation: ['脾', '肾'],
       priority: 'medium',
       weight: 25
@@ -560,8 +560,8 @@ export const coatingTextureRules: DiagnosisRule[] = [
       syndrome: '津液未伤证',
       pathogenesis: '病轻/正常/寒湿',
       treatment: '辨证调理',
-      mainPoints: ['辨证选穴'],
-      secondaryPoints: ['对症配穴'],
+      mainPoints: ['足三里', '中脘'],
+      secondaryPoints: ['阴陵泉', '丰隆'],
       organLocation: ['肺', '胃'],
       priority: 'normal',
       weight: 10
