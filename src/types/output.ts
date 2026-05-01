@@ -301,3 +301,135 @@ export const CONSTITUTION_THEME: Record<ConstitutionEnum, {
   '气郁': { bgGradient: 'from-green-50 to-teal-50', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-100' },
   '平和': { bgGradient: 'from-emerald-50 to-teal-50', border: 'border-emerald-200', text: 'text-emerald-700', badge: 'bg-emerald-100' },
 };
+
+// ==================== 推理链结构化输出 v2.0 ====================
+
+import type { InferenceChainOutput, OrganPattern } from './inference';
+
+/**
+ * 推理结果结构化输出
+ * 用于API返回和UI展示
+ */
+export interface InferenceResult {
+  /** 推理链ID */
+  chainId: string;
+  /** 推理状态 */
+  status: 'success' | 'partial' | 'failed';
+  /** 主证型 */
+  primarySyndrome: string;
+  /** 主证型置信度 */
+  primaryConfidence: number;
+  /** 次要证型列表 */
+  secondarySyndromes: SecondarySyndromeItem[];
+  /** 根本原因 */
+  rootCause: string;
+  /** 传变路径描述 */
+  transmissionPaths: string[];
+  /** 脏腑辨证详情 */
+  organPatterns: OrganPatternItem[];
+  /** 配穴方案 */
+  prescription?: PrescriptionItem;
+  /** 推理链摘要（用于展示） */
+  chainSummary: ChainSummaryItem[];
+  /** 生成时间 */
+  generatedAt: string;
+  /** 执行耗时(ms) */
+  executionTime?: number;
+}
+
+/**
+ * 次要证型条目
+ */
+export interface SecondarySyndromeItem {
+  syndrome: string;
+  confidence: number;
+  evidence: string[];
+}
+
+/**
+ * 脏腑辨证条目
+ */
+export interface OrganPatternItem {
+  organ: string;
+  pattern: string;
+  nature: string;
+  confidence: number;
+  mainSymptoms: string[];
+}
+
+/**
+ * 配穴方案条目
+ */
+export interface PrescriptionItem {
+  mainPoints: string[];
+  secondaryPoints: string[];
+  specialPoints?: {
+    yuanSource?: string;
+    luoConnecting?: string;
+    xiCleft?: string;
+    huiMeeting?: string;
+  };
+  technique: string;
+  needleRetention: number;
+  moxibustion: string;
+  frequency: string;
+  course: string;
+  precautions: string[];
+  basis: string[];
+  confidence: number;
+}
+
+/**
+ * 推理链摘要条目
+ */
+export interface ChainSummaryItem {
+  layer: number;
+  layerName: string;
+  conclusion: string;
+  confidence: number;
+  keyEvidence: string[];
+}
+
+/**
+ * 将推理链输出转换为InferenceResult
+ */
+export function convertToInferenceResult(chainOutput: InferenceChainOutput): InferenceResult {
+  return {
+    chainId: chainOutput.chainId,
+    status: chainOutput.status,
+    primarySyndrome: chainOutput.syndrome,
+    primaryConfidence: chainOutput.organPatterns[0]?.confidence || 0,
+    secondarySyndromes: chainOutput.organPatterns
+      .slice(1)
+      .map(op => ({
+        syndrome: op.pattern,
+        confidence: op.confidence,
+        evidence: op.mainSymptoms,
+      })),
+    rootCause: chainOutput.rootCause,
+    transmissionPaths: chainOutput.transmissionPaths,
+    organPatterns: chainOutput.organPatterns.map(op => ({
+      organ: op.organ,
+      pattern: op.pattern,
+      nature: op.nature,
+      confidence: op.confidence,
+      mainSymptoms: op.mainSymptoms,
+    })),
+    prescription: chainOutput.prescription ? {
+      mainPoints: chainOutput.prescription.mainPoints,
+      secondaryPoints: chainOutput.prescription.secondaryPoints,
+      specialPoints: chainOutput.prescription.specialPoints,
+      technique: chainOutput.prescription.technique,
+      needleRetention: chainOutput.prescription.needleRetention,
+      moxibustion: chainOutput.prescription.moxibustion,
+      frequency: chainOutput.prescription.frequency,
+      course: chainOutput.prescription.course,
+      precautions: chainOutput.prescription.precautions,
+      basis: chainOutput.prescription.basis,
+      confidence: chainOutput.prescription.confidence,
+    } : undefined,
+    chainSummary: [],
+    generatedAt: new Date().toISOString(),
+    executionTime: chainOutput.executionTime,
+  };
+}
