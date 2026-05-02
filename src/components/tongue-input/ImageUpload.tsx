@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import clsx from 'clsx';
-import { recognizeTongue, TongueRecognitionResult, ProgressInfo } from '@/services/tongueAI';
+import { recognizeTongue, TongueRecognitionResult, ProgressInfo, TongueNotDetectedError } from '@/services/tongueAI';
 
 interface ImageUploadProps {
   value?: string;
@@ -109,8 +109,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       setRecognizeResult(result);
       setRecognizeStatus('识别完成 ✓');
     } catch (error) {
-      const msg = error instanceof Error ? error.message : '识别失败';
-      setRecognizeStatus(`识别失败: ${msg}`);
+      if (error instanceof TongueNotDetectedError) {
+        // 安全验证：未检测到舌头，显示醒目警告
+        setRecognizeStatus(`⚠️ ${error.message}`);
+      } else {
+        const msg = error instanceof Error ? error.message : '识别失败';
+        setRecognizeStatus(`识别失败: ${msg}`);
+      }
     } finally {
       setIsRecognizing(false);
       setProgressInfo(null);

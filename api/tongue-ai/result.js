@@ -125,6 +125,12 @@ export default async function handler(req, res) {
 
     const parsed = parseTongueResult(answer.content);
 
+    // 如果未检测到舌头（安全验证）
+    if (parsed.tongueDetected === false) {
+      const errMsg = parsed.message || '未检测到舌象，请上传清晰的舌头照片';
+      return res.json({ success: true, status: 'completed', error: errMsg, tongueNotDetected: true });
+    }
+
     // Bot返回了error（如非舌象图片）
     if (parsed.error) {
       const errMsg = parsed.message || (typeof parsed.error === 'string' ? parsed.error : '识别失败');
