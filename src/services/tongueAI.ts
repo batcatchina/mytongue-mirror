@@ -34,16 +34,20 @@ export interface TongueRecognitionResult {
 const POLL_INTERVAL = 1000;
 const MAX_POLL = 20;
 
-// 获取进度文案
+// 获取进度文案 - 前置舌象检测步骤
 function getProgressMessage(elapsedSeconds: number): string {
-  if (elapsedSeconds < 8) {
-    return '正在识别舌体特征…';
-  } else if (elapsedSeconds < 16) {
-    return '正在分析舌色苔质…';
+  if (elapsedSeconds < 6) {
+    return '正在上传图片...';
+  } else if (elapsedSeconds < 12) {
+    return '正在检测舌象...';
+  } else if (elapsedSeconds < 18) {
+    return '正在识别舌色...';
   } else if (elapsedSeconds < 24) {
-    return '正在综合辨证…';
+    return '正在分析舌形...';
+  } else if (elapsedSeconds < 30) {
+    return '正在判断苔色...';
   } else {
-    return '即将完成…';
+    return '正在综合辨证...';
   }
 }
 
