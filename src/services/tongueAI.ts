@@ -1,3 +1,11 @@
+// 舌头未检测到错误（安全验证）
+export class TongueNotDetectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TongueNotDetectedError';
+  }
+}
+
 export interface TongueRecognitionResult {
   tongue_color: { value: string; confidence: number };
   tongue_shape: {
@@ -64,6 +72,10 @@ export async function recognizeTongue(
     }
 
     if (pollData.status === 'completed') {
+      // 安全验证：未检测到舌头
+      if (pollData.tongueNotDetected) {
+        throw new TongueNotDetectedError(pollData.error || '未检测到舌象，请上传清晰的舌头照片');
+      }
       if (pollData.data) {
         onProgress?.('识别完成');
         return pollData.data;

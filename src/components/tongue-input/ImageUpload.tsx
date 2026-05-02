@@ -277,6 +277,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         setRecognitionStatus(statusMsg);
         setProgressInfo({ status: '识别完成', percent: 100 });
         onAIRecognition?.(result.data);
+      } else if (result.tongueNotDetected) {
+        // 安全验证：未检测到舌头
+        setRecognitionStatus('⚠️ ' + (result.error || '未检测到舌象，请上传清晰的舌头照片'));
+        setAiResult(null);
+        setProgressInfo(null);
       } else {
         setRecognitionStatus('识别失败: ' + (result.error || '未知错误'));
         setProgressInfo(null);

@@ -8,7 +8,12 @@ const COZE_CONFIG = {
   token: 'pat_cT0kGwXPwioWz69z65sLufTqcr1PJNorzO4EJbymAfbMM7uWC2W2qDCvdEqiK1l6'
 };
 
-const TONGUE_PROMPT = '识别舌象输出JSON：{"tongue_color":{"value":"","confidence":0},"tongue_shape":{"value":"","teeth_mark":{"has":false,"degree":"","position":""},"crack":{"has":false,"degree":"","position":""}},"tongue_coating":{"color":"","texture":"","moisture":"","confidence":0},"tongue_state":{"value":""},"region_features":{"tip":{"color":"","features":[],"depression":false,"bulge":false},"sides":{"color":"","features":[],"depression":false,"bulge":false},"middle":{"color":"","features":[],"depression":false,"bulge":false},"root":{"color":"","features":[],"depression":false,"bulge":false}},"shape_distribution":{"depression":[],"bulge":[]},"overall_confidence":0,"notes":""}';
+const TONGUE_PROMPT = `【重要前置检查】首先判断图片中是否包含舌头/口腔：
+- 如果图片中没有舌头或口腔（是其他物品/风景/人物等），必须返回：{"tongueDetected":false,"message":"未检测到舌象，请上传清晰的舌头照片"}
+- 如果图片中有舌头/口腔，才进入舌象识别流程
+
+【舌象识别】（仅当检测到舌头时执行）
+识别舌象输出JSON：{"tongue_color":{"value":"","confidence":0},"tongue_shape":{"value":"","teeth_mark":{"has":false,"degree":"","position":""},"crack":{"has":false,"degree":"","position":""}},"tongue_coating":{"color":"","texture":"","moisture":"","confidence":0},"tongue_state":{"value":""},"region_features":{"tip":{"color":"","features":[],"depression":false,"bulge":false},"sides":{"color":"","features":[],"depression":false,"bulge":false},"middle":{"color":"","features":[],"depression":false,"bulge":false},"root":{"color":"","features":[],"depression":false,"bulge":false}},"shape_distribution":{"depression":[],"bulge":[]},"overall_confidence":0,"notes":""}`;
 
 export default async function handler(req, res) {
   // CORS
