@@ -305,6 +305,7 @@ export const essenceRules: EssenceRule[] = [
 
 /**
  * 匹配舌形规则
+ * 优先匹配有更多限制条件的规则
  */
 export function matchTongueShapeRule(
   shape: TongueShapeValue,
@@ -312,7 +313,8 @@ export function matchTongueShapeRule(
   hasTeethMark?: boolean,
   hasCrack?: boolean
 ): TongueShapeRule | undefined {
-  return tongueShapeRules.find(rule => {
+  // 找出所有匹配舌形的规则
+  const matchingRules = tongueShapeRules.filter(rule => {
     // 检查舌形
     const shapeMatch = Array.isArray(rule.tongueShape)
       ? rule.tongueShape.includes(shape)
@@ -338,6 +340,27 @@ export function matchTongueShapeRule(
     
     return true;
   });
+  
+  if (matchingRules.length === 0) return undefined;
+  
+  // 优先返回有最多限制条件的规则
+  // 计算每条规则的特异性分数（限制条件越多分数越高）
+  matchingRules.sort((a, b) => {
+    let scoreA = 0;
+    let scoreB = 0;
+    
+    // 舌色限制
+    if (a.tongueColor) scoreA += 2;
+    if (b.tongueColor) scoreB += 2;
+    
+    // 特征限制
+    if (a.features) scoreA += a.features.length;
+    if (b.features) scoreB += b.features.length;
+    
+    return scoreB - scoreA; // 分数高的排前面
+  });
+  
+  return matchingRules[0];
 }
 
 /**
