@@ -19,6 +19,10 @@ export { Layer2Processor } from './layers/Layer2Processor';
 export { Layer3Processor } from './layers/Layer3Processor';
 export { Layer4Processor } from './layers/Layer4Processor';
 
+// Layer结果类型
+export type { Layer3Result } from './layers/Layer3Result';
+export type { Layer4Result } from './layers/Layer4Result';
+
 // 规则配置
 export * from './rules';
 
