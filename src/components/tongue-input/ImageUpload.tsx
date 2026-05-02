@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 
 // AI识别结果类型
@@ -137,6 +137,32 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognitionStatus, setRecognitionStatus] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<AIRecognitionResult | null>(null);
+  
+  // 进度反馈定时器
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionStartTimeRef = useRef<number>(0);
+  
+  // 清理进度定时器
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
+    };
+  }, []);
+  
+  // 获取进度文案
+  const getProgressMessage = (elapsedSeconds: number): string => {
+    if (elapsedSeconds < 8) {
+      return '正在识别舌体特征…';
+    } else if (elapsedSeconds < 16) {
+      return '正在分析舌色苔质…';
+    } else if (elapsedSeconds < 24) {
+      return '正在综合辨证…';
+    } else {
+      return '即将完成…';
+    }
+  };
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -201,6 +227,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     
     setIsRecognizing(true);
     setRecognitionStatus('正在识别...');
+    recognitionStartTimeRef.current = Date.now();
+    
+    // 启动进度文案定时器（每2秒更新一次）
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recognitionStartTimeRef.current) / 1000);
+      setRecognitionStatus(getProgressMessage(elapsed));
+    }, 2000);
     
     try {
       const response = await fetch(aiApiUrl, {
@@ -221,6 +254,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     } catch (e: any) {
       setRecognitionStatus('网络错误: ' + e.message);
     } finally {
+      // 清理进度定时器
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
       setIsRecognizing(false);
     }
   }, [preview, aiApiUrl, onAIRecognition]);
