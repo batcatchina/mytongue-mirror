@@ -39,12 +39,40 @@ function getProgressMessage(elapsedSeconds: number): string {
   }
 }
 
+// 获取进度百分比 (非线性)
+// 0-8秒: 0%->30%, 8-16秒: 30%->60%, 16-24秒: 60%->80%, 24秒+: 80%->90%
+export function getProgressPercent(elapsedSeconds: number): number {
+  if (elapsedSeconds < 0) return 0;
+  if (elapsedSeconds < 8) {
+    // 快速阶段: 0 -> 30
+    return Math.round((elapsedSeconds / 8) * 30);
+  } else if (elapsedSeconds < 16) {
+    // 中速阶段: 30 -> 60
+    return 30 + Math.round(((elapsedSeconds - 8) / 8) * 30);
+  } else if (elapsedSeconds < 24) {
+    // 减速阶段: 60 -> 80
+    return 60 + Math.round(((elapsedSeconds - 16) / 8) * 20);
+  } else {
+    // 缓慢阶段: 80 -> 90
+    const extraSeconds = elapsedSeconds - 24;
+    const progress = Math.min(extraSeconds * 2, 10); // 每秒2%，最高到90
+    return 80 + Math.round(progress);
+  }
+}
+
+// 进度信息类型
+export interface ProgressInfo {
+  status: string;
+  percent: number;
+  isComplete?: boolean;
+}
+
 export async function recognizeTongue(
   imageData: string,
-  onProgress?: (status: string) => void
+  onProgress?: (info: ProgressInfo) => void
 ): Promise<TongueRecognitionResult> {
   const startTime = Date.now();
-  onProgress?.('正在上传图片...');
+  onProgress?.({ status: '正在上传图片...', percent: 0 });
 
   // Step 1: 上传图片 + 创建对话
   const createRes = await fetch('/api/tongue-ai/tongue', {
@@ -62,7 +90,7 @@ export async function recognizeTongue(
   
   // 获取初始进度文案
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  onProgress?.(getProgressMessage(elapsed));
+  onProgress?.({ status: getProgressMessage(elapsed), percent: getProgressPercent(elapsed) });
 
   // Step 2: 轮询结果
   for (let i = 0; i < MAX_POLL; i++) {
@@ -82,7 +110,7 @@ export async function recognizeTongue(
 
     if (pollData.status === 'completed') {
       if (pollData.data) {
-        onProgress?.('识别完成');
+        onProgress?.({ status: '识别完成', percent: 100, isComplete: true });
         return pollData.data;
       }
       if (pollData.error) {
@@ -93,7 +121,7 @@ export async function recognizeTongue(
 
     // 更新进度文案
     const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
-    onProgress?.(getProgressMessage(currentElapsed));
+    onProgress?.({ status: getProgressMessage(currentElapsed), percent: getProgressPercent(currentElapsed) });
   }
 
   throw new Error('识别超时，请重试');

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import clsx from 'clsx';
-import { recognizeTongue, TongueRecognitionResult } from '@/services/tongueAI';
+import { recognizeTongue, TongueRecognitionResult, ProgressInfo } from '@/services/tongueAI';
 
 interface ImageUploadProps {
   value?: string;
@@ -51,6 +51,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
   const [preview, setPreview] = useState<string | null>(value || null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognizeStatus, setRecognizeStatus] = useState<string>('');
+  const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
   const [recognizeResult, setRecognizeResult] = useState<TongueRecognitionResult | null>(null);
   const [autoRecognize, setAutoRecognize] = useState(true); // 默认自动识别
 
@@ -96,10 +97,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
     setIsRecognizing(true);
     setRecognizeResult(null);
     setRecognizeStatus('正在上传识别...');
+    setProgressInfo({ status: '正在上传图片...', percent: 0 });
 
     try {
-      const result = await recognizeTongue(dataToRecognize, (status) => {
-        setRecognizeStatus(status);
+      const result = await recognizeTongue(dataToRecognize, (info: ProgressInfo) => {
+        setRecognizeStatus(info.status);
+        setProgressInfo(info);
       });
 
       onRecognize?.(result);
@@ -110,6 +113,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       setRecognizeStatus(`识别失败: ${msg}`);
     } finally {
       setIsRecognizing(false);
+      setProgressInfo(null);
     }
   }, [preview, onRecognize]);
 
@@ -138,6 +142,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
     setPreview(null);
     onChange(null);
     setRecognizeStatus('');
+    setProgressInfo(null);
     setRecognizeResult(null);
   }, [onChange]);
 
@@ -223,6 +228,27 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
               </>
             )}
           </button>
+
+          {/* 识别进度条 */}
+          {isRecognizing && progressInfo && (
+            <div className="space-y-2 animate-fadeIn">
+              <div className="flex items-center justify-between text-xs text-stone-500">
+                <span>{progressInfo.status}</span>
+                <span className="font-medium text-primary-600">{progressInfo.percent}%</span>
+              </div>
+              <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                <div 
+                  className={clsx(
+                    'h-full rounded-full transition-all duration-500 ease-out',
+                    progressInfo.isComplete 
+                      ? 'bg-green-500' 
+                      : 'bg-gradient-to-r from-teal-400 to-cyan-500'
+                  )}
+                  style={{ width: `${progressInfo.percent}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* 识别结果摘要条 */}
           {recognizeResult && (
