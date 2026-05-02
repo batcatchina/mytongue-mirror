@@ -29,7 +29,7 @@ const DiagnosisPage: React.FC = () => {
   // 版本标记 - v1.3.0 UI优化版
   console.log('[舌镜] 版本: v1.3.0');
 
-  const [activeTab, setActiveTab] = useState<'diagnosis' | 'acupuncture' | 'care'>('diagnosis');
+  const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
   const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
   const [showEngineSwitch, setShowEngineSwitch] = useState(false); // 引擎切换默认折叠
   
@@ -476,118 +476,163 @@ const DiagnosisPage: React.FC = () => {
               </div>
             </div>
             
-            {/* 舌象特征输入 - 紧凑布局 */}
-            <div className="tcm-card p-4 space-y-3">
-              <h2 className="text-base font-medium text-stone-700 flex items-center gap-2">
-                <span>👅</span> 舌象特征
-                {isAIRecognized && (
-                  <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">AI已识别</span>
+            {/* 🔍 识别结果 - 用户关注点1：我舌头怎么了 */}
+            <div className="tcm-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-base font-medium text-stone-700 flex items-center gap-2">
+                  <span>🔍</span> 识别结果
+                  {isAIRecognized && (
+                    <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">AI</span>
+                  )}
+                </h2>
+                <button 
+                  onClick={() => {
+                    const el = document.getElementById('feature-edit');
+                    if (el) el.classList.toggle('hidden');
+                  }}
+                  className="text-xs text-stone-400 hover:text-stone-600"
+                >
+                  修改
+                </button>
+              </div>
+
+              {/* 识别结果一览 - 彩色标签 */}
+              <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+                {inputFeatures.tongueColor.value ? (
+                  <span className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
+                    {inputFeatures.tongueColor.value}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
+                  </span>
+                ) : (
+                  <span className="text-xs text-stone-400">未识别</span>
                 )}
-              </h2>
-              
-              {/* 舌色选择 */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-stone-600">舌色</span>
-                  {isAIRecognized && inputFeatures.tongueColor.value && (
-                    <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
-                  )}
-                </div>
-                <TongueColorSelector
-                  value={inputFeatures.tongueColor.value}
-                  onChange={setTongueColor}
-                />
+                {inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">
+                    {inputFeatures.tongueShape.value}
+                  </span>
+                )}
+                {inputFeatures.coating.color && (
+                  <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded-full border border-green-200">
+                    {inputFeatures.coating.color}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
+                  </span>
+                )}
+                {inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">
+                    {inputFeatures.coating.moisture}
+                  </span>
+                )}
+                {inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-purple-50 text-purple-600 rounded-full border border-purple-200">
+                    {inputFeatures.tongueState.value}
+                  </span>
+                )}
+                {inputFeatures.teethMark?.value === '是' && (
+                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">齿痕</span>
+                )}
+                {inputFeatures.crack?.value === '是' && (
+                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">裂纹</span>
+                )}
               </div>
-              
-              <div className="tcm-divider" />
-              
-              {/* 舌苔选择 */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-stone-600">舌苔</span>
-                  {isAIRecognized && inputFeatures.coating.color && (
-                    <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
-                  )}
-                </div>
-                <TongueCoatingSelector
-                  color={inputFeatures.coating.color}
-                  texture={inputFeatures.coating.texture}
-                  moisture={inputFeatures.coating.moisture}
-                  onColorChange={(color) => setCoating(color, inputFeatures.coating.texture, inputFeatures.coating.moisture)}
-                  onTextureChange={(texture) => setCoating(inputFeatures.coating.color, texture, inputFeatures.coating.moisture)}
-                  onMoistureChange={(moisture) => setCoating(inputFeatures.coating.color, inputFeatures.coating.texture, moisture)}
-                />
+
+              {/* 识别详情编辑 - 默认隐藏，点"修改"才出现 */}
+              <div id="feature-edit" className="hidden mt-3 pt-3 border-t border-stone-200 space-y-1">
+
+              {/* 当前特征一览 - 彩色标签一行看完 */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {inputFeatures.tongueColor.value && (
+                  <span className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
+                    {inputFeatures.tongueColor.value}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
+                  </span>
+                )}
+                {inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">
+                    {inputFeatures.tongueShape.value}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
+                  </span>
+                )}
+                {inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-purple-50 text-purple-600 rounded-full border border-purple-200">
+                    {inputFeatures.tongueState.value}
+                  </span>
+                )}
+                {inputFeatures.coating.color && (
+                  <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded-full border border-green-200">
+                    {inputFeatures.coating.color}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
+                  </span>
+                )}
+                {inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常' && (
+                  <span className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">
+                    {inputFeatures.coating.moisture}
+                  </span>
+                )}
+                {inputFeatures.teethMark?.value === '是' && (
+                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">齿痕</span>
+                )}
+                {inputFeatures.crack?.value === '是' && (
+                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">裂纹</span>
+                )}
               </div>
-              
-              <div className="tcm-divider" />
-              
-              {/* 舌形 - 可折叠 */}
+
+              {/* 各特征折叠编辑 */}
+              <details className="group" open={!inputFeatures.tongueColor.value}>
+                <summary className="flex items-center justify-between cursor-pointer text-sm text-stone-600 hover:text-stone-800 py-1">
+                  <span>舌色</span>
+                  <div className="flex items-center gap-2">
+                    {inputFeatures.tongueColor.value && <span className="text-xs text-stone-400">{inputFeatures.tongueColor.value}</span>}
+                    <svg className="w-3.5 h-3.5 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </summary>
+                <div className="mt-2"><TongueColorSelector value={inputFeatures.tongueColor.value} onChange={setTongueColor} /></div>
+              </details>
+
+              <details className="group" open={!inputFeatures.coating.color}>
+                <summary className="flex items-center justify-between cursor-pointer text-sm text-stone-600 hover:text-stone-800 py-1">
+                  <span>舌苔</span>
+                  <div className="flex items-center gap-2">
+                    {inputFeatures.coating.color && <span className="text-xs text-stone-400">{[inputFeatures.coating.color, inputFeatures.coating.texture, inputFeatures.coating.moisture].filter(Boolean).join('·')}</span>}
+                    <svg className="w-3.5 h-3.5 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </summary>
+                <div className="mt-2">
+                  <TongueCoatingSelector
+                    color={inputFeatures.coating.color} texture={inputFeatures.coating.texture} moisture={inputFeatures.coating.moisture}
+                    onColorChange={(c) => setCoating(c, inputFeatures.coating.texture, inputFeatures.coating.moisture)}
+                    onTextureChange={(t) => setCoating(inputFeatures.coating.color, t, inputFeatures.coating.moisture)}
+                    onMoistureChange={(m) => setCoating(inputFeatures.coating.color, inputFeatures.coating.texture, m)}
+                  />
+                </div>
+              </details>
+
               <details className="group">
-                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                <summary className="flex items-center justify-between cursor-pointer text-sm text-stone-600 hover:text-stone-800 py-1">
                   <span>舌形</span>
                   <div className="flex items-center gap-2">
-                    {inputFeatures.tongueShape.value && (
-                      <span className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{inputFeatures.tongueShape.value}</span>
-                    )}
-                    {isAIRecognized && inputFeatures.tongueShape.value && (
-                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
-                    )}
-                    <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    {inputFeatures.tongueShape.value && <span className="text-xs text-stone-400">{inputFeatures.tongueShape.value}</span>}
+                    <svg className="w-3.5 h-3.5 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </summary>
-                <div className="mt-3">
-                  <TongueShapeSelector
-                    value={inputFeatures.tongueShape.value}
-                    onChange={setTongueShape}
-                  />
-                </div>
+                <div className="mt-2"><TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={setTongueShape} /></div>
               </details>
-              
-              <div className="tcm-divider" />
-              
-              {/* 舌态 - 可折叠 */}
+
               <details className="group">
-                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                <summary className="flex items-center justify-between cursor-pointer text-sm text-stone-600 hover:text-stone-800 py-1">
                   <span>舌态</span>
                   <div className="flex items-center gap-2">
-                    {inputFeatures.tongueState.value && (
-                      <span className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{inputFeatures.tongueState.value}</span>
-                    )}
-                    {isAIRecognized && inputFeatures.tongueState.value && (
-                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">AI</span>
-                    )}
-                    <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    {inputFeatures.tongueState.value && <span className="text-xs text-stone-400">{inputFeatures.tongueState.value}</span>}
+                    <svg className="w-3.5 h-3.5 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </summary>
-                <div className="mt-3">
-                  <TongueStateSelector
-                    value={inputFeatures.tongueState.value}
-                    onChange={setTongueState}
-                    shapeValue={inputFeatures.shapeDistribution}
-                    onShapeChange={setShapeDistribution}
-                  />
-                </div>
+                <div className="mt-2"><TongueStateSelector value={inputFeatures.tongueState.value} onChange={setTongueState} shapeValue={inputFeatures.shapeDistribution} onShapeChange={setShapeDistribution} /></div>
               </details>
-              
-              {/* 区域诊断 - 可折叠，默认隐藏 */}
+
               <details className="group">
-                <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-stone-600 hover:text-stone-800">
+                <summary className="flex items-center justify-between cursor-pointer text-sm text-stone-600 hover:text-stone-800 py-1">
                   <span>区域诊断</span>
-                  <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <svg className="w-3.5 h-3.5 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </summary>
-                <div className="mt-3">
-                  <TongueColorDistribution
-                    onChange={setDistributionFeatures}
-                  />
-                </div>
+                <div className="mt-2"><TongueColorDistribution onChange={setDistributionFeatures} /></div>
               </details>
+              </div>
             </div>
+
 
             {/* 伴随症状 - 可折叠 */}
             <div className="tcm-card p-4">
@@ -678,61 +723,85 @@ const DiagnosisPage: React.FC = () => {
 
           {/* ========== 右侧：结果展示 ========== */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            {/* Tab切换 - 更紧凑 */}
-            <div className="tcm-card p-1 flex">
-              <button
-                onClick={() => setActiveTab('diagnosis')}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'diagnosis'
-                    ? 'bg-primary-500 text-white'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                辨证结果
-              </button>
-              <button
-                onClick={() => setActiveTab('acupuncture')}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'acupuncture'
-                    ? 'bg-primary-500 text-white'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                针灸
-              </button>
-              <button
-                onClick={() => setActiveTab('care')}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'care'
-                    ? 'bg-primary-500 text-white'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                调护
-              </button>
-            </div>
-
-            {/* 结果内容 */}
             {diagnosisResult ? (
-              <div className="space-y-4">
-                {activeTab === 'diagnosis' && (
-                  <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
+              <div className="space-y-3">
+                {/* 📋 辨证结果 - 用户关注点2：怎么了+怎么办 */}
+                
+                {/* 证型结论 - 最醒目 */}
+                <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
+                
+                {/* Tab切换：病机 | 针灸 | 调理 */}
+                <div className="flex border-b border-stone-200">
+                  <button
+                    onClick={() => setResultTab('pathogenesis')}
+                    className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                      resultTab === 'pathogenesis'
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-stone-500 hover:text-stone-700'
+                    }`}
+                  >
+                    病机分析
+                  </button>
+                  <button
+                    onClick={() => setResultTab('acupuncture')}
+                    className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                      resultTab === 'acupuncture'
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-stone-500 hover:text-stone-700'
+                    }`}
+                  >
+                    针灸方案
+                  </button>
+                  <button
+                    onClick={() => setResultTab('care')}
+                    className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                      resultTab === 'care'
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-stone-500 hover:text-stone-700'
+                    }`}
+                  >
+                    生活调理
+                  </button>
+                </div>
+
+                {/* Tab内容 */}
+                {resultTab === 'pathogenesis' && (
+                  <div className="tcm-card p-4 space-y-3 animate-in">
+                    <div>
+                      <span className="text-xs text-stone-500 block mb-1">病机</span>
+                      <p className="text-sm text-primary-700 font-medium">{diagnosisResult.diagnosisResult?.pathogenesis || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-stone-500 block mb-1">脏腑定位</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {diagnosisResult.diagnosisResult?.organLocation?.map((organ: string, i: number) => (
+                          <span key={i} className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
+                            {organ}{i === 0 && <span className="ml-0.5 opacity-60">(主)</span>}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {diagnosisResult.diagnosisResult?.secondarySyndromes?.length > 0 && (
+                      <div>
+                        <span className="text-xs text-stone-500 block mb-1">也需关注</span>
+                        {diagnosisResult.diagnosisResult.secondarySyndromes.slice(0, 2).map((s: any, i: number) => (
+                          <span key={i} className="text-sm text-stone-600 mr-2">· {s.syndrome}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
-                {activeTab === 'acupuncture' && (
+                {resultTab === 'acupuncture' && (
                   <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
                 )}
-                {activeTab === 'care' && (
+                {resultTab === 'care' && (
                   <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
                 )}
                 
-                {/* 保存按钮 */}
                 <button
                   onClick={handleSaveCase}
-                  className="w-full py-3 rounded-xl text-sm font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2 rounded-xl text-xs font-medium bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                  </svg>
                   保存此病例
                 </button>
               </div>
