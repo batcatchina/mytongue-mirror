@@ -86,8 +86,16 @@ export async function recognizeTongue(
       throw new Error('识别结果为空');
     }
 
-    const progress = Math.min(90, 30 + (i + 1) * 5);
-    onProgress?.(`正在识别舌象... ${progress}%`);
+    // 进度文案：先检测舌象，再逐步分析
+    const progressMessages = [
+      '正在检测舌象...',
+      '正在识别舌色...',
+      '正在分析舌形...',
+      '正在判断苔色...',
+      '正在综合辨证...',
+    ];
+    const messageIndex = Math.min(Math.floor(i / 4), progressMessages.length - 1);
+    onProgress?.(progressMessages[messageIndex]);
   }
 
   throw new Error('识别超时，请重试');
