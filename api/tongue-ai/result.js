@@ -125,8 +125,12 @@ export default async function handler(req, res) {
 
     const parsed = parseTongueResult(answer.content);
 
-    // 如果未检测到舌头（安全验证）
-    if (parsed.tongueDetected === false) {
+    // 舌头检测验证（双重保障）
+    const rawContent = answer.content || '';
+    const noTongueKeywords = ['未检测到舌', '没有舌头', '不是舌头', '未检测到口腔', '无法识别舌', '图片中没有舌头', '图片中无舌'];
+    const hasNoTongueHint = noTongueKeywords.some(kw => rawContent.includes(kw));
+    
+    if (parsed.tongueDetected === false || (parsed.tongueDetected !== true && hasNoTongueHint)) {
       const errMsg = parsed.message || '未检测到舌象，请上传清晰的舌头照片';
       return res.json({ success: true, status: 'completed', error: errMsg, tongueNotDetected: true });
     }
