@@ -11,7 +11,8 @@ import type {
   InferenceContext,
   OrganPattern,
   Prescription,
-  ChainVisualization
+  ChainVisualization,
+  InferenceLayer
 } from '@/types/inference';
 import type { TongueAnalysisResult } from '@/types/tongue';
 
@@ -24,6 +25,39 @@ export enum InferenceChainStatus {
   Running = 'running',
   Completed = 'completed',
   Failed = 'failed',
+}
+
+/**
+ * 执行轨迹项
+ */
+export interface ExecutionTraceItem {
+  timestamp: number;
+  nodeId: string;
+  layer: InferenceLayer;
+  nodeName: string;
+  conclusion: {
+    label: string;
+    confidence: number;
+  };
+  inputs: string[];
+  executionTime?: number;
+}
+
+/**
+ * 推理链输出（内部使用）
+ */
+export interface InferenceChainInternalOutput {
+  chainId: string;
+  status: 'success' | 'partial' | 'failed';
+  nodes: Map<string, InferenceNode>;
+  executionOrder: string[];
+  syndrome: string;
+  rootCause: string;
+  transmissionPaths: string[];
+  organPatterns: OrganPattern[];
+  prescription?: Prescription;
+  executionTime?: number;
+  errorMessage?: string;
 }
 
 /**
@@ -44,6 +78,12 @@ export class InferenceChain {
   private startTime?: number;
   /** 执行结束时间 */
   private endTime?: number;
+  /** 执行轨迹 */
+  private executionTrace: ExecutionTraceItem[];
+  /** 层级输出缓存 */
+  private layerOutputs: Map<InferenceLayer, LayerOutput>;
+  /** 最终输出 */
+  private finalOutput?: InferenceChainInternalOutput;
   
   /**
    * 构造函数
@@ -53,6 +93,8 @@ export class InferenceChain {
     this.nodes = new Map();
     this.executionOrder = [];
     this.status = InferenceChainStatus.Idle;
+    this.executionTrace = [];
+    this.layerOutputs = new Map();
   }
   
   /**
@@ -104,6 +146,49 @@ export class InferenceChain {
    */
   removeNode(id: string): boolean {
     return this.nodes.delete(id);
+  }
+  
+  /**
+   * 记录执行轨迹
+   */
+  private recordTrace(
+    nodeId: string,
+    layer: InferenceLayer,
+    nodeName: string,
+    conclusion: { label: string; confidence: number },
+    inputs: string[],
+    executionTime?: number
+  ): void {
+    this.executionTrace.push({
+      timestamp: Date.now(),
+      nodeId,
+      layer,
+      nodeName,
+      conclusion,
+      inputs,
+      executionTime,
+    });
+  }
+  
+  /**
+   * 获取执行轨迹
+   */
+  getExecutionTrace(): ExecutionTraceItem[] {
+    return [...this.executionTrace];
+  }
+  
+  /**
+   * 获取层级输出
+   */
+  getLayerOutput(layer: InferenceLayer): LayerOutput | undefined {
+    return this.layerOutputs.get(layer);
+  }
+  
+  /**
+   * 设置层级输出
+   */
+  setLayerOutput(layer: InferenceLayer, output: LayerOutput): void {
+    this.layerOutputs.set(layer, output);
   }
   
   /**
@@ -174,6 +259,7 @@ export class InferenceChain {
   ): Promise<InferenceChainOutput> {
     this.startTime = Date.now();
     this.status = InferenceChainStatus.Running;
+    this.executionTrace = [];
     
     try {
       // 初始化层输入
@@ -185,16 +271,25 @@ export class InferenceChain {
       // 执行拓扑排序
       this.topologicalSort();
       
-      // 按顺序执行节点（实际由LayerProcessor处理）
-      // 这里仅构建节点间的依赖关系
-      
       // 生成最终输出
-      const output = this.buildOutput(context);
+      this.finalOutput = this.buildOutput(context);
       
       this.endTime = Date.now();
       this.status = InferenceChainStatus.Completed;
       
-      return output;
+      return {
+        chainId: this.finalOutput.chainId,
+        status: this.finalOutput.status,
+        nodes: this.finalOutput.nodes,
+        executionOrder: this.finalOutput.executionOrder,
+        syndrome: this.finalOutput.syndrome,
+        rootCause: this.finalOutput.rootCause,
+        transmissionPaths: this.finalOutput.transmissionPaths,
+        organPatterns: this.finalOutput.organPatterns,
+        prescription: this.finalOutput.prescription,
+        executionTime: this.finalOutput.executionTime,
+        errorMessage: this.finalOutput.errorMessage,
+      };
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.status = InferenceChainStatus.Failed;
@@ -212,6 +307,65 @@ export class InferenceChain {
         errorMessage: this.errorMessage,
       };
     }
+  }
+  
+  /**
+   * 执行单个层级
+   * @param layer 层级
+   * @param processor 处理器
+   * @param input 输入
+   * @returns 层级输出
+   */
+  executeLayer(
+    layer: InferenceLayer,
+    processor: { process: (input: LayerInput) => LayerOutput },
+    input: LayerInput
+  ): LayerOutput {
+    const layerStartTime = Date.now();
+    const output = processor.process(input);
+    
+    // 记录轨迹
+    for (const node of output.nodes) {
+      this.recordTrace(
+        node.id,
+        layer,
+        node.name,
+        { label: node.conclusion.label, confidence: node.conclusion.confidence },
+        node.inputs.map(i => String(i.value)),
+        Date.now() - layerStartTime
+      );
+    }
+    
+    // 添加节点到链
+    this.addNodes(output.nodes);
+    
+    // 缓存层级输出
+    this.setLayerOutput(layer, output);
+    
+    return output;
+  }
+  
+  /**
+   * 获取最终输出
+   */
+  getOutput(): InferenceChainOutput | undefined {
+    if (!this.finalOutput) {
+      return undefined;
+    }
+    
+    return {
+      chainId: this.finalOutput.chainId,
+      status: this.finalOutput.status,
+      nodes: this.finalOutput.nodes,
+      executionOrder: this.finalOutput.executionOrder,
+      syndrome: this.finalOutput.syndrome,
+      rootCause: this.finalOutput.rootCause,
+      transmissionPaths: this.finalOutput.transmissionPaths,
+      organPatterns: this.finalOutput.organPatterns,
+      prescription: this.finalOutput.prescription,
+      executionTime: this.finalOutput.executionTime,
+      errorMessage: this.finalOutput.errorMessage,
+    };
   }
   
   /**
@@ -264,7 +418,7 @@ export class InferenceChain {
   /**
    * 构建输出
    */
-  private buildOutput(context: InferenceContext): InferenceChainOutput {
+  private buildOutput(context: InferenceContext): InferenceChainInternalOutput {
     const organNodes = Array.from(this.nodes.values())
       .filter(n => n.type === 'organ');
     
@@ -277,6 +431,20 @@ export class InferenceChain {
       relatedNodeIds: [node.id, ...node.effects],
     }));
     
+    // 从缓存的层级输出中获取综合结论
+    const layer1Output = this.layerOutputs.get(1);
+    const layer2Output = this.layerOutputs.get(2);
+    
+    // 生成证型结论
+    let syndrome = '';
+    if (layer1Output && layer2Output) {
+      syndrome = `${layer1Output.summary.label}，${layer2Output.summary.label}`;
+    } else if (layer1Output) {
+      syndrome = layer1Output.summary.label;
+    } else if (layer2Output) {
+      syndrome = layer2Output.summary.label;
+    }
+    
     const primaryPattern = organPatterns[0];
     
     return {
@@ -284,7 +452,7 @@ export class InferenceChain {
       status: this.status === InferenceChainStatus.Completed ? 'success' : 'partial',
       nodes: this.nodes,
       executionOrder: this.executionOrder,
-      syndrome: primaryPattern?.pattern || '',
+      syndrome,
       rootCause: this.inferRootCause(),
       transmissionPaths: this.extractTransmissionPaths(),
       organPatterns,
@@ -359,6 +527,9 @@ export class InferenceChain {
     this.errorMessage = undefined;
     this.startTime = undefined;
     this.endTime = undefined;
+    this.executionTrace = [];
+    this.layerOutputs.clear();
+    this.finalOutput = undefined;
   }
   
   /**
@@ -368,5 +539,36 @@ export class InferenceChain {
     const chain = new InferenceChain();
     chain.status = InferenceChainStatus.Initialized;
     return chain;
+  }
+  
+  /**
+   * 获取执行统计
+   */
+  getExecutionStats(): {
+    totalNodes: number;
+    nodesByLayer: Record<InferenceLayer, number>;
+    nodesByType: Record<string, number>;
+    avgConfidence: number;
+    executionTime?: number;
+  } {
+    const nodesByLayer: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const nodesByType: Record<string, number> = {};
+    let totalConfidence = 0;
+    
+    for (const node of this.nodes.values()) {
+      nodesByLayer[node.layer] = (nodesByLayer[node.layer] || 0) + 1;
+      nodesByType[node.type] = (nodesByType[node.type] || 0) + 1;
+      totalConfidence += node.conclusion.confidence;
+    }
+    
+    return {
+      totalNodes: this.nodes.size,
+      nodesByLayer: nodesByLayer as Record<InferenceLayer, number>,
+      nodesByType,
+      avgConfidence: this.nodes.size > 0 ? totalConfidence / this.nodes.size : 0,
+      executionTime: this.endTime && this.startTime 
+        ? this.endTime - this.startTime 
+        : undefined,
+    };
   }
 }

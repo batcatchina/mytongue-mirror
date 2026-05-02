@@ -1,328 +1,419 @@
 /**
- * 传变辨证规则
- * Layer 4 专用
- * 
- * 五脏六腑之间的传变关系：
- * - 子盗母气
- * - 母病及子
- * - 相克传变
- * - 相生传变
- * - 脏腑传变
+ * 传变辨证规则 v2.0
+ * Layer 4 专用规则配置
+ * 包含子盗母气、母病及子、相克传变、相生传变等规则
  */
 
-/**
- * 传变类型枚举
- */
-export type TransmissionType = 
-  | '子盗母气'
-  | '母病及子'
-  | '相克传变'
-  | '相生传变'
-  | '脏腑传变';
+import type { TransmissionType } from '@/types/inference';
 
 /**
- * 子盗母气规则
- * 子脏虚弱，消耗母脏资源
+ * 传变规则
  */
-export const childConsumesParentRules = [
+export interface TransmissionRule {
+  id: string;
+  type: TransmissionType;
+  sourceOrgan: string;
+  targetOrgan: string;
+  triggerConditions: {
+    sourcePattern: string | string[];
+    targetPattern?: string | string[];
+    minConfidence?: number;
+  };
+  mechanism: string;
+  resultDescription: string;
+  confidence: number;
+  evidence: string[];
+}
+
+export const transmissionRules: TransmissionRule[] = [
+  // ========== 子盗母气（子系统虚弱消耗母系统）==========
   {
-    id: 'child-parent-001',
-    type: '子盗母气' as TransmissionType,
+    id: 'L4-T01',
+    type: '子盗母气',
     sourceOrgan: '肝',
     targetOrgan: '肾',
-    triggerFeatures: ['舌边红', '舌根凹陷', '腰酸'],
-    pattern: '肝郁化火，耗伤肾阴',
-    mechanism: '肝木为肾水之子，肝火亢盛则耗伤肾阴，导致肾虚',
-    treatment: '清肝火，滋肾阴',
-    confidence: 0.7,
-  },
-  {
-    id: 'child-parent-002',
-    type: '子盗母气' as TransmissionType,
-    sourceOrgan: '心',
-    targetOrgan: '肝',
-    triggerFeatures: ['舌尖红', '舌边红', '失眠'],
-    pattern: '心火亢盛，引动肝火',
-    mechanism: '心为肝木之子，心火旺则肝火随之亢盛',
-    treatment: '清心火，泻肝火',
-    confidence: 0.65,
-  },
-  {
-    id: 'child-parent-003',
-    type: '子盗母气' as TransmissionType,
-    sourceOrgan: '脾',
-    targetOrgan: '心',
-    triggerFeatures: ['舌中凹陷', '舌尖淡'],
-    pattern: '脾土不足，子耗母气',
-    mechanism: '脾为心之子，脾虚则子耗母气',
-    treatment: '健脾益气',
-    confidence: 0.6,
-  },
-  {
-    id: 'child-parent-004',
-    type: '子盗母气' as TransmissionType,
-    sourceOrgan: '肺',
-    targetOrgan: '脾',
-    triggerFeatures: ['肺区异常', '舌中凹陷'],
-    pattern: '肺病及脾，子盗母气',
-    mechanism: '肺为脾之子，肺虚则脾运失常',
-    treatment: '补肺健脾',
-    confidence: 0.6,
-  },
-];
-
-/**
- * 母病及子规则
- * 母脏病变，影响子脏
- */
-export const parentAffectsChildRules = [
-  {
-    id: 'parent-child-001',
-    type: '母病及子' as TransmissionType,
-    sourceOrgan: '肾',
-    targetOrgan: '肝',
-    triggerFeatures: ['舌根凹陷', '舌边淡'],
-    pattern: '肾水不足，肝木失养',
-    mechanism: '肾水为肝木之母，肾水不足则肝木失于滋养',
-    treatment: '滋水涵木',
-    confidence: 0.7,
-  },
-  {
-    id: 'parent-child-002',
-    type: '母病及子' as TransmissionType,
-    sourceOrgan: '脾',
-    targetOrgan: '肺',
-    triggerFeatures: ['舌中凹陷', '肺区异常'],
-    pattern: '脾土虚弱，肺金失养',
-    mechanism: '脾土为肺金之母，脾虚则肺气不足',
-    treatment: '健脾补肺',
-    confidence: 0.7,
-  },
-  {
-    id: 'parent-child-003',
-    type: '母病及子' as TransmissionType,
-    sourceOrgan: '肝',
-    targetOrgan: '心',
-    triggerFeatures: ['舌边红', '舌尖红'],
-    pattern: '肝木生心火，肝旺助心火',
-    mechanism: '肝木生心火，肝火亢盛则助心火',
-    treatment: '清肝泻火',
-    confidence: 0.65,
-  },
-  {
-    id: 'parent-child-004',
-    type: '母病及子' as TransmissionType,
-    sourceOrgan: '心',
-    targetOrgan: '小肠',
-    triggerFeatures: ['心区异常', '舌前端异常'],
-    pattern: '心热移于小肠',
-    mechanism: '心火下移小肠',
-    treatment: '清心火，利小便',
-    confidence: 0.6,
-  },
-];
-
-/**
- * 相克传变规则
- */
-export const controlTransmissionRules = [
-  {
-    id: 'control-001',
-    type: '相克传变' as TransmissionType,
-    sourceOrgan: '肝',
-    targetOrgan: '脾',
-    triggerFeatures: ['舌边红凸', '舌中凹陷', '胁胀'],
-    pattern: '肝木克脾土',
-    mechanism: '肝气郁结，横逆犯脾，导致脾虚',
-    treatment: '疏肝健脾',
+    triggerConditions: {
+      sourcePattern: ['肝阴虚', '肝血虚', '肝火旺'],
+      targetPattern: ['肾阴虚'],
+      minConfidence: 0.6,
+    },
+    mechanism: '肝为肾之子，肝阴/肝血亏虚日久，耗伤肾阴',
+    resultDescription: '肝阴虚→肾阴虚（子盗母气）',
     confidence: 0.75,
+    evidence: ['肝肾同源', '子盗母气'],
   },
   {
-    id: 'control-002',
-    type: '相克传变' as TransmissionType,
-    sourceOrgan: '脾',
-    targetOrgan: '肾',
-    triggerFeatures: ['舌中苔腻', '舌根略凸'],
-    pattern: '脾土克肾水',
-    mechanism: '脾虚湿盛，湿邪下注，困阻肾气',
-    treatment: '健脾利湿，补肾',
-    confidence: 0.65,
-  },
-  {
-    id: 'control-003',
-    type: '相克传变' as TransmissionType,
+    id: 'L4-T02',
+    type: '子盗母气',
     sourceOrgan: '心',
-    targetOrgan: '肺',
-    triggerFeatures: ['舌尖红', '苔黄', '咳嗽'],
-    pattern: '心火刑金',
-    mechanism: '心火亢盛，灼伤肺阴，导致肺热',
-    treatment: '清心泻火，清肺热',
-    confidence: 0.7,
-  },
-  {
-    id: 'control-004',
-    type: '相克传变' as TransmissionType,
-    sourceOrgan: '肺',
     targetOrgan: '肝',
-    triggerFeatures: ['肺区异常', '舌边红'],
-    pattern: '金不制木',
-    mechanism: '肺气不足，不能制肝',
-    treatment: '补肺疏肝',
-    confidence: 0.6,
-  },
-  {
-    id: 'control-005',
-    type: '相克传变' as TransmissionType,
-    sourceOrgan: '肾',
-    targetOrgan: '心',
-    triggerFeatures: ['肾区异常', '舌尖红'],
-    pattern: '水不制火',
-    mechanism: '肾水不足，不能上济心火',
-    treatment: '滋肾水，降心火',
+    triggerConditions: {
+      sourcePattern: ['心阴虚', '心血虚', '心火旺'],
+      targetPattern: ['肝阴虚', '肝火旺'],
+      minConfidence: 0.6,
+    },
+    mechanism: '心为肝之子，心阴/心血亏虚，累及肝脏',
+    resultDescription: '心阴虚→肝阴虚/肝火旺（子盗母气）',
     confidence: 0.7,
+    evidence: ['心肝相关', '子盗母气'],
   },
-];
-
-/**
- * 相生传变规则
- */
-export const generatingTransmissionRules = [
   {
-    id: 'generating-001',
-    type: '相生传变' as TransmissionType,
+    id: 'L4-T03',
+    type: '子盗母气',
     sourceOrgan: '脾',
     targetOrgan: '心',
-    triggerFeatures: ['舌中凹陷', '舌尖淡'],
-    pattern: '脾土生心火，子盗母气',
-    mechanism: '脾虚则气血生化不足，心失所养',
-    treatment: '健脾养心',
+    triggerConditions: {
+      sourcePattern: ['脾气虚', '脾血虚'],
+      targetPattern: ['心气虚', '心血虚'],
+      minConfidence: 0.6,
+    },
+    mechanism: '脾为心之子，脾虚气血生化不足，累及心脏',
+    resultDescription: '脾虚→心血虚/心气虚（子盗母气）',
     confidence: 0.7,
+    evidence: ['脾为气血生化之源', '子盗母气'],
   },
   {
-    id: 'generating-002',
-    type: '相生传变' as TransmissionType,
+    id: 'L4-T04',
+    type: '子盗母气',
+    sourceOrgan: '肺',
+    targetOrgan: '脾',
+    triggerConditions: {
+      sourcePattern: ['肺气虚'],
+      targetPattern: ['脾气虚'],
+      minConfidence: 0.6,
+    },
+    mechanism: '肺为脾之子，肺气虚累及脾土',
+    resultDescription: '肺气虚→脾气虚（子盗母气）',
+    confidence: 0.65,
+    evidence: ['肺脾相关', '子盗母气'],
+  },
+  
+  // ========== 母病及子（母系统病变影响子系统）==========
+  {
+    id: 'L4-T10',
+    type: '母病及子',
     sourceOrgan: '肾',
     targetOrgan: '肝',
-    triggerFeatures: ['舌根凹陷', '舌边淡'],
-    pattern: '肾水生肝木',
-    mechanism: '肾阴不足，水不涵木，肝阳上亢',
-    treatment: '滋水涵木',
-    confidence: 0.7,
+    triggerConditions: {
+      sourcePattern: ['肾阴虚', '肾精亏'],
+      targetPattern: ['肝阴虚', '肝火旺'],
+      minConfidence: 0.6,
+    },
+    mechanism: '肾为肝之母，肾阴不足，水不涵木，肝阳上亢',
+    resultDescription: '肾阴虚→肝阴虚/肝阳上亢（母病及子）',
+    confidence: 0.75,
+    evidence: ['水不涵木', '母病及子'],
   },
   {
-    id: 'generating-003',
-    type: '相生传变' as TransmissionType,
+    id: 'L4-T11',
+    type: '母病及子',
     sourceOrgan: '肝',
     targetOrgan: '心',
-    triggerFeatures: ['肝区异常', '心区异常'],
-    pattern: '木生火',
-    mechanism: '肝血不足，不能养心',
-    treatment: '养血柔肝，补心血',
-    confidence: 0.65,
+    triggerConditions: {
+      sourcePattern: ['肝火旺', '肝郁化火'],
+      targetPattern: ['心火旺'],
+      minConfidence: 0.6,
+    },
+    mechanism: '肝为心之母，肝火炽盛，引动心火',
+    resultDescription: '肝火旺→心火旺（母病及子）',
+    confidence: 0.7,
+    evidence: ['肝木生心火', '母病及子'],
   },
   {
-    id: 'generating-004',
-    type: '相生传变' as TransmissionType,
-    sourceOrgan: '肺',
+    id: 'L4-T12',
+    type: '母病及子',
+    sourceOrgan: '脾',
+    targetOrgan: '肺',
+    triggerConditions: {
+      sourcePattern: ['脾气虚', '脾虚湿盛'],
+      targetPattern: ['肺气虚'],
+      minConfidence: 0.6,
+    },
+    mechanism: '脾为肺之母，脾虚土不生金，肺气不足',
+    resultDescription: '脾虚→肺气不足（母病及子）',
+    confidence: 0.75,
+    evidence: ['土生金', '脾为肺之母', '母病及子'],
+  },
+  
+  // ========== 相克传变（木克土/土克水/水克火/火克金/金克木）==========
+  {
+    id: 'L4-T20',
+    type: '相克传变',
+    sourceOrgan: '肝',
+    targetOrgan: '脾',
+    triggerConditions: {
+      sourcePattern: ['肝郁', '肝气郁结', '肝火旺'],
+      targetPattern: ['脾虚', '脾虚湿盛'],
+      minConfidence: 0.55,
+    },
+    mechanism: '肝木克脾土，肝气郁结横逆犯脾，导致脾虚',
+    resultDescription: '肝郁→克脾→脾虚湿盛',
+    confidence: 0.8,
+    evidence: ['肝木克脾土', '相克传变'],
+  },
+  {
+    id: 'L4-T21',
+    type: '相克传变',
+    sourceOrgan: '脾',
     targetOrgan: '肾',
-    triggerFeatures: ['肺区异常', '肾区异常'],
-    pattern: '金生水',
-    mechanism: '肺气不足，不能生肾气',
-    treatment: '补肺益肾',
-    confidence: 0.65,
+    triggerConditions: {
+      sourcePattern: ['脾虚', '脾虚湿盛'],
+      targetPattern: ['肾虚', '肾精亏'],
+      minConfidence: 0.55,
+    },
+    mechanism: '脾土克肾水，脾虚湿盛下注伤肾',
+    resultDescription: '脾虚→克肾→肾虚',
+    confidence: 0.7,
+    evidence: ['脾土克肾水', '相克传变'],
   },
-];
-
-/**
- * 脏腑直接传变规则
- */
-export const organDirectTransmissionRules = [
   {
-    id: 'direct-001',
-    type: '脏腑传变' as TransmissionType,
+    id: 'L4-T22',
+    type: '相克传变',
+    sourceOrgan: '心',
+    targetOrgan: '肺',
+    triggerConditions: {
+      sourcePattern: ['心火旺', '心阴虚火旺'],
+      targetPattern: ['肺阴虚', '肺热'],
+      minConfidence: 0.55,
+    },
+    mechanism: '心火克肺金，心火炽盛灼伤肺阴',
+    resultDescription: '心火旺→克肺→肺阴虚/肺热',
+    confidence: 0.7,
+    evidence: ['心火克肺金', '相克传变'],
+  },
+  {
+    id: 'L4-T23',
+    type: '相克传变',
+    sourceOrgan: '肺',
+    targetOrgan: '肝',
+    triggerConditions: {
+      sourcePattern: ['肺气虚', '肺阴虚'],
+      targetPattern: ['肝郁', '肝火旺'],
+      minConfidence: 0.55,
+    },
+    mechanism: '肺金克肝木，肺虚不能制肝，导致肝木反侮',
+    resultDescription: '肺虚→肝木反侮→肝郁/肝火',
+    confidence: 0.65,
+    evidence: ['金克木', '肺虚肝旺'],
+  },
+  
+  // ========== 相生传变（木生火/火生土/土生金/金生水/水生木）==========
+  {
+    id: 'L4-T30',
+    type: '相生传变',
+    sourceOrgan: '脾',
+    targetOrgan: '心',
+    triggerConditions: {
+      sourcePattern: ['脾气虚', '心气虚', '心血虚'],
+      minConfidence: 0.55,
+    },
+    mechanism: '脾土生心火，脾虚气血不足，心失所养',
+    resultDescription: '脾虚→气血不足→心失所养',
+    confidence: 0.7,
+    evidence: ['土生火', '脾为气血之源'],
+  },
+  {
+    id: 'L4-T31',
+    type: '相生传变',
+    sourceOrgan: '肾',
+    targetOrgan: '肝',
+    triggerConditions: {
+      sourcePattern: ['肾阴虚', '肝阴虚'],
+      minConfidence: 0.55,
+    },
+    mechanism: '肾水生肝木，肾阴不足，水不涵木',
+    resultDescription: '肾阴虚→水不涵木→肝阴虚/肝阳上亢',
+    confidence: 0.75,
+    evidence: ['水生木', '水涵木'],
+  },
+  {
+    id: 'L4-T32',
+    type: '相生传变',
+    sourceOrgan: '心',
+    targetOrgan: '脾',
+    triggerConditions: {
+      sourcePattern: ['心火旺', '心阴虚'],
+      targetPattern: ['脾阴虚', '胃阴虚'],
+      minConfidence: 0.55,
+    },
+    mechanism: '心火生脾土，心火亢盛耗伤脾阴',
+    resultDescription: '心火旺→耗伤脾阴→脾阴虚',
+    confidence: 0.65,
+    evidence: ['火生土', '心火耗脾阴'],
+  },
+  
+  // ========== 脏腑直接传变 ==========
+  {
+    id: 'L4-T40',
+    type: '脏腑传变',
     sourceOrgan: '肝',
     targetOrgan: '胆',
-    triggerFeatures: ['舌边红', '舌边略鼓'],
-    pattern: '肝郁化火，胆郁',
-    mechanism: '肝气郁结化火，胆腑疏泄失常',
-    treatment: '疏肝利胆',
+    triggerConditions: {
+      sourcePattern: ['肝郁', '肝火旺'],
+      targetPattern: ['胆郁', '胆湿热'],
+      minConfidence: 0.6,
+    },
+    mechanism: '肝胆相表里，肝病最易传胆',
+    resultDescription: '肝郁/肝火→胆郁/胆湿热',
     confidence: 0.8,
+    evidence: ['肝胆相表里', '脏腑传变'],
   },
   {
-    id: 'direct-002',
-    type: '脏腑传变' as TransmissionType,
-    sourceOrgan: '胃',
-    targetOrgan: '脾',
-    triggerFeatures: ['胃脘不适', '舌中苔厚'],
-    pattern: '胃病及脾',
-    mechanism: '胃气上逆，影响脾的运化功能',
-    treatment: '和胃健脾',
-    confidence: 0.7,
+    id: 'L4-T41',
+    type: '脏腑传变',
+    sourceOrgan: '脾',
+    targetOrgan: '胃',
+    triggerConditions: {
+      sourcePattern: ['脾虚', '脾虚湿盛', '胃热'],
+      targetPattern: ['胃虚', '胃热', '胃阴虚'],
+      minConfidence: 0.6,
+    },
+    mechanism: '脾胃相表里，脾病易传胃',
+    resultDescription: '脾虚/脾湿→胃虚/胃热',
+    confidence: 0.75,
+    evidence: ['脾胃相表里', '脏腑传变'],
   },
   {
-    id: 'direct-003',
-    type: '脏腑传变' as TransmissionType,
-    sourceOrgan: '大肠',
-    targetOrgan: '肺',
-    triggerFeatures: ['大肠区异常', '肺区异常'],
-    pattern: '肠病及肺',
-    mechanism: '大肠实热，上逆犯肺',
-    treatment: '清大肠热，降肺气',
-    confidence: 0.65,
-  },
-  {
-    id: 'direct-004',
-    type: '脏腑传变' as TransmissionType,
+    id: 'L4-T42',
+    type: '脏腑传变',
     sourceOrgan: '心',
     targetOrgan: '小肠',
-    triggerFeatures: ['心区热象', '小便异常'],
-    pattern: '心热移小肠',
-    mechanism: '心火亢盛，下移小肠',
-    treatment: '清心火，利小便',
+    triggerConditions: {
+      sourcePattern: ['心火旺', '心阴虚'],
+      targetPattern: ['小肠热'],
+      minConfidence: 0.55,
+    },
+    mechanism: '心与小肠相表里，心火下移小肠',
+    resultDescription: '心火旺→小肠热',
     confidence: 0.7,
+    evidence: ['心与小肠相表里'],
+  },
+  {
+    id: 'L4-T43',
+    type: '脏腑传变',
+    sourceOrgan: '肺',
+    targetOrgan: '大肠',
+    triggerConditions: {
+      sourcePattern: ['肺气虚', '肺阴虚', '肺热'],
+      targetPattern: ['大肠虚', '大肠湿热', '便秘'],
+      minConfidence: 0.55,
+    },
+    mechanism: '肺与大肠相表里，肺病易传大肠',
+    resultDescription: '肺虚/肺热→大肠虚/大肠湿热',
+    confidence: 0.7,
+    evidence: ['肺与大肠相表里'],
+  },
+  {
+    id: 'L4-T44',
+    type: '脏腑传变',
+    sourceOrgan: '肾',
+    targetOrgan: '膀胱',
+    triggerConditions: {
+      sourcePattern: ['肾阴虚', '肾阳虚', '肾气虚'],
+      targetPattern: ['膀胱湿热', '膀胱虚'],
+      minConfidence: 0.55,
+    },
+    mechanism: '肾与膀胱相表里，肾病易传膀胱',
+    resultDescription: '肾虚→膀胱虚/膀胱湿热',
+    confidence: 0.7,
+    evidence: ['肾与膀胱相表里'],
   },
 ];
 
 /**
- * 组合传变规则（多脏器传变）
+ * 传变方向枚举
  */
-export const combinedTransmissionRules = [
-  {
-    id: 'combined-001',
-    path: ['肝', '脾', '肾'],
-    pattern: '肝郁→克脾→脾虚→生化不足→气血虚',
-    mechanism: '肝脾肾三脏传变',
-    treatment: '疏肝健脾补肾',
-    confidence: 0.85,
-  },
-  {
-    id: 'combined-002',
-    path: ['脾', '肺', '卫'],
-    pattern: '脾虚→肺气不足→卫外不固',
-    mechanism: '脾胃虚弱影响肺卫',
-    treatment: '健脾益肺',
-    confidence: 0.8,
-  },
-  {
-    id: 'combined-003',
-    path: ['肾', '肝', '心'],
-    pattern: '肾阴虚→水不涵木→肝阳上亢→心火亢盛',
-    mechanism: '心肾不交，肝火上炎',
-    treatment: '滋肾阴，清肝火，安心神',
-    confidence: 0.8,
-  },
-];
+export type TransmissionDirection = 'forward' | 'backward';
 
 /**
- * 获取所有传变规则
+ * 匹配传变规则
  */
-export function getAllTransmissionRules() {
-  return [
-    ...childConsumesParentRules,
-    ...parentAffectsChildRules,
-    ...controlTransmissionRules,
-    ...generatingTransmissionRules,
-    ...organDirectTransmissionRules,
-    ...combinedTransmissionRules,
-  ];
+export function matchTransmissionRule(
+  sourceOrgan: string,
+  targetOrgan: string,
+  sourcePatterns: string[],
+  minConfidence: number = 0.6
+): TransmissionRule | undefined {
+  return transmissionRules.find(rule => {
+    if (rule.sourceOrgan !== sourceOrgan || rule.targetOrgan !== targetOrgan) {
+      return false;
+    }
+    
+    // 检查触发条件
+    const patternMatch = sourcePatterns.some(pattern =>
+      Array.isArray(rule.triggerConditions.sourcePattern)
+        ? rule.triggerConditions.sourcePattern.some(sp => pattern.includes(sp) || sp.includes(pattern))
+        : pattern.includes(rule.triggerConditions.sourcePattern as string) || 
+          (rule.triggerConditions.sourcePattern as string).includes(pattern)
+    );
+    
+    if (!patternMatch) return false;
+    
+    // 检查置信度
+    if (rule.confidence < minConfidence) return false;
+    
+    return true;
+  });
 }
+
+/**
+ * 查找某脏腑的所有传变关系
+ */
+export function findTransmissionByOrgan(
+  organ: string,
+  direction: TransmissionDirection = 'forward'
+): TransmissionRule[] {
+  return transmissionRules.filter(rule => {
+    if (direction === 'forward') {
+      return rule.sourceOrgan === organ;
+    } else {
+      return rule.targetOrgan === organ;
+    }
+  });
+}
+
+/**
+ * 推断可能的传变路径
+ */
+export function inferTransmissionPath(
+  organPatterns: Array<{ organ: string; pattern: string; confidence: number }>
+): TransmissionRule[] {
+  const path: TransmissionRule[] = [];
+  
+  for (const op of organPatterns) {
+    // 查找从该脏腑出发的传变
+    const forwardRules = transmissionRules.filter(rule =>
+      rule.sourceOrgan === op.organ &&
+      op.confidence >= (rule.triggerConditions.minConfidence || 0.6)
+    );
+    
+    for (const rule of forwardRules) {
+      // 检查目标脏腑是否也有问题
+      const targetPatterns = rule.triggerConditions.targetPattern;
+      const targetPatternArray = targetPatterns 
+        ? (Array.isArray(targetPatterns) ? targetPatterns : [targetPatterns])
+        : [];
+      
+      const targetExists = organPatterns.some(op2 =>
+        op2.organ === rule.targetOrgan &&
+        targetPatternArray.some(p => op2.pattern.includes(p) || p.includes(op2.pattern))
+      );
+      
+      if (targetExists && !path.includes(rule)) {
+        path.push(rule);
+      }
+    }
+  }
+  
+  return path;
+}
+
+/**
+ * Layer4 规则导出
+ */
+export const Layer4Rules = {
+  transmissionRules,
+  matchTransmissionRule,
+  findTransmissionByOrgan,
+  inferTransmissionPath,
+};

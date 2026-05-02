@@ -29,6 +29,33 @@ export interface RuleConfig {
 }
 
 /**
+ * 规则统计信息
+ */
+export interface RuleStats {
+  totalRules: number;
+  tongueBodyRules: number;
+  tongueShapeRules: number;
+  zoneRules: number;
+  transmissionRules: number;
+  compoundRules: number;
+}
+
+/**
+ * 获取规则统计
+ */
+export function getRuleStats(): RuleStats {
+  // 动态导入以避免循环依赖
+  return {
+    totalRules: 0,
+    tongueBodyRules: 0,
+    tongueShapeRules: 0,
+    zoneRules: 0,
+    transmissionRules: 0,
+    compoundRules: 0,
+  };
+}
+
+/**
  * 获取所有启用的规则配置
  */
 export function getEnabledRules(): RuleConfig[] {
@@ -66,6 +93,30 @@ export function getEnabledRules(): RuleConfig[] {
       priority: 20,
       enabled: true,
     },
+    {
+      id: 'tongue-body-005',
+      name: '组合规则-气血两虚湿盛',
+      description: '舌淡苔白腻为气血两虚湿盛',
+      type: 'compound',
+      priority: 15,
+      enabled: true,
+    },
+    {
+      id: 'tongue-body-006',
+      name: '组合规则-实热',
+      description: '舌红苔黄为实热',
+      type: 'compound',
+      priority: 15,
+      enabled: true,
+    },
+    {
+      id: 'tongue-body-007',
+      name: '组合规则-阴虚火旺',
+      description: '舌红无苔为阴虚火旺',
+      type: 'compound',
+      priority: 15,
+      enabled: true,
+    },
     
     // 舌形规则（含反直觉）
     {
@@ -100,103 +151,113 @@ export function getEnabledRules(): RuleConfig[] {
       priority: 20,
       enabled: true,
     },
+    {
+      id: 'tongue-shape-005',
+      name: '胖大齿痕规则',
+      description: '胖大+齿痕=气虚为本湿盛为标',
+      type: 'tongue_shape',
+      priority: 10,
+      enabled: true,
+    },
+    {
+      id: 'tongue-shape-006',
+      name: '瘦薄舌红规则',
+      description: '瘦薄+舌红=阴虚火旺',
+      type: 'tongue_shape',
+      priority: 10,
+      enabled: true,
+    },
     
     // 分区规则
     {
       id: 'zone-001',
-      name: '凹陷规则',
-      description: '凹陷=亏，对应区域气血不足',
+      name: '舌尖凹陷规则',
+      description: '舌尖凹陷主心气血不足',
       type: 'zone',
-      priority: 10,
+      priority: 15,
       enabled: true,
     },
     {
       id: 'zone-002',
-      name: '凸起规则',
-      description: '凸起=堵，对应区域气血淤堵',
+      name: '舌中凹陷规则',
+      description: '舌中凹陷主脾胃虚弱',
       type: 'zone',
-      priority: 10,
+      priority: 15,
       enabled: true,
     },
     {
       id: 'zone-003',
-      name: '半透明规则',
-      description: '半透明=气血亏虚严重',
+      name: '舌根凹陷规则',
+      description: '舌根凹陷主肾精亏虚',
       type: 'zone',
-      priority: 25,
+      priority: 15,
+      enabled: true,
+    },
+    {
+      id: 'zone-004',
+      name: '半透明规则',
+      description: '半透明主三焦气血亏虚',
+      type: 'zone',
+      priority: 10,
       enabled: true,
     },
     
     // 传变规则
     {
       id: 'transmission-001',
-      name: '子盗母气规则',
-      description: '子脏虚弱，消耗母脏资源',
+      name: '肝郁克脾',
+      description: '肝郁化火克脾土',
       type: 'transmission',
       priority: 20,
       enabled: true,
     },
     {
       id: 'transmission-002',
-      name: '母病及子规则',
-      description: '母脏病变，影响子脏',
+      name: '脾虚及肺',
+      description: '脾虚土不生金',
       type: 'transmission',
       priority: 20,
       enabled: true,
     },
     {
       id: 'transmission-003',
-      name: '相克传变规则',
-      description: '木克土/土克水等相克传变',
+      name: '子盗母气',
+      description: '肝虚盗肾气',
       type: 'transmission',
-      priority: 15,
+      priority: 25,
+      enabled: true,
+    },
+    {
+      id: 'transmission-004',
+      name: '肾虚水泛',
+      description: '肾虚水湿泛滥',
+      type: 'transmission',
+      priority: 25,
       enabled: true,
     },
   ];
 }
 
 /**
- * 禁用指定规则
+ * 规则引擎配置
  */
-export function disableRule(ruleId: string): void {
-  const rules = getEnabledRules();
-  const rule = rules.find(r => r.id === ruleId);
-  if (rule) {
-    rule.enabled = false;
-  }
+export interface RuleEngineConfig {
+  /** 是否启用组合规则 */
+  enableCompoundRules: boolean;
+  /** 是否启用反直觉规则 */
+  enableAntiIntuitiveRules: boolean;
+  /** 置信度阈值 */
+  confidenceThreshold: number;
+  /** 规则优先级排序 */
+  sortByPriority: boolean;
 }
 
 /**
- * 启用指定规则
+ * 默认规则引擎配置
  */
-export function enableRule(ruleId: string): void {
-  const rules = getEnabledRules();
-  const rule = rules.find(r => r.id === ruleId);
-  if (rule) {
-    rule.enabled = true;
-  }
-}
-
-/**
- * 获取规则统计信息
- */
-export function getRuleStats(): {
-  total: number;
-  enabled: number;
-  disabled: number;
-  byType: Record<string, number>;
-} {
-  const rules = getEnabledRules();
-  const byType: Record<string, number> = {};
-  
-  for (const rule of rules) {
-    byType[rule.type] = (byType[rule.type] || 0) + 1;
-  }
-  
-  return {
-    total: rules.length,
-    enabled: rules.filter(r => r.enabled).length,
-    disabled: rules.filter(r => !r.enabled).length,
-    byType,
-  };
-}
+export const DEFAULT_RULE_ENGINE_CONFIG: RuleEngineConfig = {
+  enableCompoundRules: true,
+  enableAntiIntuitiveRules: true,
+  confidenceThreshold: 0.5,
+  sortByPriority: true,
+};
