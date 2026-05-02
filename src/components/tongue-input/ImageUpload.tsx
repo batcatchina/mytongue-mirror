@@ -136,6 +136,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [preview, setPreview] = useState<string | null>(value || null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognitionStatus, setRecognitionStatus] = useState<string | null>(null);
+  const [progressInfo, setProgressInfo] = useState<{ status: string; percent: number } | null>(null);
   const [aiResult, setAiResult] = useState<AIRecognitionResult | null>(null);
   
   // 进度反馈定时器
@@ -161,6 +162,27 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       return '正在综合辨证…';
     } else {
       return '即将完成…';
+    }
+  };
+
+  // 获取进度百分比 (非线性)
+  // 0-8秒: 0%->30%, 8-16秒: 30%->60%, 16-24秒: 60%->80%, 24秒+: 80%->90%
+  const getProgressPercent = (elapsedSeconds: number): number => {
+    if (elapsedSeconds < 0) return 0;
+    if (elapsedSeconds < 8) {
+      // 快速阶段: 0 -> 30
+      return Math.round((elapsedSeconds / 8) * 30);
+    } else if (elapsedSeconds < 16) {
+      // 中速阶段: 30 -> 60
+      return 30 + Math.round(((elapsedSeconds - 8) / 8) * 30);
+    } else if (elapsedSeconds < 24) {
+      // 减速阶段: 60 -> 80
+      return 60 + Math.round(((elapsedSeconds - 16) / 8) * 20);
+    } else {
+      // 缓慢阶段: 80 -> 90
+      const extraSeconds = elapsedSeconds - 24;
+      const progress = Math.min(extraSeconds * 2, 10); // 每秒2%，最高到90
+      return 80 + Math.round(progress);
     }
   };
 
@@ -219,6 +241,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     onChange(null);
     setAiResult(null);
     setRecognitionStatus(null);
+    setProgressInfo(null);
   }, [onChange]);
 
   // AI识别功能
@@ -227,12 +250,16 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     
     setIsRecognizing(true);
     setRecognitionStatus('正在识别...');
+    setProgressInfo({ status: '正在识别...', percent: 0 });
     recognitionStartTimeRef.current = Date.now();
     
     // 启动进度文案定时器（每2秒更新一次）
     progressTimerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - recognitionStartTimeRef.current) / 1000);
-      setRecognitionStatus(getProgressMessage(elapsed));
+      const message = getProgressMessage(elapsed);
+      const percent = getProgressPercent(elapsed);
+      setRecognitionStatus(message);
+      setProgressInfo({ status: message, percent });
     }, 2000);
     
     try {
@@ -246,13 +273,17 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       
       if (result.success && result.data) {
         setAiResult(result.data);
-        setRecognitionStatus(`识别完成 (置信度: ${Math.round(result.data.overall_confidence * 100)}%)`);
+        const statusMsg = `识别完成 (置信度: ${Math.round(result.data.overall_confidence * 100)}%)`;
+        setRecognitionStatus(statusMsg);
+        setProgressInfo({ status: '识别完成', percent: 100 });
         onAIRecognition?.(result.data);
       } else {
         setRecognitionStatus('识别失败: ' + (result.error || '未知错误'));
+        setProgressInfo(null);
       }
     } catch (e: any) {
       setRecognitionStatus('网络错误: ' + e.message);
+      setProgressInfo(null);
     } finally {
       // 清理进度定时器
       if (progressTimerRef.current) {
@@ -356,6 +387,27 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         )}>
           {isRecognizing && <div className="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>}
           <span>{recognitionStatus}</span>
+        </div>
+      )}
+
+      {/* 识别进度条 */}
+      {isRecognizing && progressInfo && (
+        <div className="space-y-2 px-1">
+          <div className="flex items-center justify-between text-xs text-stone-500">
+            <span>{progressInfo.status}</span>
+            <span className="font-medium text-purple-600">{progressInfo.percent}%</span>
+          </div>
+          <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden">
+            <div 
+              className={clsx(
+                'h-full rounded-full transition-all duration-500 ease-out',
+                progressInfo.percent >= 100 
+                  ? 'bg-green-500' 
+                  : 'bg-gradient-to-r from-purple-400 to-pink-500'
+              )}
+              style={{ width: `${progressInfo.percent}%` }}
+            />
+          </div>
         </div>
       )}
       
