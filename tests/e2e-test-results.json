@@ -1,0 +1,76 @@
+{
+  "testDate": "2026-05-02T09:07:43.815Z",
+  "totalCases": 4,
+  "averageScores": {
+    "visual": 0.7964,
+    "organ": 1,
+    "syndrome": 1,
+    "transmission": 0.25,
+    "acupoint": 0.761904761904762,
+    "overall": 0.8212457142857144
+  },
+  "results": [
+    {
+      "testCaseId": "TC01",
+      "testCaseName": "肝郁化火",
+      "imagePath": "./上古文化资料库/舌镜参考图/肝郁化火实例.jpg",
+      "evaluation": {
+        "visualRecognitionScore": 0.8096,
+        "organLocationScore": 1,
+        "syndromeScore": 1,
+        "transmissionScore": 1,
+        "acupointScore": 0.5,
+        "overallScore": 0.89644
+      },
+      "issues": [],
+      "executionTime": 2
+    },
+    {
+      "testCaseId": "TC02",
+      "testCaseName": "肝郁血虚",
+      "imagePath": "./上古文化资料库/舌镜参考图/肝郁血虚实例.png",
+      "evaluation": {
+        "visualRecognitionScore": 0.792,
+        "organLocationScore": 1,
+        "syndromeScore": 1,
+        "transmissionScore": 0,
+        "acupointScore": 1,
+        "overallScore": 0.8188000000000001
+      },
+      "issues": [],
+      "executionTime": 0
+    },
+    {
+      "testCaseId": "TC03",
+      "testCaseName": "气滞血瘀",
+      "imagePath": "./上古文化资料库/舌镜参考图/气滞血瘀实例.png",
+      "evaluation": {
+        "visualRecognitionScore": 0.836,
+        "organLocationScore": 1,
+        "syndromeScore": 1,
+        "transmissionScore": 0,
+        "acupointScore": 0.8333333333333334,
+        "overallScore": 0.8004
+      },
+      "issues": [],
+      "executionTime": 1
+    },
+    {
+      "testCaseId": "TC04",
+      "testCaseName": "三高舌象（气血亏虚）",
+      "imagePath": "./上古文化资料库/舌镜参考图/三高舌象半透明.png",
+      "evaluation": {
+        "visualRecognitionScore": 0.748,
+        "organLocationScore": 1,
+        "syndromeScore": 1,
+        "transmissionScore": 0,
+        "acupointScore": 0.7142857142857143,
+        "overallScore": 0.769342857142857
+      },
+      "issues": [],
+      "executionTime": 0
+    }
+  ],
+  "allIssues": [],
+  "successRate": 1
+}

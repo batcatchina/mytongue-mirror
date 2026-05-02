@@ -1,95 +1,149 @@
 /**
  * Layer4 处理器：综合推理层 v2.0
- * 职责：综合推理 → 传变关系+配方案
+ * 职责：综合推理 → 传变关系+配穴方案
  * 
  * 子盗母气 / 相克传变 / 经脉辨证 / 配穴组合
+ * 
+ * v2.1 修复：锚定脏腑定位、根因归因不指向"心"
  */
 
 import type { LayerInput, LayerOutput, InferenceNode, OrganPattern, Prescription } from '@/types/inference';
+import type { TongueAnalysisResult } from '@/types/tongue';
 import { BaseLayerProcessor } from '../core/LayerProcessor';
 import { createPrescriptionNode, createPatternNode } from '../core/InferenceNode';
 import { TransmissionEngine } from '../core/TransmissionEngine';
 
 /**
- * 配穴规则配置
+ * 证型推理规则配置（优先级从高到低）
+ * 锚定脏腑：必须与Layer2/Layer3识别的脏腑一致
  */
-const ACUPOINT_RULES: Record<string, {
+const SYNDROME_RULES: Array<{
+  pattern: string | RegExp;
+  organCheck?: (patterns: OrganPattern[]) => boolean;
+  tongueCheck?: (analysis: TongueAnalysisResult) => boolean;
+  label: string;
+  description: string;
+  rootCause: string;
+  method: string;
+  confidence: number;
+}> = [
+  // 肝郁化火：肝区热/火 + 舌红
+  {
+    pattern: /肝.*热|热.*肝|肝火/i,
+    organCheck: (patterns) => patterns.some(p => p.organ === '肝'),
+    tongueCheck: (analysis) => analysis.bodyColor === '红',
+    label: '肝郁化火证',
+    description: '肝气郁结，久而化火',
+    rootCause: '肝气郁结，疏泄失常',
+    method: '疏肝解郁，清热泻火',
+    confidence: 0.85,
+  },
+  // 肝郁血虚：肝区虚证
+  {
+    pattern: /肝.*虚|肝郁/i,
+    organCheck: (patterns) => patterns.some(p => p.organ === '肝'),
+    tongueCheck: (analysis) => analysis.bodyColor === '淡红' || analysis.bodyColor === '淡白',
+    label: '肝郁血虚证',
+    description: '肝气郁结，血液生化不足',
+    rootCause: '肝气郁结，血液生化不足',
+    method: '疏肝解郁，养血柔肝',
+    confidence: 0.82,
+  },
+  // 气滞血瘀：血瘀证
+  {
+    pattern: /血瘀|瘀/i,
+    organCheck: (patterns) => patterns.some(p => 
+      p.pattern.includes('瘀') || p.pattern.includes('血瘀')
+    ),
+    tongueCheck: (analysis) => analysis.bodyColor === '紫' || analysis.hasEcchymosis,
+    label: '气滞血瘀证',
+    description: '气行不畅，血行瘀滞',
+    rootCause: '气滞血瘀，运行不畅',
+    method: '活血化瘀，行气止痛',
+    confidence: 0.88,
+  },
+  // 气血两虚：半透明舌
+  {
+    pattern: /气血.*虚|虚.*证/i,
+    organCheck: (patterns) => patterns.some(p => 
+      p.pattern.includes('虚') || p.organ === '脾' || p.organ === '肾'
+    ),
+    tongueCheck: (analysis) => analysis.isSemitransparent || analysis.bodyColor === '淡白',
+    label: '气血两虚证',
+    description: '三焦气血亏虚，脏腑失养',
+    rootCause: '三焦气血亏虚，脏腑失养',
+    method: '补益气血，调理脏腑',
+    confidence: 0.85,
+  },
+  // 脾虚湿盛：脾区虚证
+  {
+    pattern: /脾.*虚|脾湿/i,
+    organCheck: (patterns) => patterns.some(p => p.organ === '脾'),
+    tongueCheck: (analysis) => analysis.hasTeethMark,
+    label: '脾虚湿盛证',
+    description: '脾失健运，水湿内停',
+    rootCause: '脾气虚弱，运化失常',
+    method: '健脾化湿',
+    confidence: 0.82,
+  },
+];
+
+/**
+ * 根本原因归因映射表
+ * 锚定脏腑：根据Layer3识别的脏腑定位根本原因
+ */
+const ROOT_CAUSE_MAPPING: Record<string, string> = {
+  '肝': '肝气郁结，疏泄失常',
+  '胆': '胆气郁结，疏泄不利',
+  '心': '心火亢盛或心阴不足',
+  '脾': '脾气虚弱，运化失常',
+  '胃': '胃气上逆或胃阴不足',
+  '肺': '肺气不宣或肺阴不足',
+  '肾': '肾精不足或肾阴亏虚',
+  '小肠': '小肠泌别清浊功能失常',
+  '大肠': '大肠传导功能失常',
+  '膀胱': '膀胱气化功能失常',
+};
+
+/**
+ * 证型特异性配穴规则
+ * 覆盖ACUPOINT_RULES的默认配穴逻辑
+ */
+const SYNDROME_PRESCRIPTION_RULES: Record<string, {
   mainPoints: string[];
   secondaryPoints: string[];
   technique: '补法' | '泻法' | '平补平泻';
   basis: string[];
 }> = {
-  '气虚': {
-    mainPoints: ['足三里', '气海', '中脘'],
-    secondaryPoints: ['脾俞', '胃俞', '关元'],
-    technique: '补法',
-    basis: ['足三里为强壮要穴', '气海补气', '中脘和胃'],
-  },
-  '气血两虚': {
-    mainPoints: ['足三里', '膈俞', '三阴交'],
-    secondaryPoints: ['脾俞', '血海', '气海'],
-    technique: '补法',
-    basis: ['膈俞为血会', '三阴交健脾养血', '足三里益气'],
-  },
-  '阴虚': {
-    mainPoints: ['太溪', '三阴交', '照海'],
-    secondaryPoints: ['肾俞', '心俞', '内关'],
-    technique: '平补平泻',
-    basis: ['太溪为肾经原穴', '照海滋阴', '三阴交健脾滋阴'],
-  },
-  '阴虚火旺': {
-    mainPoints: ['太溪', '照海', '涌泉'],
-    secondaryPoints: ['肾俞', '心俞', '神门'],
-    technique: '平补平泻',
-    basis: ['涌泉引火归元', '太溪滋阴降火', '照海滋阴清热'],
-  },
-  '阳虚': {
-    mainPoints: ['关元', '命门', '肾俞'],
-    secondaryPoints: ['足三里', '神阙', '腰阳关'],
-    technique: '补法',
-    basis: ['关元温阳', '命门补肾阳', '肾俞益肾'],
-  },
-  '湿盛': {
-    mainPoints: ['阴陵泉', '丰隆', '水分'],
-    secondaryPoints: ['脾俞', '三阴交', '中脘'],
-    technique: '泻法',
-    basis: ['阴陵泉利湿', '丰隆化痰湿', '水分分利水湿'],
-  },
-  '湿热': {
-    mainPoints: ['阴陵泉', '曲池', '内庭'],
-    secondaryPoints: ['合谷', '足三里', '三阴交'],
-    technique: '泻法',
-    basis: ['曲池清热', '内庭清胃热', '阴陵泉利湿'],
-  },
-  '肝郁': {
-    mainPoints: ['太冲', '肝俞', '期门'],
-    secondaryPoints: ['膻中', '内关', '三阴交'],
-    technique: '平补平泻',
-    basis: ['太冲疏肝理气', '肝俞调肝', '期门疏肝解郁'],
-  },
-  '肝郁化火': {
-    mainPoints: ['太冲', '行间', '肝俞'],
+  '肝郁化火证': {
+    mainPoints: ['太冲', '行间', '阳陵泉'],
     secondaryPoints: ['期门', '合谷', '曲池'],
     technique: '泻法',
-    basis: ['行间清肝火', '太冲疏肝', '曲池清热'],
+    basis: ['太冲疏肝理气', '行间清肝火', '阳陵泉疏肝利胆'],
   },
-  '脾虚': {
-    mainPoints: ['足三里', '脾俞', '中脘'],
-    secondaryPoints: ['阴陵泉', '三阴交', '胃俞'],
-    technique: '补法',
-    basis: ['足三里益气健脾', '脾俞健脾', '中脘和胃'],
+  '肝郁血虚证': {
+    mainPoints: ['太冲', '血海', '三阴交'],
+    secondaryPoints: ['肝俞', '膈俞', '足三里'],
+    technique: '平补平泻',
+    basis: ['太冲疏肝解郁', '血海活血养血', '三阴交健脾养血'],
   },
-  '血瘀': {
+  '气滞血瘀证': {
     mainPoints: ['血海', '膈俞', '三阴交'],
-    secondaryPoints: ['太冲', '肝俞', '合谷'],
+    secondaryPoints: ['太冲', '肝俞', '内关'],
     technique: '泻法',
-    basis: ['血海活血化瘀', '膈俞为血会', '三阴交活血'],
+    basis: ['血海活血化瘀', '膈俞为血会', '三阴交活血调经'],
   },
-  '痰湿': {
-    mainPoints: ['丰隆', '阴陵泉', '中脘'],
-    secondaryPoints: ['足三里', '脾俞', '内关'],
-    technique: '泻法',
-    basis: ['丰隆化痰要穴', '阴陵泉利湿', '中脘化痰和胃'],
+  '气血两虚证': {
+    mainPoints: ['气海', '足三里', '三阴交'],
+    secondaryPoints: ['关元', '膈俞', '脾俞'],
+    technique: '补法',
+    basis: ['气海补气', '足三里益气健脾', '三阴交健脾养血'],
+  },
+  '脾虚湿盛证': {
+    mainPoints: ['足三里', '阴陵泉', '中脘'],
+    secondaryPoints: ['脾俞', '三阴交', '胃俞'],
+    technique: '补法',
+    basis: ['足三里益气健脾', '阴陵泉利湿', '中脘和胃化湿'],
   },
 };
 
@@ -104,6 +158,9 @@ export class Layer4Processor extends BaseLayerProcessor {
   /** 传变引擎 */
   private transmissionEngine: TransmissionEngine;
   
+  /** 当前识别的证型 */
+  private currentSyndrome: { label: string; description: string; rootCause: string; method: string } | null = null;
+  
   constructor() {
     super();
     this.transmissionEngine = new TransmissionEngine();
@@ -114,6 +171,7 @@ export class Layer4Processor extends BaseLayerProcessor {
    */
   process(input: LayerInput): LayerOutput {
     const previousLayerOutput = input.previousLayerOutput;
+    const tongueAnalysis = input.tongueAnalysis;
     
     if (!previousLayerOutput) {
       return this.createEmptyOutput();
@@ -124,20 +182,48 @@ export class Layer4Processor extends BaseLayerProcessor {
     // 1. 收集前三层的辨证结果
     const previousNodes = previousLayerOutput.nodes;
     
-    // 2. 生成脏腑辨证汇总
+    // 2. 生成脏腑辨证汇总（按置信度排序，但保留所有脏腑）
     const organPatterns = this.generateOrganPatterns(previousNodes);
     
-    // 3. 分析传变关系
+    // 3. 锚定主要脏腑：根据Layer3识别结果确定主脏腑
+    const primaryOrgan = this.determinePrimaryOrgan(organPatterns, tongueAnalysis);
+    
+    // 4. 证型推理：使用锚定脏腑 + 舌象特征
+    this.currentSyndrome = this.inferSyndrome(organPatterns, tongueAnalysis, primaryOrgan);
+    
+    // 5. 生成证型节点
+    const syndromeNode = createPatternNode(
+      this.generateNodeId('final-syndrome'),
+      this.currentSyndrome.label,
+      this.currentSyndrome.description,
+      this.currentSyndrome.confidence || 0.80,
+      this.generateSyndromeEvidence(organPatterns, tongueAnalysis),
+      4
+    );
+    nodes.push(syndromeNode);
+    
+    // 6. 生成根本原因节点（锚定脏腑）
+    const rootCauseNode = createPatternNode(
+      this.generateNodeId('root-cause'),
+      this.currentSyndrome.rootCause,
+      `根本原因：${this.currentSyndrome.rootCause}`,
+      0.85,
+      [`主脏腑：${primaryOrgan}`],
+      4
+    );
+    nodes.push(rootCauseNode);
+    
+    // 7. 分析传变关系
     const triggerFeatures = this.extractTriggerFeatures(previousNodes);
     const transmissions = this.transmissionEngine.analyzeTransmission(organPatterns, triggerFeatures);
     const transmissionNodes = this.transmissionEngine.buildTransmissionChain(organPatterns, transmissions);
     nodes.push(...transmissionNodes);
     
-    // 4. 生成传变路径描述
+    // 8. 生成传变路径描述
     const transmissionPaths = this.transmissionEngine.generateTransmissionPaths(transmissions);
     
-    // 5. 生成配穴方案
-    const prescription = this.generatePrescription(organPatterns);
+    // 9. 生成配穴方案（优先使用证型特异性配穴）
+    const prescription = this.generatePrescription(organPatterns, tongueAnalysis);
     if (prescription) {
       const prescriptionNode = createPrescriptionNode(
         this.generateNodeId('prescription'),
@@ -149,25 +235,13 @@ export class Layer4Processor extends BaseLayerProcessor {
       nodes.push(prescriptionNode);
     }
     
-    // 6. 生成最终证型
-    const finalSyndrome = this.generateFinalSyndrome(organPatterns, transmissionPaths);
-    const syndromeNode = createPatternNode(
-      this.generateNodeId('final-syndrome'),
-      finalSyndrome,
-      this.generateSyndromeDescription(organPatterns, transmissionPaths),
-      this.calculateSyndromeConfidence(organPatterns),
-      organPatterns.flatMap(p => p.mainSymptoms),
-      4
-    );
-    nodes.push(syndromeNode);
-    
     return {
       layer: 4,
       nodes,
       summary: {
-        label: syndromeNode.conclusion.label,
-        description: syndromeNode.conclusion.description,
-        confidence: syndromeNode.conclusion.confidence,
+        label: this.currentSyndrome.label,
+        description: `${this.currentSyndrome.description}；根本原因：${this.currentSyndrome.rootCause}`,
+        confidence: this.currentSyndrome.confidence || 0.80,
       },
       validationQuestions: this.generateValidationQuestions(organPatterns),
     };
@@ -200,7 +274,7 @@ export class Layer4Processor extends BaseLayerProcessor {
       } else if (node.type === 'pattern') {
         // 从pattern节点中提取脏腑信息
         const description = node.conclusion.description;
-        const organs = ['心', '肝', '脾', '肺', '肾', '胃', '胆'];
+        const organs = ['心', '肝', '脾', '肺', '肾', '胃', '胆', '小肠', '大肠', '膀胱'];
         
         for (const organ of organs) {
           if (description.includes(organ)) {
@@ -227,6 +301,190 @@ export class Layer4Processor extends BaseLayerProcessor {
   }
   
   /**
+   * 锚定主要脏腑
+   * 根据Layer3识别结果和舌象特征确定主脏腑
+   */
+  private determinePrimaryOrgan(patterns: OrganPattern[], analysis: TongueAnalysisResult): string {
+    if (patterns.length === 0) {
+      // 无脏腑模式时，根据舌象特征推断
+      return this.inferPrimaryOrganFromTongue(analysis);
+    }
+    
+    // 1. 优先检查是否有明确的肝区异常（肝郁类证型最常见漏诊）
+    const liverPattern = patterns.find(p => p.organ === '肝');
+    if (liverPattern && this.hasLiverZoneAbnormality(analysis)) {
+      return '肝';
+    }
+    
+    // 2. 检查是否有脾虚特征（齿痕、胖大舌）
+    const spleenPattern = patterns.find(p => p.organ === '脾');
+    if (spleenPattern && analysis.hasTeethMark) {
+      return '脾';
+    }
+    
+    // 3. 检查是否有血瘀特征
+    if (analysis.bodyColor === '紫' || analysis.hasEcchymosis) {
+      return '肝'; // 肝主疏泄，气滞血瘀常与肝相关
+    }
+    
+    // 4. 检查是否有半透明舌
+    if (analysis.isSemitransparent) {
+      return '脾'; // 气血亏虚先责之脾
+    }
+    
+    // 5. 默认返回置信度最高的脏腑
+    return patterns[0].organ;
+  }
+  
+  /**
+   * 检查是否有肝区异常特征
+   */
+  private hasLiverZoneAbnormality(analysis: TongueAnalysisResult): boolean {
+    if (!analysis.zoneFeatures) return false;
+    
+    // 肝区：舌中两侧（middleThird left/right）
+    const liverZones = analysis.zoneFeatures.filter(
+      z => z.position === 'middleThird' && (z.side === 'left' || z.side === 'right')
+    );
+    
+    // 肝区颜色偏深或偏红
+    for (const zone of liverZones) {
+      if (zone.colorIntensity === '偏深' || zone.colorIntensity === '偏红') {
+        return true;
+      }
+      if (zone.color === '红' || zone.color === '绛') {
+        return true;
+      }
+      if (zone.hasTeethMark) {
+        return true; // 舌边齿痕提示肝郁
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * 从舌象特征推断主脏腑
+   */
+  private inferPrimaryOrganFromTongue(analysis: TongueAnalysisResult): string {
+    // 舌边齿痕 → 肝郁（舌边属肝）
+    if (analysis.hasTeethMark && analysis.zoneFeatures) {
+      const sideZones = analysis.zoneFeatures.filter(
+        z => z.side === 'left' || z.side === 'right'
+      );
+      if (sideZones.length > 0) {
+        return '肝';
+      }
+    }
+    
+    // 舌紫 → 肝（气滞血瘀）
+    if (analysis.bodyColor === '紫') {
+      return '肝';
+    }
+    
+    // 半透明 → 脾（气血生化之源）
+    if (analysis.isSemitransparent) {
+      return '脾';
+    }
+    
+    return '心';
+  }
+  
+  /**
+   * 证型推理（锚定脏腑）
+   */
+  private inferSyndrome(
+    patterns: OrganPattern[],
+    analysis: TongueAnalysisResult,
+    primaryOrgan: string
+  ): { label: string; description: string; rootCause: string; method: string; confidence: number } {
+    // 按优先级遍历证型规则
+    for (const rule of SYNDROME_RULES) {
+      // 检查器官匹配
+      const organMatch = rule.organCheck ? rule.organCheck(patterns) : true;
+      // 检查舌象匹配
+      const tongueMatch = rule.tongueCheck ? rule.tongueCheck(analysis) : true;
+      
+      if (organMatch && tongueMatch) {
+        return {
+          label: rule.label,
+          description: rule.description,
+          rootCause: rule.rootCause,
+          method: rule.method,
+          confidence: rule.confidence,
+        };
+      }
+    }
+    
+    // 默认综合判断
+    return this.generateDefaultSyndrome(patterns, analysis, primaryOrgan);
+  }
+  
+  /**
+   * 生成默认证型
+   */
+  private generateDefaultSyndrome(
+    patterns: OrganPattern[],
+    analysis: TongueAnalysisResult,
+    primaryOrgan: string
+  ): { label: string; description: string; rootCause: string; method: string; confidence: number } {
+    const patternStr = patterns.map(p => `${p.organ}${p.pattern}`).join('、');
+    const bodyColorDesc = this.getBodyColorDescription(analysis.bodyColor);
+    
+    return {
+      label: `${bodyColorDesc}舌`,
+      description: `舌象特征：${bodyColorDesc}${patternStr ? '；' + patternStr : ''}`,
+      rootCause: ROOT_CAUSE_MAPPING[primaryOrgan] || '脏腑气血功能紊乱',
+      method: '调理脏腑',
+      confidence: 0.70,
+    };
+  }
+  
+  /**
+   * 获取舌色描述
+   */
+  private getBodyColorDescription(color: string): string {
+    const descriptions: Record<string, string> = {
+      '淡红': '淡红',
+      '淡白': '淡白',
+      '红': '红',
+      '绛': '绛红',
+      '紫': '紫暗',
+      '青紫': '青紫',
+      '淡紫': '淡紫',
+    };
+    return descriptions[color] || color;
+  }
+  
+  /**
+   * 生成证型证据
+   */
+  private generateSyndromeEvidence(patterns: OrganPattern[], analysis: TongueAnalysisResult): string[] {
+    const evidence: string[] = [];
+    
+    // 舌色
+    evidence.push(`舌色${analysis.bodyColor}`);
+    
+    // 舌形
+    if (analysis.hasTeethMark) {
+      evidence.push('舌边有齿痕');
+    }
+    if (analysis.hasCrack) {
+      evidence.push('舌有裂纹');
+    }
+    if (analysis.hasEcchymosis) {
+      evidence.push('舌有瘀斑');
+    }
+    
+    // 脏腑模式
+    for (const pattern of patterns.slice(0, 3)) {
+      evidence.push(`${pattern.organ}区${pattern.pattern}`);
+    }
+    
+    return evidence;
+  }
+  
+  /**
    * 从证型推断病性
    */
   private inferNatureFromPattern(pattern: string): string {
@@ -249,12 +507,30 @@ export class Layer4Processor extends BaseLayerProcessor {
   }
   
   /**
-   * 生成配穴方案
+   * 生成配穴方案（优先使用证型特异性配穴）
    */
-  private generatePrescription(patterns: OrganPattern[]): Prescription | undefined {
+  private generatePrescription(patterns: OrganPattern[], analysis: TongueAnalysisResult): Prescription | undefined {
     if (patterns.length === 0) return undefined;
     
-    // 找到主证型
+    // 找到当前证型对应的配穴规则
+    if (this.currentSyndrome && SYNDROME_PRESCRIPTION_RULES[this.currentSyndrome.label]) {
+      const syndromeRule = SYNDROME_PRESCRIPTION_RULES[this.currentSyndrome.label];
+      return {
+        id: `prescription-${Date.now()}`,
+        mainPoints: syndromeRule.mainPoints,
+        secondaryPoints: syndromeRule.secondaryPoints,
+        technique: syndromeRule.technique,
+        needleRetention: 30,
+        moxibustion: syndromeRule.technique === '补法' ? '建议艾灸' : '慎用艾灸',
+        frequency: '每周2-3次',
+        course: '4周为一疗程',
+        precautions: ['避开空腹和过饱', '治疗后注意保暖', '保持情绪舒畅'],
+        basis: syndromeRule.basis,
+        confidence: this.currentSyndrome.confidence || 0.80,
+      };
+    }
+    
+    // 降级：使用原始的脏腑配穴逻辑
     const primaryPattern = patterns[0];
     
     // 匹配配穴规则
@@ -301,72 +577,6 @@ export class Layer4Processor extends BaseLayerProcessor {
       basis: matchedRule.basis,
       confidence: primaryPattern.confidence,
     };
-  }
-  
-  /**
-   * 生成最终证型
-   */
-  private generateFinalSyndrome(patterns: OrganPattern[], transmissionPaths: string[]): string {
-    if (patterns.length === 0) return '未能确定证型';
-    
-    const primaryPattern = patterns[0];
-    let syndrome = primaryPattern.pattern;
-    
-    // 如果有传变，添加传变描述
-    if (transmissionPaths.length > 0) {
-      const firstTransmission = transmissionPaths[0];
-      // 简化传变描述
-      if (firstTransmission.includes('→')) {
-        syndrome += '，' + this.simplifyTransmission(firstTransmission);
-      }
-    }
-    
-    return syndrome;
-  }
-  
-  /**
-   * 简化传变描述
-   */
-  private simplifyTransmission(transmission: string): string {
-    // 提取关键信息
-    const match = transmission.match(/(\w+)（(\w+)）→ (\w+)：/);
-    if (match) {
-      return `${match[2]}传变`;
-    }
-    return '存在传变关系';
-  }
-  
-  /**
-   * 生成证型描述
-   */
-  private generateSyndromeDescription(patterns: OrganPattern[], transmissionPaths: string[]): string {
-    const descriptions: string[] = [];
-    
-    // 脏腑辨证
-    for (const pattern of patterns.slice(0, 3)) {
-      descriptions.push(`${pattern.organ}：${pattern.pattern}（${pattern.nature}）`);
-    }
-    
-    // 传变关系
-    if (transmissionPaths.length > 0) {
-      descriptions.push('传变：' + transmissionPaths[0]);
-    }
-    
-    return descriptions.join('；');
-  }
-  
-  /**
-   * 计算证型置信度
-   */
-  private calculateSyndromeConfidence(patterns: OrganPattern[]): number {
-    if (patterns.length === 0) return 0;
-    
-    // 取最高置信度
-    const maxConfidence = Math.max(...patterns.map(p => p.confidence));
-    
-    // 根据传变调整
-    // 简单的置信度加权
-    return Math.min(1, maxConfidence * 1.1);
   }
   
   /**
