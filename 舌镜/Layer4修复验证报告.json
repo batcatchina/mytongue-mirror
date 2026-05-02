@@ -1,0 +1,161 @@
+{
+  "timestamp": "2026-05-02T20:38:35.679Z",
+  "totalCases": 17,
+  "avgSyndromeScore": 0.7647058823529411,
+  "avgOverallScore": 0.8588235294117648,
+  "results": [
+    {
+      "id": "TC01",
+      "name": "淡白舌熟白苔",
+      "category": "寒证-气血两虚",
+      "expected": "气血两虚证",
+      "inferred": "气血两虚证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC02",
+      "name": "青紫舌血瘀",
+      "category": "寒证-血瘀",
+      "expected": "寒凝血瘀证",
+      "inferred": "寒凝血瘀证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC03",
+      "name": "脾胃湿热",
+      "category": "热证-湿热",
+      "expected": "脾胃湿热证",
+      "inferred": "脾胃湿热证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC04",
+      "name": "绛舌热入营血",
+      "category": "热证-热入营血",
+      "expected": "阴虚火旺证",
+      "inferred": "阴虚火旺证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC05",
+      "name": "气虚齿痕舌",
+      "category": "虚证-气虚",
+      "expected": "脾虚湿盛证",
+      "inferred": "肝郁血虚证",
+      "syndromeScore": 0,
+      "overallScore": 0.4
+    },
+    {
+      "id": "TC06",
+      "name": "阴虚裂纹舌",
+      "category": "虚证-阴虚",
+      "expected": "阴虚火旺证",
+      "inferred": "阴虚火旺证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC07",
+      "name": "湿热黄腻苔",
+      "category": "实证-湿热",
+      "expected": "下焦湿热证",
+      "inferred": "脾胃湿热证",
+      "syndromeScore": 0,
+      "overallScore": 0.4
+    },
+    {
+      "id": "TC08",
+      "name": "气滞血瘀紫舌",
+      "category": "实证-血瘀",
+      "expected": "气滞血瘀证",
+      "inferred": "气滞血瘀证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC09",
+      "name": "脾虚湿盛白腻苔",
+      "category": "复合证-脾虚湿盛",
+      "expected": "脾虚湿盛证",
+      "inferred": "脾虚湿盛证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC10",
+      "name": "气阴两虚薄黄苔",
+      "category": "复合证-气阴两虚",
+      "expected": "气阴两虚证",
+      "inferred": "肝郁血虚证",
+      "syndromeScore": 0,
+      "overallScore": 0.4
+    },
+    {
+      "id": "TC11",
+      "name": "肝郁克脾",
+      "category": "复合证-肝郁克脾",
+      "expected": "肝郁血虚证",
+      "inferred": "肝郁血虚证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC12",
+      "name": "剥苔舌",
+      "category": "特殊-剥苔",
+      "expected": "胃阴不足证",
+      "inferred": "胃阴不足证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC13",
+      "name": "裂纹舌脾胃虚",
+      "category": "特殊-裂纹",
+      "expected": "脾虚湿盛证",
+      "inferred": "气阴两虚证",
+      "syndromeScore": 0,
+      "overallScore": 0.4
+    },
+    {
+      "id": "TC14",
+      "name": "灰黑苔热盛",
+      "category": "特殊-灰黑苔",
+      "expected": "阴虚火旺证",
+      "inferred": "阴虚火旺证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC15",
+      "name": "半透明舌三高",
+      "category": "特殊-半透明",
+      "expected": "气血两虚证",
+      "inferred": "气血两虚证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC16",
+      "name": "镜面舌无苔",
+      "category": "特殊-无苔",
+      "expected": "胃阴不足证",
+      "inferred": "胃阴不足证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    },
+    {
+      "id": "TC17",
+      "name": "肝郁血虚",
+      "category": "复合证-肝郁血虚",
+      "expected": "肝郁血虚证",
+      "inferred": "肝郁血虚证",
+      "syndromeScore": 1,
+      "overallScore": 1
+    }
+  ]
+}
