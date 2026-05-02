@@ -1,11 +1,6 @@
 export * from './input';
 export * from './output';
 
-// 导出新的 v2.0 类型系统
-export * from './tongue';
-export * from './inference';
-export * from './interrogation';
-
 // 通用类型
 export interface ApiResponse<T> {
   success: boolean;

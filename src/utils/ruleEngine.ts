@@ -16,7 +16,7 @@ export type TongueShape =
 
 /** 舌体特征枚举 */
 export type TongueBodyFeature = 
-  | '正常' | '水滑' | '瘀斑' | '干燥' | '少津' | '齿痕';
+  | '正常' | '水滑' | '瘀斑' | '干燥' | '少津';
 
 /** 苔色枚举 */
 export type CoatingColor = 
@@ -24,7 +24,7 @@ export type CoatingColor =
 
 /** 苔质枚举 */
 export type CoatingTexture = 
-  | '薄苔' | '厚苔' | '润苔' | '滑苔' | '燥苔' | '腻苔' | '腐苔' | '剥落苔' | '少苔';
+  | '薄苔' | '厚苔' | '润苔' | '滑苔' | '燥苔' | '腻苔' | '腐苔' | '剥落苔';
 
 /** 舌苔分布枚举 */
 export type Distribution = 
@@ -201,8 +201,7 @@ const TONGUE_BODY_SCORES: Record<TongueBodyFeature, number> = {
   '水滑': 6,
   '瘀斑': 8,
   '干燥': 5,
-  '少津': 8,
-  '齿痕': 7
+  '少津': 8
 };
 
 /** 苔色评分表 */
@@ -224,8 +223,7 @@ const COATING_TEXTURE_SCORES: Record<CoatingTexture, number> = {
   '燥苔': 7,
   '腻苔': 7,
   '腐苔': 8,
-  '剥落苔': 8,
-  '少苔': 8
+  '剥落苔': 8
 };
 
 /** 舌苔分布评分表 */
@@ -467,293 +465,6 @@ const COMPOSITE_RULES: CompositeRule[] = [
       main: ['足三里', '太溪', '三阴交'],
       secondary: ['气海', '关元', '阴郄']
     }
-  },
-  // ==================== 三焦辨证规则（来源：古典巨灵经脉辨证·三焦经）====================
-  {
-    id: 'CF11',
-    name: '上焦虚证-肺气虚',
-    features: {
-      tongueColor: '淡白舌',
-      coatingColor: '薄白苔'
-    },
-    threshold: 9,
-    pathogenesis: '上焦肺气虚弱，治节失职，水溢于上则吐涎沫面肿，水流于下则遗尿',
-    treatment: {
-      principle: '补上焦，益肺气',
-      method: '补法'
-    },
-    acupoints: {
-      main: ['关元', '太溪', '肾俞'],
-      secondary: ['风门', '肺俞']
-    }
-  },
-  {
-    id: 'CF12',
-    name: '上焦实证-肺气郁闭',
-    features: {
-      tongueColor: '红舌',
-      coatingColor: '黄苔'
-    },
-    threshold: 12,
-    pathogenesis: '邪阻手少阳之经，经气郁滞，闭阻上焦，肺气失宣',
-    treatment: {
-      principle: '散寒驱邪，宣肺理气',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['天井', '申脉', '风门'],
-      secondary: ['昆仑', '肺俞']
-    }
-  },
-  {
-    id: 'CF13',
-    name: '上焦寒证-三焦阳虚',
-    features: {
-      tongueColor: '淡白舌',
-      coatingColor: '白苔',
-      coatingTexture: '润苔'
-    },
-    threshold: 11,
-    pathogenesis: '寒邪客于手少阳经，三焦原气运行不畅，阳气不足，胸背失于温煦',
-    treatment: {
-      principle: '祛寒邪，理三焦，止疼痛',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['肾俞', '命门', '曲泽'],
-      secondary: ['天井']
-    }
-  },
-  {
-    id: 'CF14',
-    name: '上焦热证-心肺热盛',
-    features: {
-      tongueColor: '绛舌',
-      coatingColor: '黄苔',
-      coatingTexture: '燥苔'
-    },
-    threshold: 15,
-    pathogenesis: '手少阳多气少血，内寄相火，邪客少阳从火化，热灼津液',
-    treatment: {
-      principle: '清热泻火',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['劳宫', '大陵', '合谷'],
-      secondary: ['曲池', '外关', '曲泽']
-    }
-  },
-  {
-    id: 'CF15',
-    name: '中焦虚证-脾胃气虚',
-    features: {
-      tongueColor: '淡白舌',
-      tongueShape: '胖大舌',
-      coatingColor: '薄白苔'
-    },
-    threshold: 13,
-    pathogenesis: '脾胃气虚，升降失常，腐熟运化功能减弱',
-    treatment: {
-      principle: '舒调气机，健脾和胃',
-      method: '补法'
-    },
-    acupoints: {
-      main: ['内关', '天井', '足三里'],
-      secondary: []
-    }
-  },
-  {
-    id: 'CF16',
-    name: '中焦实证-气机郁滞',
-    features: {
-      tongueColor: '红舌',
-      tongueShape: '胖大舌',
-      coatingColor: '黄苔'
-    },
-    threshold: 14,
-    pathogenesis: '邪客中焦，气机郁滞',
-    treatment: {
-      principle: '舒调气机，理气消胀',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['内关', '天井', '中脘'],
-      secondary: ['足三里']
-    }
-  },
-  {
-    id: 'CF17',
-    name: '中焦寒证-脾胃虚寒',
-    features: {
-      tongueColor: '淡白舌',
-      tongueShape: '胖大舌',
-      coatingColor: '白苔',
-      coatingTexture: '厚苔'
-    },
-    threshold: 15,
-    pathogenesis: '中焦阳虚或外感寒邪，元气运行不畅，温化脾胃不利',
-    treatment: {
-      principle: '温中散寒',
-      method: '补法'
-    },
-    acupoints: {
-      main: ['命门', '肾俞', '中脘'],
-      secondary: ['足三里', '天井']
-    }
-  },
-  {
-    id: 'CF18',
-    name: '中焦热证-脾胃湿热',
-    features: {
-      tongueColor: '红舌',
-      coatingColor: '黄苔',
-      coatingTexture: '腻苔'
-    },
-    threshold: 15,
-    pathogenesis: '邪热蕴结中焦，胃火炽盛',
-    treatment: {
-      principle: '清泻胃火',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['支沟', '中渚', '内关'],
-      secondary: ['足三里']
-    }
-  },
-  {
-    id: 'CF19',
-    name: '下焦虚证-肾阳不足',
-    features: {
-      tongueColor: '淡白舌',
-      tongueShape: '胖大舌',
-      coatingColor: '白苔',
-      coatingTexture: '润苔'
-    },
-    threshold: 14,
-    pathogenesis: '下焦肾阳不足，气化失司',
-    treatment: {
-      principle: '温补下焦',
-      method: '补法'
-    },
-    acupoints: {
-      main: ['命门', '肾俞', '关元'],
-      secondary: ['中极']
-    }
-  },
-  {
-    id: 'CF20',
-    name: '下焦实证-膀胱气化失常',
-    features: {
-      tongueColor: '红舌',
-      coatingColor: '黄苔',
-      coatingTexture: '燥苔'
-    },
-    threshold: 14,
-    pathogenesis: '实邪客于下焦，膀胱气化失常，大肠津液枯涸',
-    treatment: {
-      principle: '通利下焦',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['支沟', '天井', '委阳'],
-      secondary: []
-    }
-  },
-  {
-    id: 'CF21',
-    name: '下焦寒证-阳气不足',
-    features: {
-      tongueColor: '淡白舌',
-      tongueShape: '胖大舌',
-      coatingColor: '白苔',
-      coatingTexture: '润苔'
-    },
-    threshold: 14,
-    pathogenesis: '寒邪客于下焦，阳气不足',
-    treatment: {
-      principle: '温阳散寒',
-      method: '补法'
-    },
-    acupoints: {
-      main: ['命门', '肾俞', '关元'],
-      secondary: ['中极', '膀胱俞']
-    }
-  },
-  {
-    id: 'CF22',
-    name: '下焦热证-膀胱湿热',
-    features: {
-      tongueColor: '红舌',
-      coatingColor: '黄苔',
-      coatingTexture: '腻苔'
-    },
-    threshold: 14,
-    pathogenesis: '手少阳内寄相火，邪从火化，灼伤下焦',
-    treatment: {
-      principle: '清热通利',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['支沟', '外关', '合谷'],
-      secondary: ['曲池']
-    }
-  },
-  {
-    id: 'CF23',
-    name: '络脉虚证-经筋失养',
-    features: {
-      tongueColor: '淡白舌',
-      tongueShape: '瘦薄舌',
-      coatingColor: '薄白苔'
-    },
-    threshold: 12,
-    pathogenesis: '气血虚弱，经筋失养',
-    treatment: {
-      principle: '补益气血，柔养经络',
-      method: '补法'
-    },
-    acupoints: {
-      main: ['关元', '足三里', '三阴交'],
-      secondary: ['外关', '天井', '肩髎']
-    }
-  },
-  {
-    id: 'CF24',
-    name: '络脉实证-经气郁滞',
-    features: {
-      tongueColor: '紫舌',
-      tongueShape: '点刺舌',
-      coatingColor: '黄苔'
-    },
-    threshold: 16,
-    pathogenesis: '经气郁滞，筋脉拘急',
-    treatment: {
-      principle: '行气活血，舒筋活络',
-      method: '平补平泻'
-    },
-    acupoints: {
-      main: ['足三里', '三阴交', '外关'],
-      secondary: ['天井', '肩髎']
-    }
-  },
-  {
-    id: 'CF25',
-    name: '三焦经脉阻滞证',
-    features: {
-      tongueColor: '紫舌',
-      tongueShape: '裂纹舌',
-      coatingColor: '黄苔'
-    },
-    threshold: 16,
-    pathogenesis: '三焦经气阻滞，手臂外侧疼痛',
-    treatment: {
-      principle: '疏通经络，祛邪止痛',
-      method: '泻法'
-    },
-    acupoints: {
-      main: ['关冲', '外关', '肩髎'],
-      secondary: []
-    }
   }
 ];
 
@@ -781,33 +492,14 @@ const ACUPOINT_INFO: Record<string, Acupoint> = {
   '内关': { name: '内关', meridian: '心包经', function: '宽胸理气，安神要穴' },
   '大椎': { name: '大椎', meridian: '督脉', function: '清热解表，诸阳之会' },
   '内庭': { name: '内庭', meridian: '胃经', function: '清胃泻火，胃之荥穴' },
+  '血海': { name: '血海', meridian: '脾经', function: '活血化瘀' },
   '曲泉': { name: '曲泉', meridian: '肝经', function: '清利湿热，肝之合穴' },
   '阳陵泉': { name: '阳陵泉', meridian: '胆经', function: '疏肝利胆，筋会' },
   '气海': { name: '气海', meridian: '任脉', function: '补气固本' },
   '关元': { name: '关元', meridian: '任脉', function: '补肾固本，丹田要穴' },
   '阴郄': { name: '阴郄', meridian: '心经', function: '滋阴清热，心之郄穴' },
   '胃俞': { name: '胃俞', meridian: '膀胱经', function: '和胃健脾' },
-  // 三焦经穴位
-  '关冲': { name: '关冲', meridian: '手少阳三焦经', function: '清热开窍，三焦井穴' },
-  '天井': { name: '天井', meridian: '手少阳三焦经', function: '理气散结，三焦合穴' },
-  '支沟': { name: '支沟', meridian: '手少阳三焦经', function: '通调气机，三焦经穴' },
-  '中渚': { name: '中渚', meridian: '手少阳三焦经', function: '清热通络，三焦荥穴' },
-  '外关': { name: '外关', meridian: '手少阳三焦经', function: '清热解表，八脉交会穴' },
-  '肩髎': { name: '肩髎', meridian: '手少阳三焦经', function: '祛风通络，局部取穴' },
-  // 膀胱经穴位
-  '风门': { name: '风门', meridian: '膀胱经', function: '祛风散寒，宣肺止咳' },
-  '肺俞': { name: '肺俞', meridian: '膀胱经', function: '宣肺理气，肺之背俞' },
-  '昆仑': { name: '昆仑', meridian: '膀胱经', function: '舒筋活络，足太阳经穴' },
-  '委阳': { name: '委阳', meridian: '膀胱经', function: '通利三焦，三焦下合穴' },
-  '膀胱俞': { name: '膀胱俞', meridian: '膀胱经', function: '利尿通淋，膀胱背俞' },
-  // 督脉穴位
-  '命门': { name: '命门', meridian: '督脉', function: '温肾壮阳，补命门火' },
-  // 心包经穴位
-  '曲泽': { name: '曲泽', meridian: '心包经', function: '清心除烦，心包合穴' },
-  '劳宫': { name: '劳宫', meridian: '心包经', function: '清心泻火，心包荥穴' },
-  '大陵': { name: '大陵', meridian: '心包经', function: '清心宁神，心包原穴' },
-  // 任脉穴位
-  '中极': { name: '中极', meridian: '任脉', function: '补肾固涩，膀胱募穴' }
+  '膈俞': { name: '膈俞', meridian: '膀胱经', function: '活血化瘀' }
 };
 
 // ==================== 评分计算函数 ====================
@@ -1168,13 +860,13 @@ export function diagnose(features: TongueFeatures): DiagnosisResult {
     '待辨证';
   
   const syndromeScore = primaryRule?.matchScore || 0;
-  const pathogenesis = 
+  const pathogenesis = primaryRule?.pathogenesis || 
     (coldHeatConflict?.resolution) || 
     (deficiencyExcessConflict?.resolution) || 
     '需要进一步辨证分析';
   
   // 6. 生成处方
-  const prescription = generatePrescription(primarySyndrome);
+  const prescription = generatePrescription(primarySyndrome, primaryRule);
   
   return {
     features,
@@ -1186,7 +878,7 @@ export function diagnose(features: TongueFeatures): DiagnosisResult {
       matchedRules,
       pathogenesis,
       treatment: prescription.treatment,
-      conflictResolution: coldHeatConflict ?? deficiencyExcessConflict ?? undefined
+      conflictResolution: coldHeatConflict || deficiencyExcessConflict
     },
     prescription,
     timestamp: new Date().toISOString()
@@ -1312,4 +1004,10 @@ export default {
   matchCompositeSyndrome,
   generatePrescription,
   formatDiagnosisResult,
+  // 类型
+  TongueFeatures,
+  ScoringResult,
+  SyndromeDiagnosis,
+  AcupuncturePrescription,
+  DiagnosisResult
 };

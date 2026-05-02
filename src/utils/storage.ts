@@ -1,720 +1,563 @@
 /**
- * 正和系统 - 舌镜本地存储模块
- *
+ * 舌镜本地存储模块
+ * 
  * 功能：
- * 1. 舌诊图片本地缓存（IndexedDB）
- * 2. 用户舌诊历史记录
- * 3. 离线数据同步状态管理
- * 4. 存储空间配额管理
- *
- * 存储结构：
- * - 图片数据表：{ id, uri, thumbnail, metadata, createdAt, synced }
- * - 诊断历史表：{ id, tongueImageId, diagnosis, acupoints, createdAt, synced }
- * - 同步队列：{ id, type, data, createdAt, retryCount }
+ * - 舌诊图片本地缓存
+ * - 用户舌诊历史记录
+ * - 离线数据同步
+ * - 存储空间管理
  */
 
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
-
-// ============================================
+// ============================================================
 // 类型定义
-// ============================================
+// ============================================================
 
-/** 舌象元数据 */
-export interface TongueMetadata {
-  tongueColor?: string;
-  tongueShape?: string;
-  coatingColor?: string;
-  coatingTexture?: string;
-  moisture?: string;
-  sublingual?: string;
-  /** 患者信息 */
-  patientAge?: number;
-  patientGender?: 'male' | 'female' | 'other';
-  chiefComplaint?: string;
-  /** 原始图片信息 */
-  sourceApp?: string;
-  originalSize?: number; // bytes
-  width?: number;
-  height?: number;
-}
-
-/** 舌诊图片 */
 export interface TongueImage {
   id: string;
-  /** Base64 DataURL 或 blob URL */
-  uri: string;
-  /** 缩略图（压缩版） */
-  thumbnail?: string;
-  metadata: TongueMetadata;
-  /** 创建时间 */
-  createdAt: number;
-  /** 是否已同步到服务器 */
-  synced: boolean;
-  /** 最后同步时间 */
-  syncedAt?: number;
+  uri: string;                    // 本地文件URI
+  thumbnailUri?: string;         // 缩略图URI
+  capturedAt: string;            // 拍摄时间 ISO8601
+  metadata: TongueImageMetadata;
+  synced: boolean;               // 是否已同步到服务器
+  serverId?: string;            // 服务器记录ID
 }
 
-/** 舌诊结果 */
+export interface TongueImageMetadata {
+  width: number;
+  height: number;
+  format: 'jpeg' | 'png' | 'webp';
+  size: number;                  // 文件大小 bytes
+  deviceId?: string;
+  userId?: string;
+}
+
 export interface TongueDiagnosis {
   id: string;
-  tongueImageId: string;
-  /** 辨证结果 */
-  primarySyndrome: string;
-  syndromeScore?: number;
-  pathogenesis?: string;
-  tongueAnalysis?: string;
-  /** 选穴方案 */
-  acupoints: AcupunctureResult[];
-  /** 服务信息 */
-  agentId?: string;
-  pricingUsdt?: string;
-  orderId?: string;
-  /** 创建时间 */
-  createdAt: number;
-  /** 是否已同步到正和系统 */
+  imageId: string;              // 关联图片ID
+  createdAt: string;            // 诊断时间
+  result: DiagnosisResult;
+  providerAgentId: string;      // 服务提供者 Agent ID
+  tokensSpent: string;          // 消耗积分
   synced: boolean;
-  syncedAt?: number;
+  serverId?: string;
 }
 
-/** 针灸穴位结果 */
-export interface AcupunctureResult {
-  point: string;
-  meridian: string;
-  effect: string;
-  method: string;
-  needleSize?: string;
-  angle?: string;
+export interface DiagnosisResult {
+  tongueColor?: string;         // 舌色
+  tongueCoating?: string;       // 舌苔
+  tongueShape?: string;         // 舌形
+  diagnosisType?: string;       // 证型
+  diagnosisDescription?: string;
+  suggestions?: string[];
+  confidence?: number;         // 置信度 0-1
 }
 
-/** 同步队列项 */
 export interface SyncQueueItem {
   id: string;
-  /** 同步类型 */
   type: 'image' | 'diagnosis';
-  /** 操作类型 */
   action: 'create' | 'update' | 'delete';
-  data: TongueImage | TongueDiagnosis;
-  createdAt: number;
+  data: any;
+  createdAt: string;
   retryCount: number;
   lastError?: string;
 }
 
-/** 存储统计 */
 export interface StorageStats {
+  totalSize: number;           // 总占用空间 bytes
   imageCount: number;
   diagnosisCount: number;
   syncQueueLength: number;
-  totalSizeBytes: number;
-  quotaBytes: number;
-  usagePercent: number;
+  lastSyncAt?: string;
 }
 
-// ============================================
-// IndexedDB Schema 定义
-// ============================================
-
-interface TongueMirrorDB extends DBSchema {
-  images: {
-    key: string;
-    value: TongueImage;
-    indexes: {
-      'by-created': number;
-      'by-synced': number;
-    };
-  };
-  diagnoses: {
-    key: string;
-    value: TongueDiagnosis;
-    indexes: {
-      'by-image': string;
-      'by-created': number;
-      'by-synced': number;
-    };
-  };
-  syncQueue: {
-    key: string;
-    value: SyncQueueItem;
-    indexes: {
-      'by-created': number;
-      'by-type': string;
-    };
-  };
-  meta: {
-    key: string;
-    value: { key: string; value: unknown };
-  };
+export interface StorageConfig {
+  maxCacheSize: number;         // 最大缓存大小 bytes (默认 500MB)
+  maxImageAge: number;           // 图片最大保存天数 (默认 90天)
+  autoSync: boolean;            // 自动同步开关
+  syncInterval: number;         // 同步间隔 ms (默认 5分钟)
 }
 
-// ============================================
-// 常量配置
-// ============================================
+// ============================================================
+// 常量定义
+// ============================================================
 
-const DB_NAME = 'tongue-mirror-db';
-const DB_VERSION = 1;
+const STORAGE_KEYS = {
+  TONGUE_IMAGES: 'tongue_images',
+  DIAGNOSES: 'tongue_diagnoses',
+  SYNC_QUEUE: 'sync_queue',
+  USER_PREFERENCES: 'user_preferences',
+  LAST_SYNC: 'last_sync',
+} as const;
 
-/** 图片最大存储尺寸（100KB，压缩后 base64） */
-const MAX_IMAGE_SIZE = 100 * 1024;
+const DEFAULT_CONFIG: StorageConfig = {
+  maxCacheSize: 500 * 1024 * 1024, // 500MB
+  maxImageAge: 90,                  // 90天
+  autoSync: true,
+  syncInterval: 5 * 60 * 1000,      // 5分钟
+};
 
-/** 缩略图尺寸 */
-const THUMBNAIL_MAX_SIZE = 200;
-
-/** 最大重试次数 */
-const MAX_RETRY = 3;
-
-// ============================================
-// 工具函数
-// ============================================
-
-/** 生成唯一 ID */
-function generateId(): string {
-  return `tm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-/** 压缩图片为 base64 */
-async function compressImage(
-  fileUri: string,
-  maxSize = MAX_IMAGE_SIZE
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      // 缩放尺寸
-      let { width, height } = img;
-      const ratio = Math.min(
-        THUMBNAIL_MAX_SIZE / width,
-        THUMBNAIL_MAX_SIZE / height,
-        1
-      );
-      width = Math.round(width * ratio);
-      height = Math.round(height * ratio);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Canvas context unavailable'));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-
-      // 逐步降低质量直到满足大小限制
-      let quality = 0.8;
-      let dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-      while (dataUrl.length > maxSize && quality > 0.1) {
-        quality -= 0.1;
-        dataUrl = canvas.toDataURL('image/jpeg', quality);
-      }
-
-      resolve(dataUrl);
-    };
-    img.onerror = () => reject(new Error('图片加载失败'));
-    img.src = fileUri;
-  });
-}
-
-/** 估算存储大小（字节） */
-function estimateStorageSize(data: unknown): number {
-  return new Blob([JSON.stringify(data)]).size;
-}
-
-// ============================================
-// 数据库操作类
-// ============================================
+// ============================================================
+// 核心存储类
+// ============================================================
 
 class TongueStorage {
-  private db: IDBPDatabase<TongueMirrorDB> | null = null;
-  private initPromise: Promise<void> | null = null;
+  private config: StorageConfig;
+  private memoryCache: Map<string, TongueImage[]> = new Map();
+  private syncTimer?: NodeJS.Timeout;
 
-  /**
-   * 初始化 IndexedDB
-   */
-  async init(): Promise<void> {
-    if (this.db) return;
-    if (this.initPromise) return this.initPromise;
-
-    this.initPromise = (async () => {
-      this.db = await openDB<TongueMirrorDB>(DB_NAME, DB_VERSION, {
-        upgrade(db) {
-          // 图片存储
-          if (!db.objectStoreNames.contains('images')) {
-            const imageStore = db.createObjectStore('images', { keyPath: 'id' });
-            imageStore.createIndex('by-created', 'createdAt');
-            imageStore.createIndex('by-synced', 'synced');
-          }
-
-          // 诊断记录
-          if (!db.objectStoreNames.contains('diagnoses')) {
-            const diagStore = db.createObjectStore('diagnoses', {
-              keyPath: 'id',
-            });
-            diagStore.createIndex('by-image', 'tongueImageId');
-            diagStore.createIndex('by-created', 'createdAt');
-            diagStore.createIndex('by-synced', 'synced');
-          }
-
-          // 同步队列
-          if (!db.objectStoreNames.contains('syncQueue')) {
-            const syncStore = db.createObjectStore('syncQueue', {
-              keyPath: 'id',
-            });
-            syncStore.createIndex('by-created', 'createdAt');
-            syncStore.createIndex('by-type', 'type');
-          }
-
-          // 元数据存储
-          if (!db.objectStoreNames.contains('meta')) {
-            db.createObjectStore('meta', { keyPath: 'key' });
-          }
-        },
-      });
-    })();
-
-    return this.initPromise;
+  constructor(config: Partial<StorageConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  private async ensureDB(): Promise<IDBPDatabase<TongueMirrorDB>> {
-    await this.init();
-    if (!this.db) throw new Error('IndexedDB 未初始化');
-    return this.db;
-  }
-
-  // ============================================
-  // 图片操作
-  // ============================================
+  // ==================== 图片管理 ====================
 
   /**
    * 保存舌诊图片
-   *
-   * @param uri - 图片 URI（支持 base64 / blob URL / file path）
-   * @param metadata - 舌象元数据
-   * @param options - 可选配置
    */
-  async saveImage(
-    uri: string,
-    metadata: TongueMetadata,
-    options: { compress?: boolean; autoSync?: boolean } = { compress: true, autoSync: true }
-  ): Promise<TongueImage> {
-    const db = await this.ensureDB();
-    const id = generateId();
-    const createdAt = Date.now();
+  async saveImage(image: TongueImage): Promise<void> {
+    const images = await this.getAllImages();
+    
+    // 检查是否已存在
+    const existingIndex = images.findIndex(img => img.id === image.id);
+    if (existingIndex >= 0) {
+      images[existingIndex] = { ...images[existingIndex], ...image };
+    } else {
+      images.unshift(image); // 新图片放在最前面
+    }
 
-    let finalUri = uri;
-    let thumbnail: string | undefined;
+    await this.saveToStorage(STORAGE_KEYS.TONGUE_IMAGES, images);
+    await this.updateMemoryCache(STORAGE_KEYS.TONGUE_IMAGES, images);
+  }
 
-    // 压缩处理（如果是 base64 或 blob）
-    if (options.compress && (uri.startsWith('data:') || uri.startsWith('blob:'))) {
-      try {
-        finalUri = await compressImage(uri);
-        // 生成缩略图
-        thumbnail = await compressImage(uri, 20 * 1024);
-      } catch (e) {
-        console.warn('图片压缩失败，使用原图', e);
+  /**
+   * 批量保存图片
+   */
+  async saveImages(newImages: TongueImage[]): Promise<void> {
+    const images = await this.getAllImages();
+    
+    for (const image of newImages) {
+      const existingIndex = images.findIndex(img => img.id === image.id);
+      if (existingIndex >= 0) {
+        images[existingIndex] = { ...images[existingIndex], ...image };
+      } else {
+        images.unshift(image);
       }
     }
 
-    const image: TongueImage = {
-      id,
-      uri: finalUri,
-      thumbnail,
-      metadata,
-      createdAt,
-      synced: false,
-    };
-
-    await db.put('images', image);
-
-    // 加入同步队列
-    if (options.autoSync) {
-      await this.addToSyncQueue('image', 'create', image);
-    }
-
-    return image;
+    await this.saveToStorage(STORAGE_KEYS.TONGUE_IMAGES, images);
+    await this.updateMemoryCache(STORAGE_KEYS.TONGUE_IMAGES, images);
   }
 
   /**
-   * 获取图片
-   */
-  async getImage(id: string): Promise<TongueImage | undefined> {
-    const db = await this.ensureDB();
-    return db.get('images', id);
-  }
-
-  /**
-   * 获取所有图片（按时间倒序）
+   * 获取所有本地图片
    */
   async getAllImages(): Promise<TongueImage[]> {
-    const db = await this.ensureDB();
-    const images = await db.getAllFromIndex('images', 'by-created');
-    return images.reverse(); // 最新的在前
+    if (this.memoryCache.has(STORAGE_KEYS.TONGUE_IMAGES)) {
+      return this.memoryCache.get(STORAGE_KEYS.TONGUE_IMAGES)!;
+    }
+    
+    const stored = await this.getFromStorage<TongueImage[]>(STORAGE_KEYS.TONGUE_IMAGES);
+    const images = stored || [];
+    await this.updateMemoryCache(STORAGE_KEYS.TONGUE_IMAGES, images);
+    return images;
   }
 
   /**
-   * 获取未同步的图片
+   * 根据ID获取图片
    */
-  async getUnsyncedImages(): Promise<TongueImage[]> {
-    const db = await this.ensureDB();
-    return db.getAllFromIndex('images', 'by-synced', false);
+  async getImage(id: string): Promise<TongueImage | undefined> {
+    const images = await this.getAllImages();
+    return images.find(img => img.id === id);
   }
 
   /**
    * 删除图片
    */
   async deleteImage(id: string): Promise<void> {
-    const db = await this.ensureDB();
-    const image = await db.get('images', id);
-    if (image) {
-      await db.delete('images', id);
-      // 级联删除诊断记录
-      const diagnoses = await db.getAllFromIndex('diagnoses', 'by-image', id);
-      for (const d of diagnoses) {
-        await this.deleteDiagnosis(d.id);
-      }
-      await this.addToSyncQueue('image', 'delete', image);
-    }
+    const images = await this.getAllImages();
+    const filtered = images.filter(img => img.id !== id);
+    await this.saveToStorage(STORAGE_KEYS.TONGUE_IMAGES, filtered);
+    await this.updateMemoryCache(STORAGE_KEYS.TONGUE_IMAGES, filtered);
+  }
+
+  /**
+   * 获取未同步的图片
+   */
+  async getUnsyncedImages(): Promise<TongueImage[]> {
+    const images = await this.getAllImages();
+    return images.filter(img => !img.synced);
   }
 
   /**
    * 标记图片已同步
    */
-  async markImageSynced(id: string): Promise<void> {
-    const db = await this.ensureDB();
-    const image = await db.get('images', id);
+  async markImageSynced(id: string, serverId: string): Promise<void> {
+    const images = await this.getAllImages();
+    const image = images.find(img => img.id === id);
     if (image) {
       image.synced = true;
-      image.syncedAt = Date.now();
-      await db.put('images', image);
+      image.serverId = serverId;
+      await this.saveToStorage(STORAGE_KEYS.TONGUE_IMAGES, images);
+      await this.updateMemoryCache(STORAGE_KEYS.TONGUE_IMAGES, images);
     }
   }
 
-  // ============================================
-  // 诊断记录操作
-  // ============================================
+  // ==================== 诊断记录管理 ====================
 
   /**
    * 保存诊断记录
    */
-  async saveDiagnosis(
-    diagnosis: Omit<TongueDiagnosis, 'id' | 'createdAt' | 'synced'>,
-    options: { autoSync?: boolean } = { autoSync: true }
-  ): Promise<TongueDiagnosis> {
-    const db = await this.ensureDB();
-    const id = generateId();
-    const createdAt = Date.now();
-
-    const fullDiagnosis: TongueDiagnosis = {
-      ...diagnosis,
-      id,
-      createdAt,
-      synced: false,
-    };
-
-    await db.put('diagnoses', fullDiagnosis);
-
-    if (options.autoSync) {
-      await this.addToSyncQueue('diagnosis', 'create', fullDiagnosis);
+  async saveDiagnosis(diagnosis: TongueDiagnosis): Promise<void> {
+    const diagnoses = await this.getAllDiagnoses();
+    
+    const existingIndex = diagnoses.findIndex(d => d.id === diagnosis.id);
+    if (existingIndex >= 0) {
+      diagnoses[existingIndex] = { ...diagnoses[existingIndex], ...diagnosis };
+    } else {
+      diagnoses.unshift(diagnosis);
     }
 
-    return fullDiagnosis;
+    await this.saveToStorage(STORAGE_KEYS.DIAGNOSES, diagnoses);
+    await this.updateMemoryCache(STORAGE_KEYS.DIAGNOSES, diagnoses);
   }
 
   /**
-   * 获取诊断记录
-   */
-  async getDiagnosis(id: string): Promise<TongueDiagnosis | undefined> {
-    const db = await this.ensureDB();
-    return db.get('diagnoses', id);
-  }
-
-  /**
-   * 获取某图片的诊断记录
-   */
-  async getDiagnosesByImage(imageId: string): Promise<TongueDiagnosis[]> {
-    const db = await this.ensureDB();
-    return db.getAllFromIndex('diagnoses', 'by-image', imageId);
-  }
-
-  /**
-   * 获取所有诊断记录（按时间倒序）
+   * 获取所有诊断记录
    */
   async getAllDiagnoses(): Promise<TongueDiagnosis[]> {
-    const db = await this.ensureDB();
-    const results = await db.getAllFromIndex('diagnoses', 'by-created');
-    return results.reverse();
+    if (this.memoryCache.has(STORAGE_KEYS.DIAGNOSES)) {
+      return this.memoryCache.get(STORAGE_KEYS.DIAGNOSES)!;
+    }
+    
+    const stored = await this.getFromStorage<TongueDiagnosis[]>(STORAGE_KEYS.DIAGNOSES);
+    const diagnoses = stored || [];
+    await this.updateMemoryCache(STORAGE_KEYS.DIAGNOSES, diagnoses);
+    return diagnoses;
   }
 
   /**
-   * 获取未同步的诊断记录
+   * 获取图片关联的诊断记录
    */
-  async getUnsyncedDiagnoses(): Promise<TongueDiagnosis[]> {
-    const db = await this.ensureDB();
-    return db.getAllFromIndex('diagnoses', 'by-synced', false);
+  async getDiagnosesByImageId(imageId: string): Promise<TongueDiagnosis[]> {
+    const diagnoses = await this.getAllDiagnoses();
+    return diagnoses.filter(d => d.imageId === imageId);
+  }
+
+  /**
+   * 获取最新诊断记录
+   */
+  async getLatestDiagnoses(limit: number = 10): Promise<TongueDiagnosis[]> {
+    const diagnoses = await this.getAllDiagnoses();
+    return diagnoses.slice(0, limit);
   }
 
   /**
    * 删除诊断记录
    */
   async deleteDiagnosis(id: string): Promise<void> {
-    const db = await this.ensureDB();
-    const diag = await db.get('diagnoses', id);
-    if (diag) {
-      await db.delete('diagnoses', id);
-      await this.addToSyncQueue('diagnosis', 'delete', diag);
-    }
+    const diagnoses = await this.getAllDiagnoses();
+    const filtered = diagnoses.filter(d => d.id !== id);
+    await this.saveToStorage(STORAGE_KEYS.DIAGNOSES, filtered);
+    await this.updateMemoryCache(STORAGE_KEYS.DIAGNOSES, filtered);
   }
 
-  /**
-   * 标记诊断记录已同步
-   */
-  async markDiagnosisSynced(id: string): Promise<void> {
-    const db = await this.ensureDB();
-    const diag = await db.get('diagnoses', id);
-    if (diag) {
-      diag.synced = true;
-      diag.syncedAt = Date.now();
-      await db.put('diagnoses', diag);
-    }
-  }
-
-  // ============================================
-  // 同步队列
-  // ============================================
+  // ==================== 同步队列管理 ====================
 
   /**
-   * 加入同步队列
+   * 添加到同步队列
    */
-  private async addToSyncQueue(
-    type: 'image' | 'diagnosis',
-    action: 'create' | 'update' | 'delete',
-    data: TongueImage | TongueDiagnosis
-  ): Promise<void> {
-    const db = await this.ensureDB();
-    const item: SyncQueueItem = {
-      id: generateId(),
-      type,
-      action,
-      data,
-      createdAt: Date.now(),
+  async addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'createdAt' | 'retryCount'>): Promise<void> {
+    const queue = await this.getSyncQueue();
+    const queueItem: SyncQueueItem = {
+      ...item,
+      id: this.generateId(),
+      createdAt: new Date().toISOString(),
       retryCount: 0,
     };
-    await db.put('syncQueue', item);
+    queue.push(queueItem);
+    await this.saveToStorage(STORAGE_KEYS.SYNC_QUEUE, queue);
   }
 
   /**
    * 获取同步队列
    */
   async getSyncQueue(): Promise<SyncQueueItem[]> {
-    const db = await this.ensureDB();
-    const items = await db.getAllFromIndex('syncQueue', 'by-created');
-    return items;
+    const stored = await this.getFromStorage<SyncQueueItem[]>(STORAGE_KEYS.SYNC_QUEUE);
+    return stored || [];
   }
 
   /**
-   * 移除同步队列项
+   * 从同步队列移除
    */
-  async removeSyncQueueItem(id: string): Promise<void> {
-    const db = await this.ensureDB();
-    await db.delete('syncQueue', id);
-  }
-
-  /**
-   * 处理同步队列（与正和系统对接）
-   * 需要配合 zhenghe.ts 的 API 客户端使用
-   */
-  async processSyncQueue(
-    syncFn: (item: SyncQueueItem) => Promise<boolean>
-  ): Promise<{ success: number; failed: number }> {
-    const db = await this.ensureDB();
+  async removeFromSyncQueue(id: string): Promise<void> {
     const queue = await this.getSyncQueue();
+    const filtered = queue.filter(item => item.id !== id);
+    await this.saveToStorage(STORAGE_KEYS.SYNC_QUEUE, filtered);
+  }
 
-    let success = 0;
-    let failed = 0;
+  /**
+   * 更新同步队列项（增加重试次数）
+   */
+  async updateSyncQueueItem(id: string, error: string): Promise<void> {
+    const queue = await this.getSyncQueue();
+    const item = queue.find(i => i.id === id);
+    if (item) {
+      item.retryCount++;
+      item.lastError = error;
+      await this.saveToStorage(STORAGE_KEYS.SYNC_QUEUE, queue);
+    }
+  }
 
-    for (const item of queue) {
-      try {
-        const ok = await syncFn(item);
-        if (ok) {
-          await this.removeSyncQueueItem(item.id);
-          if (item.type === 'image') {
-            await this.markImageSynced((item.data as TongueImage).id);
-          } else {
-            await this.markDiagnosisSynced((item.data as TongueDiagnosis).id);
-          }
-          success++;
-        } else {
-          failed++;
-        }
-      } catch (e) {
-        // 重试计数
-        item.retryCount++;
-        item.lastError = e instanceof Error ? e.message : '未知错误';
-        if (item.retryCount >= MAX_RETRY) {
-          await this.removeSyncQueueItem(item.id);
-          console.error(`同步失败已达最大重试次数，移除队列项: ${item.id}`, e);
-        } else {
-          const db2 = await this.ensureDB();
-          await db2.put('syncQueue', item);
-        }
-        failed++;
+  // ==================== 存储统计 ====================
+
+  /**
+   * 获取存储统计信息
+   */
+  async getStorageStats(): Promise<StorageStats> {
+    const images = await this.getAllImages();
+    const diagnoses = await this.getAllDiagnoses();
+    const syncQueue = await this.getSyncQueue();
+
+    // 计算总大小（估算）
+    let totalSize = 0;
+    for (const img of images) {
+      if (img.metadata.size) {
+        totalSize += img.metadata.size;
       }
     }
 
-    return { success, failed };
-  }
-
-  // ============================================
-  // 存储空间管理
-  // ============================================
-
-  /**
-   * 获取存储统计
-   */
-  async getStorageStats(): Promise<StorageStats> {
-    const db = await this.ensureDB();
-
-    const images = await db.getAll('images');
-    const diagnoses = await db.getAll('diagnoses');
-    const syncQueue = await db.getAll('syncQueue');
-
-    const imageSize = images.reduce(
-      (sum, img) =>
-        sum + estimateStorageSize(img.uri) + estimateStorageSize(img.thumbnail || ''),
-      0
-    );
-    const diagSize = diagnoses.reduce(
-      (sum, d) => sum + estimateStorageSize(d),
-      0
-    );
-    const queueSize = syncQueue.reduce(
-      (sum, q) => sum + estimateStorageSize(q),
-      0
-    );
-    const totalSizeBytes = imageSize + diagSize + queueSize;
-
-    // 浏览器存储配额（估算 50MB）
-    const quotaBytes = 50 * 1024 * 1024;
-
+    // 获取最后同步时间
+    const lastSyncStr = await this.getFromStorage<string>(STORAGE_KEYS.LAST_SYNC);
+    
     return {
+      totalSize,
       imageCount: images.length,
       diagnosisCount: diagnoses.length,
       syncQueueLength: syncQueue.length,
-      totalSizeBytes,
-      quotaBytes,
-      usagePercent: (totalSizeBytes / quotaBytes) * 100,
+      lastSyncAt: lastSyncStr || undefined,
     };
   }
 
   /**
-   * 清理旧数据（按日期）
+   * 清理过期数据
    */
-  async cleanOldData(daysToKeep = 30): Promise<number> {
-    const db = await this.ensureDB();
-    const cutoff = Date.now() - daysToKeep * 24 * 60 * 60 * 1000;
+  async cleanupExpiredData(): Promise<{ imagesRemoved: number; sizeFreed: number }> {
+    const maxAge = this.config.maxImageAge * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - maxAge;
+    
+    const images = await this.getAllImages();
+    const toRemove: TongueImage[] = [];
+    let sizeFreed = 0;
 
-    let deleted = 0;
-
-    const oldImages = await db.getAllFromIndex('images', 'by-created');
-    for (const img of oldImages) {
-      if (img.createdAt < cutoff && img.synced) {
-        await db.delete('images', img.id);
-        deleted++;
+    for (const img of images) {
+      const capturedTime = new Date(img.capturedAt).getTime();
+      if (capturedTime < cutoff && img.synced) { // 只清理已同步的图片
+        toRemove.push(img);
+        sizeFreed += img.metadata.size || 0;
       }
     }
 
-    const oldDiags = await db.getAllFromIndex('diagnoses', 'by-created');
-    for (const diag of oldDiags) {
-      if (diag.createdAt < cutoff && diag.synced) {
-        await db.delete('diagnoses', diag.id);
-        deleted++;
-      }
+    if (toRemove.length > 0) {
+      const filtered = images.filter(img => !toRemove.some(r => r.id === img.id));
+      await this.saveToStorage(STORAGE_KEYS.TONGUE_IMAGES, filtered);
+      await this.updateMemoryCache(STORAGE_KEYS.TONGUE_IMAGES, filtered);
     }
 
-    return deleted;
+    return { imagesRemoved: toRemove.length, sizeFreed };
   }
 
   /**
-   * 清空所有本地数据（谨慎使用）
+   * 检查存储空间是否足够
+   */
+  async checkStorageSpace(requiredBytes: number): Promise<boolean> {
+    const stats = await this.getStorageStats();
+    return (stats.totalSize + requiredBytes) <= this.config.maxCacheSize;
+  }
+
+  // ==================== 同步管理 ====================
+
+  /**
+   * 启动自动同步
+   */
+  startAutoSync(syncFn: () => Promise<void>): void {
+    if (this.syncTimer) {
+      clearInterval(this.syncTimer);
+    }
+    
+    if (this.config.autoSync) {
+      this.syncTimer = setInterval(async () => {
+        try {
+          await syncFn();
+          await this.saveToStorage(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
+        } catch (error) {
+          console.error('Auto sync failed:', error);
+        }
+      }, this.config.syncInterval);
+    }
+  }
+
+  /**
+   * 停止自动同步
+   */
+  stopAutoSync(): void {
+    if (this.syncTimer) {
+      clearInterval(this.syncTimer);
+      this.syncTimer = undefined;
+    }
+  }
+
+  /**
+   * 手动触发同步
+   */
+  async triggerSync(syncFn: () => Promise<void>): Promise<void> {
+    await syncFn();
+    await this.saveToStorage(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
+  }
+
+  // ==================== 配置管理 ====================
+
+  /**
+   * 更新配置
+   */
+  async updateConfig(newConfig: Partial<StorageConfig>): Promise<void> {
+    this.config = { ...this.config, ...newConfig };
+    await this.saveToStorage(STORAGE_KEYS.USER_PREFERENCES, this.config);
+  }
+
+  /**
+   * 获取当前配置
+   */
+  async getConfig(): Promise<StorageConfig> {
+    const stored = await this.getFromStorage<StorageConfig>(STORAGE_KEYS.USER_PREFERENCES);
+    return stored ? { ...DEFAULT_CONFIG, ...stored } : { ...this.config };
+  }
+
+  // ==================== 工具方法 ====================
+
+  /**
+   * 生成唯一ID
+   */
+  private generateId(): string {
+    return `tm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * 保存到本地存储
+   */
+  private async saveToStorage<T>(key: string, data: T): Promise<void> {
+    try {
+      const json = JSON.stringify(data);
+      localStorage.setItem(key, json);
+    } catch (error) {
+      console.error(`Failed to save ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 从本地存储读取
+   */
+  private async getFromStorage<T>(key: string): Promise<T | null> {
+    try {
+      const json = localStorage.getItem(key);
+      return json ? JSON.parse(json) : null;
+    } catch (error) {
+      console.error(`Failed to load ${key}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * 更新内存缓存
+   */
+  private updateMemoryCache(key: string, data: any[]): void {
+    this.memoryCache.set(key, data);
+  }
+
+  /**
+   * 清除所有数据（谨慎使用）
    */
   async clearAll(): Promise<void> {
-    const db = await this.ensureDB();
-    await db.clear('images');
-    await db.clear('diagnoses');
-    await db.clear('syncQueue');
-  }
-
-  /**
-   * 导出所有数据（用于备份）
-   */
-  async exportAll(): Promise<{
-    images: TongueImage[];
-    diagnoses: TongueDiagnosis[];
-    exportedAt: number;
-  }> {
-    const db = await this.ensureDB();
-    return {
-      images: await db.getAll('images'),
-      diagnoses: await db.getAll('diagnoses'),
-      exportedAt: Date.now(),
-    };
+    Object.values(STORAGE_KEYS).forEach(key => {
+      localStorage.removeItem(key);
+    });
+    this.memoryCache.clear();
   }
 }
 
-// ============================================
-// 便捷工厂函数
-// ============================================
+// ============================================================
+// 导出单例实例和工具函数
+// ============================================================
 
-/** 从文件对象创建舌诊图片 */
-export async function createTongueImageFromFile(
-  file: File,
-  metadata: TongueMetadata = {}
-): Promise<TongueImage> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const uri = e.target?.result as string;
-      try {
-        const image = await tongueStorage.saveImage(uri, {
-          ...metadata,
-          originalSize: file.size,
-          sourceApp: 'tongue-mirror',
-        });
-        resolve(image);
-      } catch (err) {
-        reject(err);
-      }
-    };
-    reader.onerror = () => reject(new Error('文件读取失败'));
-    reader.readAsDataURL(file);
-  });
-}
-
-/** 从 URI/URL 创建舌诊图片（已有 URL 的情况）*/
-export async function createTongueImageFromUri(
-  uri: string,
-  metadata: TongueMetadata = {}
-): Promise<TongueImage> {
-  return tongueStorage.saveImage(uri, {
-    ...metadata,
-    sourceApp: 'tongue-mirror',
-  });
-}
-
-// ============================================
-// 导出单例
-// ============================================
-
+// 默认存储实例
 export const tongueStorage = new TongueStorage();
 
-// ============================================
-// 类型再导出（供外部使用）
-// ============================================
+// 辅助函数
 
-export type {
-  TongueMetadata,
-  TongueImage,
-  TongueDiagnosis,
-  AcupunctureResult,
-  SyncQueueItem,
-  StorageStats,
-};
+/**
+ * 创建舌诊图片对象
+ */
+export function createTongueImage(
+  uri: string,
+  metadata: TongueImageMetadata,
+  additionalData: Partial<TongueImage> = {}
+): TongueImage {
+  return {
+    id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    uri,
+    capturedAt: new Date().toISOString(),
+    metadata,
+    synced: false,
+    ...additionalData,
+  };
+}
+
+/**
+ * 创建诊断记录对象
+ */
+export function createTongueDiagnosis(
+  imageId: string,
+  result: DiagnosisResult,
+  providerAgentId: string,
+  tokensSpent: string
+): TongueDiagnosis {
+  return {
+    id: `diag_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    imageId,
+    createdAt: new Date().toISOString(),
+    result,
+    providerAgentId,
+    tokensSpent,
+    synced: false,
+  };
+}
+
+/**
+ * 格式化存储大小
+ */
+export function formatStorageSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const k = 1024;
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${units[i]}`;
+}
+
+/**
+ * 检查是否支持本地存储
+ */
+export function isStorageSupported(): boolean {
+  try {
+    const test = '__storage_test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// 导出类以便测试时可以创建多个实例
+export { TongueStorage };
