@@ -1,6 +1,9 @@
 /**
  * 问诊引擎 v2.0
  * 管理问诊流程、问题生成、用户反馈处理
+ * 
+ * 核心定位：问诊不是填问卷，是与推理引擎联动的动态验证
+ * 推理引擎四层推理出初步结论 → 问诊验证 → 修正推理 → 输出最终方案
  */
 
 import type {
@@ -10,9 +13,11 @@ import type {
   AccumulatedCorrection,
   Question,
 } from '@/types/interrogation';
+import type { InferenceNode } from '@/types/inference';
+import type { TongueAnalysisResult } from '@/types/tongue';
 import { AgeWeightCalculator } from './AgeWeightCalculator';
 import { QuestionTree } from './QuestionTree';
-import { TEN_QUESTIONS } from '@/types/interrogation';
+import { getCorrectionAction } from './CorrectionRules';
 
 /**
  * 问诊引擎状态
@@ -23,6 +28,24 @@ export enum InterrogationEngineStatus {
   InProgress = 'in_progress',
   Completed = 'completed',
   Skipped = 'skipped',
+}
+
+/**
+ * 问诊结果
+ */
+export interface InterrogationResult {
+  /** 是否完成 */
+  isComplete: boolean;
+  /** 修正后的推理节点 */
+  correctedNodes: InferenceNode[];
+  /** 累积的修正 */
+  corrections: AccumulatedCorrection[];
+  /** 最终证型结论 */
+  finalSyndrome: string;
+  /** 置信度变化 */
+  confidenceChanges: Record<string, number>;
+  /** 问诊摘要 */
+  summary: string;
 }
 
 /**
@@ -38,7 +61,13 @@ export class InterrogationEngine {
   private questionTree: QuestionTree;
   /** 当前会话 */
   private currentSession?: InterrogationSession;
-  
+  /** 原始推理节点（用于修正） */
+  private originalNodes: Map<string, InferenceNode>;
+  /** 当前推理节点（已修正） */
+  private currentNodes: Map<string, InferenceNode>;
+  /** 引擎状态 */
+  private status: InterrogationEngineStatus;
+
   constructor(config?: Partial<InterrogationEngineConfig>) {
     this.config = {
       maxQuestions: 10,
@@ -47,240 +76,507 @@ export class InterrogationEngine {
       enableDynamicTree: true,
       ...config,
     };
-    
+
     this.ageCalculator = new AgeWeightCalculator();
     this.questionTree = new QuestionTree();
+    this.originalNodes = new Map();
+    this.currentNodes = new Map();
+    this.status = InterrogationEngineStatus.Idle;
   }
-  
+
   /**
-   * 初始化问诊会话
+   * 根据舌象和推理结果初始化问诊会话
+   * @param tongueResult 舌象分析结果
+   * @param inferenceNodes 推理节点列表
+   * @param age 患者年龄（可选）
+   * @returns 初始问题
    */
-  initialize(age: number, tongueAnalysis: any): InterrogationSession {
-    // 计算年龄权重
-    const ageWeight = this.ageCalculator.calculate(age);
-    
-    // 获取年龄段
-    const ageGroup = this.ageCalculator.getAgeGroup(age);
-    
-    // 生成初始问题
-    const initialQuestions = this.generateInitialQuestions(age, tongueAnalysis);
-    
-    // 创建会话
-    const session: InterrogationSession = {
+  startSession(
+    tongueResult: TongueAnalysisResult,
+    inferenceNodes: InferenceNode[],
+    age?: number
+  ): Question | undefined {
+    // 设置状态
+    this.status = InterrogationEngineStatus.Initializing;
+
+    // 初始化年龄权重
+    if (age !== undefined && this.config.enableAgeWeight) {
+      this.ageCalculator.setAge(age);
+    }
+
+    // 保存原始推理节点
+    this.originalNodes = new Map();
+    this.currentNodes = new Map();
+    for (const node of inferenceNodes) {
+      this.originalNodes.set(node.id, { ...node });
+      this.currentNodes.set(node.id, { ...node });
+    }
+
+    // 创建问诊会话
+    this.currentSession = {
       id: `session-${Date.now()}`,
-      age,
-      ageGroup,
-      ageWeight,
-      questionQueue: initialQuestions.map(q => q.id),
+      age: age || this.ageCalculator.getAge(),
+      ageGroup: this.ageCalculator.getAgeGroup(),
+      ageWeight: this.ageCalculator.getConfig(),
+      questionQueue: [],
       answeredQuestions: [],
       corrections: [],
       status: 'init',
       startTime: new Date().toISOString(),
       skipped: false,
     };
-    
-    this.currentSession = session;
-    return session;
+
+    // 构建问题树
+    const questions = this.questionTree.buildTree(
+      tongueResult,
+      inferenceNodes,
+      age
+    );
+
+    // 筛选需要验证的问题（置信度低于阈值）
+    const validationQuestions = this.filterValidationQuestions(
+      inferenceNodes,
+      questions
+    );
+
+    // 设置问题队列
+    this.currentSession.questionQueue = validationQuestions.map(q => q.id);
+
+    // 更新状态
+    this.currentSession.status = 'in_progress';
+    this.status = InterrogationEngineStatus.InProgress;
+
+    // 返回第一个问题
+    return validationQuestions[0];
   }
-  
+
   /**
-   * 生成初始问题
+   * 筛选需要验证的问题
    */
-  private generateInitialQuestions(age: number, tongueAnalysis: any): Question[] {
-    const questions: Question[] = [];
-    
-    // 根据舌象特征生成相关问题
-    if (tongueAnalysis) {
-      // 根据舌色
-      if (tongueAnalysis.bodyColor === '淡白') {
-        questions.push(this.createQuestion('q-cold', '是否怕冷？', ['怕冷', '不怕冷']));
-      }
-      if (tongueAnalysis.bodyColor === '红') {
-        questions.push(this.createQuestion('q-hot', '是否怕热？', ['怕热', '不怕热']));
-      }
-      
-      // 根据舌形
-      if (tongueAnalysis.shape === '胖大') {
-        questions.push(this.createQuestion('q-fatigue', '是否容易疲劳？', ['容易疲劳', '不太疲劳']));
-      }
-      if (tongueAnalysis.shape === '瘦薄') {
-        questions.push(this.createQuestion('q-thirsty', '是否口干？', ['口干明显', '口干不明显']));
-      }
-      
-      // 根据苔色
-      if (tongueAnalysis.coatingColor === '黄') {
-        questions.push(this.createQuestion('q-bitter', '是否口苦？', ['口苦', '口不苦']));
-      }
-      if (tongueAnalysis.coatingColor === '腻') {
-        questions.push(this.createQuestion('q-stool', '大便情况如何？', ['便溏', '大便正常', '便秘']));
+  private filterValidationQuestions(
+    nodes: InferenceNode[],
+    questions: Question[]
+  ): Question[] {
+    const validationQuestions: Question[] = [];
+
+    for (const node of nodes) {
+      // 只验证置信度在 0.3-0.7 之间的问题
+      if (node.conclusion.confidence >= 0.3 && node.conclusion.confidence < this.config.confidenceThreshold) {
+        // 查找相关问题
+        const relatedQuestion = questions.find(
+          q => q.relatedNodeId === node.id ||
+               node.conclusion.label.includes(this.getQuestionPattern(q.id))
+        );
+        if (relatedQuestion) {
+          validationQuestions.push(relatedQuestion);
+        }
       }
     }
-    
-    // 添加十问歌相关问题
-    for (const q of TEN_QUESTIONS.slice(1, 5)) { // 二便、寒热、睡眠、头身
-      const relatedQuestion = this.createQuestion(
-        `q-ten-${q.order}`,
-        q.questionTemplates[0],
-        ['有', '无', '不确定']
-      );
-      if (!questions.find(q => q.id === relatedQuestion.id)) {
-        questions.push(relatedQuestion);
-      }
+
+    // 如果没有需要验证的问题，添加基础问题
+    if (validationQuestions.length === 0) {
+      // 按优先级添加基础问题
+      const baseQuestions = questions.filter(q => q.required || q.priority <= 5);
+      validationQuestions.push(...baseQuestions.slice(0, 3));
     }
-    
-    return questions.slice(0, this.config.maxQuestions);
+
+    // 按优先级排序
+    return validationQuestions.sort((a, b) => a.priority - b.priority);
   }
-  
+
   /**
-   * 创建问题
+   * 从问题ID获取模式
    */
-  private createQuestion(id: string, content: string, options: string[]): Question {
-    return {
-      id,
-      content,
-      type: 'single_choice',
-      options: options.map((opt, idx) => ({
-        id: `opt-${idx}`,
-        text: opt,
-        value: opt,
-      })),
-      trigger: {},
-      priority: 1,
-      required: true,
+  private getQuestionPattern(questionId: string): string {
+    const patternMap: Record<string, string> = {
+      'q-sleep': '心',
+      'q-fatigue': '气虚',
+      'q-stool': '脾',
+      'q-diet': '脾',
+      'q-cold-heat': '虚',
+      'q-chest-abdomen': '肝',
+      'q-ear-thirst': '肾',
+      'q-thirsty': '阴虚',
+      'q-head-body': '血虚',
     };
+    return patternMap[questionId] || '';
   }
-  
+
   /**
-   * 获取下一个问题
+   * 获取下一个动态问题
+   * @returns 下一个问题，如果没有更多问题则返回 undefined
    */
-  getNextQuestion(session?: InterrogationSession): Question | null {
-    const s = session || this.currentSession;
-    if (!s) return null;
-    
-    if (s.questionQueue.length === 0) {
-      return null;
+  getNextQuestion(): Question | undefined {
+    if (!this.currentSession || this.isComplete()) {
+      return undefined;
     }
-    
-    // 返回队列中的下一个问题
-    const nextQuestionId = s.questionQueue[0];
-    return this.questionTree.getQuestion(nextQuestionId) ?? null;
+
+    // 获取已回答的问题ID
+    const answeredIds = this.currentSession.answeredQuestions.map(a => a.questionId);
+
+    // 获取下一个未回答的问题
+    const nextQuestion = this.questionTree.getNextUnansweredQuestion(answeredIds);
+
+    // 如果没有未回答的问题，尝试动态生成
+    if (!nextQuestion && this.currentSession.questionQueue.length > 0) {
+      const nextId = this.currentSession.questionQueue[0];
+      return this.questionTree.getQuestion(nextId);
+    }
+
+    return nextQuestion;
   }
-  
+
   /**
-   * 处理用户回答
+   * 提交用户回答
+   * @param questionId 问题ID
+   * @param answer 用户回答
+   * @returns 修正结果
    */
-  processAnswer(
-    session: InterrogationSession,
-    questionId: string,
-    selectedOption: string
-  ): InterrogationSession {
-    // 查找问题
-    const question = this.questionTree.getQuestion(questionId);
-    if (!question) {
-      return session;
+  submitAnswer(questionId: string, answer: string): {
+    correction: AccumulatedCorrection | null;
+    nextQuestion: Question | undefined;
+  } {
+    if (!this.currentSession) {
+      throw new Error('问诊会话未初始化');
     }
-    
-    // 查找选项
-    const option = question.options.find(o => o.value === selectedOption);
-    
-    // 创建回答记录
-    const answered: AnsweredQuestion = {
+
+    // 记录回答
+    const answeredQuestion: AnsweredQuestion = {
       questionId,
-      selectedOption,
-      answerText: option?.text || selectedOption,
+      selectedOption: answer,
+      answerText: answer,
       timestamp: new Date().toISOString(),
     };
-    
-    // 获取修正规则并转换为累积修正格式
-    const rawCorrections = this.questionTree.getCorrections(questionId, selectedOption);
-    const corrections: AccumulatedCorrection[] = rawCorrections.map(rule => ({
-      targetNodeId: rule.targetNodeId,
-      type: rule.correctionType,
-      confidenceDelta: rule.confidenceDelta,
-      newLabel: rule.newLabel,
-      newDescription: rule.newDescription,
-      sourceQuestionId: questionId,
-      sourceAnswer: selectedOption,
-    }));
-    
-    // 更新会话
-    const updatedSession: InterrogationSession = {
-      ...session,
-      answeredQuestions: [...session.answeredQuestions, answered],
-      corrections: [...session.corrections, ...corrections],
-      questionQueue: session.questionQueue.filter(id => id !== questionId),
-    };
-    
-    // 检查是否完成
-    if (updatedSession.questionQueue.length === 0) {
-      updatedSession.status = 'completed';
-      updatedSession.endTime = new Date().toISOString();
+    this.currentSession.answeredQuestions.push(answeredQuestion);
+
+    // 查找匹配的修正规则
+    const correctionAction = getCorrectionAction(questionId, answer);
+
+    let correction: AccumulatedCorrection | null = null;
+
+    if (correctionAction) {
+      // 应用修正
+      correction = this.applyCorrection(
+        correctionAction.targetNodeId,
+        correctionAction.type as 'increase' | 'decrease' | 'replace' | 'invalidate' | 'split',
+        correctionAction.modification,
+        questionId,
+        answer
+      );
+      this.currentSession.corrections.push(correction);
     }
-    
-    this.currentSession = updatedSession;
-    return updatedSession;
+
+    // 获取下一个问题
+    const nextQuestion = this.getNextQuestion();
+
+    // 检查是否完成
+    if (this.shouldComplete()) {
+      this.currentSession.status = 'completed';
+      this.status = InterrogationEngineStatus.Completed;
+      this.currentSession.endTime = new Date().toISOString();
+    }
+
+    return { correction, nextQuestion };
   }
-  
+
+  /**
+   * 应用修正到推理节点
+   */
+  private applyCorrection(
+    targetNodeId: string,
+    type: 'increase' | 'decrease' | 'replace' | 'invalidate' | 'split',
+    modification: { label?: string; description?: string; confidenceDelta?: number },
+    sourceQuestionId: string,
+    sourceAnswer: string
+  ): AccumulatedCorrection {
+    const node = this.currentNodes.get(targetNodeId);
+    if (!node) {
+      // 如果节点不存在，创建一个新的
+      const newNode: InferenceNode = {
+        id: targetNodeId,
+        name: modification.label || targetNodeId,
+        layer: 2,
+        type: 'pattern',
+        inputs: [{
+          sourceType: 'interrogation',
+          sourceId: sourceQuestionId,
+          value: sourceAnswer,
+          weight: 1,
+        }],
+        conclusion: {
+          label: modification.label || targetNodeId,
+          description: modification.description || '',
+          confidence: Math.abs(modification.confidenceDelta || 0.1),
+          evidence: [`通过问诊 "${sourceQuestionId}" 验证`],
+          priority: 'medium',
+        },
+        causes: [],
+        effects: [],
+        corrections: [],
+        createdAt: new Date().toISOString(),
+      };
+      this.currentNodes.set(targetNodeId, newNode);
+    } else {
+      // 修正现有节点
+      switch (type) {
+        case 'increase':
+          node.conclusion.confidence = Math.min(
+            1.0,
+            node.conclusion.confidence + (modification.confidenceDelta || 0.1)
+          );
+          if (modification.label) {
+            node.conclusion.label = modification.label;
+          }
+          node.conclusion.evidence.push(`问诊 "${sourceQuestionId}" 支持`);
+          break;
+
+        case 'decrease':
+          node.conclusion.confidence = Math.max(
+            0,
+            node.conclusion.confidence - Math.abs(modification.confidenceDelta || 0.1)
+          );
+          node.conclusion.evidence.push(`问诊 "${sourceQuestionId}" 不支持`);
+          break;
+
+        case 'replace':
+          if (modification.label) {
+            node.conclusion.label = modification.label;
+          }
+          if (modification.description) {
+            node.conclusion.description = modification.description;
+          }
+          if (modification.confidenceDelta) {
+            node.conclusion.confidence = Math.max(
+              0.3,
+              Math.min(1.0, node.conclusion.confidence + modification.confidenceDelta)
+            );
+          }
+          node.conclusion.evidence.push(`问诊 "${sourceQuestionId}" 修正为 "${modification.label}"`);
+          break;
+
+        case 'invalidate':
+          node.conclusion.confidence = 0;
+          node.conclusion.evidence.push(`问诊 "${sourceQuestionId}" 否定`);
+          break;
+
+        case 'split':
+          // 处理分裂（创建新节点）
+          if (modification.label) {
+            const newNode: InferenceNode = {
+              id: `${targetNodeId}-split`,
+              name: modification.label,
+              layer: node.layer,
+              type: node.type,
+              inputs: [{
+                sourceType: 'interrogation',
+                sourceId: sourceQuestionId,
+                value: sourceAnswer,
+                weight: 1,
+              }],
+              conclusion: {
+                label: modification.label,
+                description: modification.description || '',
+                confidence: modification.confidenceDelta ? Math.abs(modification.confidenceDelta) : 0.5,
+                evidence: [`通过问诊 "${sourceQuestionId}" 分裂`],
+                priority: 'medium',
+              },
+              causes: [targetNodeId],
+              effects: [],
+              corrections: [],
+              createdAt: new Date().toISOString(),
+            };
+            this.currentNodes.set(newNode.id, newNode);
+          }
+          break;
+      }
+    }
+
+    return {
+      targetNodeId,
+      type,
+      confidenceDelta: modification.confidenceDelta,
+      newLabel: modification.label,
+      newDescription: modification.description,
+      sourceQuestionId,
+      sourceAnswer,
+    };
+  }
+
+  /**
+   * 根据回答修正推理链
+   */
+  applyCorrections(): void {
+    if (!this.currentSession) return;
+
+    // 所有修正已在 submitAnswer 中应用
+    // 这里可以添加额外的批量处理逻辑
+  }
+
+  /**
+   * 判断问诊是否完成
+   */
+  isComplete(): boolean {
+    if (!this.currentSession) return false;
+
+    // 检查是否已回答足够多的问题
+    const answeredCount = this.currentSession.answeredQuestions.length;
+    if (answeredCount >= this.config.maxQuestions) {
+      return true;
+    }
+
+    // 检查问题队列是否为空
+    if (this.currentSession.questionQueue.length === 0 && answeredCount > 0) {
+      return true;
+    }
+
+    // 检查状态
+    return this.currentSession.status === 'completed' ||
+           this.currentSession.status === 'skipped';
+  }
+
+  /**
+   * 判断是否应该完成问诊
+   */
+  private shouldComplete(): boolean {
+    if (!this.currentSession) return false;
+
+    const answeredCount = this.currentSession.answeredQuestions.length;
+    
+    // 已回答足够多问题
+    if (answeredCount >= this.config.maxQuestions) {
+      return true;
+    }
+
+    // 所有问题都已回答
+    if (this.currentSession.questionQueue.length === 0) {
+      return true;
+    }
+
+    // 累积的修正已验证主要结论
+    const highConfidenceNodes = Array.from(this.currentNodes.values())
+      .filter(n => n.conclusion.confidence >= this.config.confidenceThreshold);
+    
+    if (highConfidenceNodes.length >= 2) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 获取修正后的推理结果
+   */
+  getCorrectedInference(): InferenceResult {
+    if (!this.currentSession) {
+      throw new Error('问诊会话未初始化');
+    }
+
+    const nodes = Array.from(this.currentNodes.values());
+    
+    // 按置信度排序
+    const sortedNodes = [...nodes].sort(
+      (a, b) => b.conclusion.confidence - a.conclusion.confidence
+    );
+
+    // 生成最终证型
+    const primarySyndrome = sortedNodes
+      .filter(n => n.conclusion.confidence >= this.config.confidenceThreshold)
+      .map(n => n.conclusion.label)
+      .slice(0, 3)
+      .join('，');
+
+    // 计算置信度变化
+    const confidenceChanges: Record<string, number> = {};
+    for (const [nodeId, currentNode] of this.currentNodes) {
+      const originalNode = this.originalNodes.get(nodeId);
+      if (originalNode) {
+        const change = currentNode.conclusion.confidence - originalNode.conclusion.confidence;
+        if (Math.abs(change) > 0.01) {
+          confidenceChanges[nodeId] = change;
+        }
+      }
+    }
+
+    return {
+      nodes: sortedNodes,
+      primarySyndrome: primarySyndrome || '待进一步辨证',
+      confidenceChanges,
+      session: this.currentSession,
+    };
+  }
+
   /**
    * 跳过问诊
    */
-  skipInterrogation(session: InterrogationSession): InterrogationSession {
-    return {
-      ...session,
-      status: 'skipped',
-      skipped: true,
-      endTime: new Date().toISOString(),
-    };
+  skip(): void {
+    if (!this.currentSession) return;
+
+    this.currentSession.status = 'skipped';
+    this.currentSession.skipped = true;
+    this.currentSession.endTime = new Date().toISOString();
+    this.status = InterrogationEngineStatus.Skipped;
   }
-  
+
   /**
-   * 判断是否可以结束问诊
+   * 获取当前会话状态
    */
-  isComplete(session: InterrogationSession): boolean {
-    return session.status === 'completed' || 
-           session.status === 'skipped' ||
-           session.questionQueue.length === 0;
+  getSession(): InterrogationSession | undefined {
+    return this.currentSession;
   }
-  
+
   /**
-   * 获取累积的修正指令
+   * 获取已回答的问题
    */
-  getCorrections(session: InterrogationSession): AccumulatedCorrection[] {
-    return session.corrections;
+  getAnsweredQuestions(): AnsweredQuestion[] {
+    return this.currentSession?.answeredQuestions || [];
   }
-  
+
   /**
-   * 应用修正到推理链
+   * 获取累积的修正
    */
-  applyCorrectionsToChain(corrections: AccumulatedCorrection[], chain: any): void {
-    for (const correction of corrections) {
-      chain.correct(correction.sourceQuestionId, correction.sourceAnswer);
-    }
+  getCorrections(): AccumulatedCorrection[] {
+    return this.currentSession?.corrections || [];
   }
-  
+
   /**
    * 获取问诊进度
    */
-  getProgress(session: InterrogationSession): {
-    total: number;
-    answered: number;
-    remaining: number;
-    percentage: number;
-  } {
-    const total = session.answeredQuestions.length + session.questionQueue.length;
-    const answered = session.answeredQuestions.length;
-    return {
-      total,
-      answered,
-      remaining: session.questionQueue.length,
-      percentage: total > 0 ? Math.round((answered / total) * 100) : 0,
-    };
+  getProgress(): { current: number; total: number } {
+    const total = this.currentSession?.questionQueue.length || 0;
+    const current = this.currentSession?.answeredQuestions.length || 0;
+    return { current, total };
   }
-  
+
   /**
-   * 重置引擎
+   * 获取引擎状态
    */
-  reset(): void {
-    this.currentSession = undefined;
+  getStatus(): InterrogationEngineStatus {
+    return this.status;
   }
+}
+
+/**
+ * 推理结果类型
+ */
+interface InferenceResult {
+  nodes: InferenceNode[];
+  primarySyndrome: string;
+  confidenceChanges: Record<string, number>;
+  session: InterrogationSession;
+}
+
+/**
+ * 问诊会话工厂函数
+ */
+export function createInterrogationSession(
+  tongueResult: TongueAnalysisResult,
+  inferenceNodes: InferenceNode[],
+  age?: number
+): {
+  engine: InterrogationEngine;
+  firstQuestion: Question | undefined;
+} {
+  const engine = new InterrogationEngine();
+  const firstQuestion = engine.startSession(tongueResult, inferenceNodes, age);
+  return { engine, firstQuestion };
 }
