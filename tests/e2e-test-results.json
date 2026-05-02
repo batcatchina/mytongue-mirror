@@ -1,5 +1,5 @@
 {
-  "testDate": "2026-05-02T09:07:43.815Z",
+  "testDate": "2026-05-02T19:11:01.000Z",
   "totalCases": 4,
   "averageScores": {
     "visual": 0.7964,
@@ -23,7 +23,7 @@
         "overallScore": 0.89644
       },
       "issues": [],
-      "executionTime": 2
+      "executionTime": 1
     },
     {
       "testCaseId": "TC02",
@@ -38,7 +38,7 @@
         "overallScore": 0.8188000000000001
       },
       "issues": [],
-      "executionTime": 0
+      "executionTime": 1
     },
     {
       "testCaseId": "TC03",
@@ -53,7 +53,7 @@
         "overallScore": 0.8004
       },
       "issues": [],
-      "executionTime": 1
+      "executionTime": 0
     },
     {
       "testCaseId": "TC04",
@@ -68,7 +68,7 @@
         "overallScore": 0.769342857142857
       },
       "issues": [],
-      "executionTime": 0
+      "executionTime": 1
     }
   ],
   "allIssues": [],

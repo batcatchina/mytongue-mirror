@@ -8,6 +8,8 @@ export * from './tongueBody.rules';
 export * from './tongueShape.rules';
 export * from './zone.rules';
 export * from './transmission.rules';
+export * from './lungMeridian.rules';
+export * from './kidneyMeridian.rules';
 
 /**
  * 规则配置入口
