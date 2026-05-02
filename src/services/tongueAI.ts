@@ -23,7 +23,7 @@ export interface TongueRecognitionResult {
   message?: string;
 }
 
-const POLL_INTERVAL = 3000;
+const POLL_INTERVAL = 1000;
 const MAX_POLL = 20;
 
 export async function recognizeTongue(
