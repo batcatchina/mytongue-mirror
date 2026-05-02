@@ -8,12 +8,18 @@ const COZE_CONFIG = {
   token: 'pat_cT0kGwXPwioWz69z65sLufTqcr1PJNorzO4EJbymAfbMM7uWC2W2qDCvdEqiK1l6'
 };
 
-const TONGUE_PROMPT = `【重要前置检查】首先判断图片中是否包含舌头/口腔：
-- 如果图片中没有舌头或口腔（是其他物品/风景/人物等），必须返回：{"tongueDetected":false,"message":"未检测到舌象，请上传清晰的舌头照片"}
-- 如果图片中有舌头/口腔，才进入舌象识别流程
+const TONGUE_PROMPT = `你是一个舌象判断与识别系统。请严格执行以下互斥判断：
 
-【舌象识别】（仅当检测到舌头时执行）
-识别舌象输出JSON：{"tongue_color":{"value":"","confidence":0},"tongue_shape":{"value":"","teeth_mark":{"has":false,"degree":"","position":""},"crack":{"has":false,"degree":"","position":""}},"tongue_coating":{"color":"","texture":"","moisture":"","confidence":0},"tongue_state":{"value":""},"region_features":{"tip":{"color":"","features":[],"depression":false,"bulge":false},"sides":{"color":"","features":[],"depression":false,"bulge":false},"middle":{"color":"","features":[],"depression":false,"bulge":false},"root":{"color":"","features":[],"depression":false,"bulge":false}},"shape_distribution":{"depression":[],"bulge":[]},"overall_confidence":0,"notes":""}`;
+【判断】图片中是否包含伸出的舌头和口腔？
+判断标准：必须能清晰看到口腔内伸出的舌头。织物、食物、风景、物品、人物面部等都不属于舌象。
+
+如果没有舌头和口腔，只返回以下JSON，不要填写任何其他字段：
+{"tongueDetected":false,"message":"未检测到舌象，请上传清晰的舌头照片"}
+
+如果有舌头和口腔，返回以下完整JSON（tongueDetected必须为true）：
+{"tongueDetected":true,"tongue_color":{"value":"","confidence":0},"tongue_shape":{"value":"","teeth_mark":{"has":false,"degree":"","position":""},"crack":{"has":false,"degree":"","position":""}},"tongue_coating":{"color":"","texture":"","moisture":"","confidence":0},"tongue_state":{"value":""},"region_features":{"tip":{"color":"","features":[],"depression":false,"bulge":false},"sides":{"color":"","features":[],"depression":false,"bulge":false},"middle":{"color":"","features":[],"depression":false,"bulge":false},"root":{"color":"","features":[],"depression":false,"bulge":false}},"shape_distribution":{"depression":[],"bulge":[]},"overall_confidence":0,"notes":""}
+
+重要：以上两种结果是互斥的。没有舌头时，绝对不能返回分析结果，只能返回tongueDetected:false的简短JSON。`;
 
 export default async function handler(req, res) {
   // CORS
