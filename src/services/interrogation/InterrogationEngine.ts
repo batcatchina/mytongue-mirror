@@ -163,7 +163,7 @@ export class InterrogationEngine {
     
     // 返回队列中的下一个问题
     const nextQuestionId = s.questionQueue[0];
-    return this.questionTree.getQuestion(nextQuestionId);
+    return this.questionTree.getQuestion(nextQuestionId) ?? null;
   }
   
   /**
@@ -191,8 +191,17 @@ export class InterrogationEngine {
       timestamp: new Date().toISOString(),
     };
     
-    // 获取修正规则
-    const corrections = this.questionTree.getCorrections(questionId, selectedOption);
+    // 获取修正规则并转换为累积修正格式
+    const rawCorrections = this.questionTree.getCorrections(questionId, selectedOption);
+    const corrections: AccumulatedCorrection[] = rawCorrections.map(rule => ({
+      targetNodeId: rule.targetNodeId,
+      type: rule.correctionType,
+      confidenceDelta: rule.confidenceDelta,
+      newLabel: rule.newLabel,
+      newDescription: rule.newDescription,
+      sourceQuestionId: questionId,
+      sourceAnswer: selectedOption,
+    }));
     
     // 更新会话
     const updatedSession: InterrogationSession = {

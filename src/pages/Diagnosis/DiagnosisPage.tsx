@@ -83,13 +83,13 @@ const DiagnosisPage: React.FC = () => {
     // 舌苔
     if (result.tongue_coating) {
       if (result.tongue_coating.color) {
-        setCoating({ ...inputFeatures.coating, color: result.tongue_coating.color });
+        setCoating(result.tongue_coating.color, inputFeatures.coating.texture, inputFeatures.coating.moisture);
       }
       if (result.tongue_coating.texture) {
-        setCoating({ ...inputFeatures.coating, texture: result.tongue_coating.texture });
+        setCoating(inputFeatures.coating.color, result.tongue_coating.texture, inputFeatures.coating.moisture);
       }
       if (result.tongue_coating.moisture) {
-        setCoating({ ...inputFeatures.coating, moisture: result.tongue_coating.moisture });
+        setCoating(inputFeatures.coating.color, inputFeatures.coating.texture, result.tongue_coating.moisture);
       }
     }
     

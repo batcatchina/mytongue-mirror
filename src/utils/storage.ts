@@ -294,7 +294,7 @@ class TongueStorage {
   async saveImage(
     uri: string,
     metadata: TongueMetadata,
-    options: { compress = true; autoSync = true } = {}
+    options: { compress?: boolean; autoSync?: boolean } = { compress: true, autoSync: true }
   ): Promise<TongueImage> {
     const db = await this.ensureDB();
     const id = generateId();
@@ -397,7 +397,7 @@ class TongueStorage {
    */
   async saveDiagnosis(
     diagnosis: Omit<TongueDiagnosis, 'id' | 'createdAt' | 'synced'>,
-    options: { autoSync = true } = {}
+    options: { autoSync?: boolean } = { autoSync: true }
   ): Promise<TongueDiagnosis> {
     const db = await this.ensureDB();
     const id = generateId();

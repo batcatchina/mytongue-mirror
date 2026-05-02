@@ -6,17 +6,13 @@
  * 要看到表象下的本质
  */
 
-import type { LayerInput, LayerOutput, InferenceNode, LayerOutput as PreviousLayerOutput } from '@/types/inference';
-import type { TongueAnalysisResult, TongueShapeValue, TongueColorValue } from '@/types/tongue';
+import type { LayerInput, LayerOutput, InferenceNode } from '@/types/inference';
+import type { TongueAnalysisResult } from '@/types/tongue';
 import { BaseLayerProcessor } from '../core/LayerProcessor';
 import { createPatternNode } from '../core/InferenceNode';
 import {
-  Layer2Rules,
-  tongueShapeRules,
-  essenceRules,
   matchTongueShapeRule,
   determineEssence,
-  type TongueShapeRule
 } from '../rules/tongueShape.rules';
 
 /**
@@ -72,7 +68,7 @@ export class Layer2Processor extends BaseLayerProcessor {
     }
     
     const nodes: InferenceNode[] = [];
-    const { shape, bodyColor, hasTeethMark, hasCrack, teethMarkDegree, crackDegree, crackDistribution } = tongueAnalysis;
+    const { hasTeethMark, hasCrack } = tongueAnalysis;
     
     // 1. 分析舌形本质
     const shapeAnalysis = this.analyzeShapeEssence(tongueAnalysis);
@@ -247,6 +243,10 @@ export class Layer2Processor extends BaseLayerProcessor {
     if (bodyColor) {
       evidence.push(`舌色：${bodyColor}`);
     }
+    // 反直觉判断信息注入 evidence
+    if (isAntiIntuitive) {
+      evidence.push('【反直觉】胖大≠实，瘦小红≠单纯虚');
+    }
     
     const patternNode = createPatternNode(
       this.generateNodeId('shape-essence'),
@@ -308,6 +308,10 @@ export class Layer2Processor extends BaseLayerProcessor {
     }
     
     evidence.push('齿痕程度：' + (teethMarkDegree || '中等'));
+    // 反直觉判断信息注入 evidence
+    if (isAntiIntuitive) {
+      evidence.push('【反直觉】胖大+齿痕=气虚为本，湿盛为标');
+    }
     
     const patternNode = createPatternNode(
       this.generateNodeId('teeth-mark'),

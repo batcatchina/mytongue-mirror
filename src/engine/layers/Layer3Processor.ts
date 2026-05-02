@@ -9,10 +9,9 @@
  */
 
 import type { LayerInput, LayerOutput, InferenceNode } from '@/types/inference';
-import type { TongueAnalysisResult, ZoneFeature, ZonePosition, UndulationType } from '@/types/tongue';
+import type { ZoneFeature, ZonePosition, UndulationType } from '@/types/tongue';
 import { BaseLayerProcessor } from '../core/LayerProcessor';
 import { createOrganNode, createPatternNode } from '../core/InferenceNode';
-import { getOrgansForZone } from '@/types/tongue';
 
 /**
  * 分区凹凸辨证规则

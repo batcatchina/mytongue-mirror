@@ -16,7 +16,7 @@ export type TongueShape =
 
 /** 舌体特征枚举 */
 export type TongueBodyFeature = 
-  | '正常' | '水滑' | '瘀斑' | '干燥' | '少津';
+  | '正常' | '水滑' | '瘀斑' | '干燥' | '少津' | '齿痕';
 
 /** 苔色枚举 */
 export type CoatingColor = 
@@ -24,7 +24,7 @@ export type CoatingColor =
 
 /** 苔质枚举 */
 export type CoatingTexture = 
-  | '薄苔' | '厚苔' | '润苔' | '滑苔' | '燥苔' | '腻苔' | '腐苔' | '剥落苔';
+  | '薄苔' | '厚苔' | '润苔' | '滑苔' | '燥苔' | '腻苔' | '腐苔' | '剥落苔' | '少苔';
 
 /** 舌苔分布枚举 */
 export type Distribution = 
@@ -201,7 +201,8 @@ const TONGUE_BODY_SCORES: Record<TongueBodyFeature, number> = {
   '水滑': 6,
   '瘀斑': 8,
   '干燥': 5,
-  '少津': 8
+  '少津': 8,
+  '齿痕': 7
 };
 
 /** 苔色评分表 */
@@ -223,7 +224,8 @@ const COATING_TEXTURE_SCORES: Record<CoatingTexture, number> = {
   '燥苔': 7,
   '腻苔': 7,
   '腐苔': 8,
-  '剥落苔': 8
+  '剥落苔': 8,
+  '少苔': 8
 };
 
 /** 舌苔分布评分表 */
@@ -779,14 +781,12 @@ const ACUPOINT_INFO: Record<string, Acupoint> = {
   '内关': { name: '内关', meridian: '心包经', function: '宽胸理气，安神要穴' },
   '大椎': { name: '大椎', meridian: '督脉', function: '清热解表，诸阳之会' },
   '内庭': { name: '内庭', meridian: '胃经', function: '清胃泻火，胃之荥穴' },
-  '血海': { name: '血海', meridian: '脾经', function: '活血化瘀' },
   '曲泉': { name: '曲泉', meridian: '肝经', function: '清利湿热，肝之合穴' },
   '阳陵泉': { name: '阳陵泉', meridian: '胆经', function: '疏肝利胆，筋会' },
   '气海': { name: '气海', meridian: '任脉', function: '补气固本' },
   '关元': { name: '关元', meridian: '任脉', function: '补肾固本，丹田要穴' },
   '阴郄': { name: '阴郄', meridian: '心经', function: '滋阴清热，心之郄穴' },
   '胃俞': { name: '胃俞', meridian: '膀胱经', function: '和胃健脾' },
-  '膈俞': { name: '膈俞', meridian: '膀胱经', function: '活血化瘀' },
   // 三焦经穴位
   '关冲': { name: '关冲', meridian: '手少阳三焦经', function: '清热开窍，三焦井穴' },
   '天井': { name: '天井', meridian: '手少阳三焦经', function: '理气散结，三焦合穴' },
@@ -1168,13 +1168,13 @@ export function diagnose(features: TongueFeatures): DiagnosisResult {
     '待辨证';
   
   const syndromeScore = primaryRule?.matchScore || 0;
-  const pathogenesis = primaryRule?.pathogenesis || 
+  const pathogenesis = 
     (coldHeatConflict?.resolution) || 
     (deficiencyExcessConflict?.resolution) || 
     '需要进一步辨证分析';
   
   // 6. 生成处方
-  const prescription = generatePrescription(primarySyndrome, primaryRule);
+  const prescription = generatePrescription(primarySyndrome);
   
   return {
     features,
@@ -1186,7 +1186,7 @@ export function diagnose(features: TongueFeatures): DiagnosisResult {
       matchedRules,
       pathogenesis,
       treatment: prescription.treatment,
-      conflictResolution: coldHeatConflict || deficiencyExcessConflict
+      conflictResolution: coldHeatConflict ?? deficiencyExcessConflict ?? undefined
     },
     prescription,
     timestamp: new Date().toISOString()
@@ -1312,10 +1312,4 @@ export default {
   matchCompositeSyndrome,
   generatePrescription,
   formatDiagnosisResult,
-  // 类型
-  TongueFeatures,
-  ScoringResult,
-  SyndromeDiagnosis,
-  AcupuncturePrescription,
-  DiagnosisResult
 };

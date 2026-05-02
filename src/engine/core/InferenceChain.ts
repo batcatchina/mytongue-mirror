@@ -1,6 +1,10 @@
 /**
  * 推理链核心类 v2.0
  * 管理推理节点、拓扑排序、执行推理链
+ * 
+ * Phase 1.2 核心实现：
+ * - execute() 真正按序调用 Layer1→2→3→4 四层处理器
+ * - 各层输出通过 previousLayerOutput 链式传递
  */
 
 import type { 
@@ -62,6 +66,12 @@ export interface InferenceChainInternalOutput {
 
 /**
  * 推理链核心类
+ * 
+ * 四层推理架构：
+ * Layer1 舌质舌苔 → 气血与脾胃整体判断
+ * Layer2 舌形 → 虚实本质（反直觉层）
+ * Layer3 分区凹凸 → 精确定位（"神"之层）
+ * Layer4 综合推理 → 传变关系+配穴方案
  */
 export class InferenceChain {
   /** 推理链ID */
@@ -246,12 +256,11 @@ export class InferenceChain {
     this.executionOrder = result;
     return result;
   }
-  
+
   /**
-   * 执行推理链
-   * @param input 舌象分析输入
-   * @param context 推理上下文
-   * @returns 推理链执行结果
+   * ============================================================
+   * Phase 1.2 核心实现：execute() 真正调用四层处理器
+   * ============================================================
    */
   async execute(
     input: TongueAnalysisResult,
@@ -260,22 +269,129 @@ export class InferenceChain {
     this.startTime = Date.now();
     this.status = InferenceChainStatus.Running;
     this.executionTrace = [];
+    this.nodes = new Map();
+    this.layerOutputs = new Map();
     
     try {
-      // 初始化层输入
-      const layerInput: LayerInput = {
+      // 动态导入四层处理器（避免循环依赖）
+      const [{ Layer1Processor }, { Layer2Processor }, { Layer3Processor }, { Layer4Processor }] = 
+        await Promise.all([
+          import('../layers/Layer1Processor'),
+          import('../layers/Layer2Processor'),
+          import('../layers/Layer3Processor'),
+          import('../layers/Layer4Processor'),
+        ]);
+      
+      const layer1 = new Layer1Processor();
+      const layer2 = new Layer2Processor();
+      const layer3 = new Layer3Processor();
+      const layer4 = new Layer4Processor();
+      
+      // =====================================================
+      // Layer 1: 舌质舌苔 → 气血与脾胃整体判断
+      // =====================================================
+      const layer1Start = Date.now();
+      const layer1Input: LayerInput = {
         tongueAnalysis: input,
+        age: context?.age,
         context: context as Record<string, any>,
       };
+      const layer1Output = layer1.process(layer1Input);
+      this.setLayerOutput(1, layer1Output);
+      this.addNodes(layer1Output.nodes);
       
-      // 执行拓扑排序
+      // 记录 Layer1 轨迹
+      for (const node of layer1Output.nodes) {
+        this.recordTrace(
+          node.id, 1, node.name,
+          { label: node.conclusion.label, confidence: node.conclusion.confidence },
+          node.inputs.map(i => String(i.value)),
+          Date.now() - layer1Start
+        );
+      }
+      
+      // =====================================================
+      // Layer 2: 舌形 → 虚实本质（反直觉层）
+      // =====================================================
+      const layer2Start = Date.now();
+      const layer2Input: LayerInput = {
+        tongueAnalysis: input,
+        previousLayerOutput: layer1Output,
+        age: context?.age,
+        context: context as Record<string, any>,
+      };
+      const layer2Output = layer2.process(layer2Input);
+      this.setLayerOutput(2, layer2Output);
+      this.addNodes(layer2Output.nodes);
+      
+      // 记录 Layer2 轨迹
+      for (const node of layer2Output.nodes) {
+        this.recordTrace(
+          node.id, 2, node.name,
+          { label: node.conclusion.label, confidence: node.conclusion.confidence },
+          node.inputs.map(i => String(i.value)),
+          Date.now() - layer2Start
+        );
+      }
+      
+      // =====================================================
+      // Layer 3: 分区凹凸 → 精确定位（"神"之层）
+      // =====================================================
+      const layer3Start = Date.now();
+      const layer3Input: LayerInput = {
+        tongueAnalysis: input,
+        previousLayerOutput: layer2Output,
+        zoneFeatures: input.zoneFeatures,
+        age: context?.age,
+        context: context as Record<string, any>,
+      };
+      const layer3Output = layer3.process(layer3Input);
+      this.setLayerOutput(3, layer3Output);
+      this.addNodes(layer3Output.nodes);
+      
+      // 记录 Layer3 轨迹
+      for (const node of layer3Output.nodes) {
+        this.recordTrace(
+          node.id, 3, node.name,
+          { label: node.conclusion.label, confidence: node.conclusion.confidence },
+          node.inputs.map(i => String(i.value)),
+          Date.now() - layer3Start
+        );
+      }
+      
+      // =====================================================
+      // Layer 4: 综合推理 → 传变关系+配穴方案
+      // =====================================================
+      const layer4Start = Date.now();
+      const layer4Input: LayerInput = {
+        tongueAnalysis: input,
+        previousLayerOutput: layer3Output,
+        age: context?.age,
+        context: context as Record<string, any>,
+      };
+      const layer4Output = layer4.process(layer4Input);
+      this.setLayerOutput(4, layer4Output);
+      this.addNodes(layer4Output.nodes);
+      
+      // 记录 Layer4 轨迹
+      for (const node of layer4Output.nodes) {
+        this.recordTrace(
+          node.id, 4, node.name,
+          { label: node.conclusion.label, confidence: node.conclusion.confidence },
+          node.inputs.map(i => String(i.value)),
+          Date.now() - layer4Start
+        );
+      }
+      
+      // 执行拓扑排序（基于节点间的因果关系）
       this.topologicalSort();
       
-      // 生成最终输出
-      this.finalOutput = this.buildOutput(context);
-      
-      this.endTime = Date.now();
+      // 标记为完成，再构建输出（buildOutput 依赖 status）
       this.status = InferenceChainStatus.Completed;
+      this.endTime = Date.now();
+      
+      // 构建最终输出
+      this.finalOutput = this.buildOutput(context);
       
       return {
         chainId: this.finalOutput.chainId,
@@ -310,11 +426,7 @@ export class InferenceChain {
   }
   
   /**
-   * 执行单个层级
-   * @param layer 层级
-   * @param processor 处理器
-   * @param input 输入
-   * @returns 层级输出
+   * 执行单个层级（供外部调用或调试）
    */
   executeLayer(
     layer: InferenceLayer,
@@ -418,34 +530,40 @@ export class InferenceChain {
   /**
    * 构建输出
    */
-  private buildOutput(context: InferenceContext): InferenceChainInternalOutput {
-    const organNodes = Array.from(this.nodes.values())
-      .filter(n => n.type === 'organ');
+  private buildOutput(_context: InferenceContext): InferenceChainInternalOutput {
+    // 从 Layer4 获取脏腑辨证（如果执行了Layer4）
+    const layer4Output = this.layerOutputs.get(4);
+    let organPatterns: OrganPattern[] = [];
+    let prescription: Prescription | undefined;
     
-    const organPatterns: OrganPattern[] = organNodes.map(node => ({
-      organ: node.metadata?.organLocation?.[0] || '',
-      pattern: node.conclusion.label,
-      nature: node.metadata?.pathogenicNature || '',
-      confidence: node.conclusion.confidence,
-      mainSymptoms: node.conclusion.evidence,
-      relatedNodeIds: [node.id, ...node.effects],
-    }));
-    
-    // 从缓存的层级输出中获取综合结论
-    const layer1Output = this.layerOutputs.get(1);
-    const layer2Output = this.layerOutputs.get(2);
-    
-    // 生成证型结论
-    let syndrome = '';
-    if (layer1Output && layer2Output) {
-      syndrome = `${layer1Output.summary.label}，${layer2Output.summary.label}`;
-    } else if (layer1Output) {
-      syndrome = layer1Output.summary.label;
-    } else if (layer2Output) {
-      syndrome = layer2Output.summary.label;
+    if (layer4Output) {
+      // 从 Layer4 节点中提取脏腑辨证
+      organPatterns = this.extractOrganPatternsFromNodes(layer4Output.nodes);
+      // 从 Layer4 节点中提取配穴方案
+      const prescriptionNode = layer4Output.nodes.find(n => n.type === 'prescription');
+      if (prescriptionNode) {
+        // 解析配穴节点构建 Prescription
+        prescription = this.parsePrescriptionFromNode(prescriptionNode);
+      }
     }
     
-    const primaryPattern = organPatterns[0];
+    // 从各层输出中生成证型结论
+    const layer1Summary = this.layerOutputs.get(1)?.summary.label || '';
+    const layer2Summary = this.layerOutputs.get(2)?.summary.label || '';
+    const layer3Summary = this.layerOutputs.get(3)?.summary.label || '';
+    const layer4Summary = layer4Output?.summary.label || '';
+    
+    // 生成综合证型：优先使用 Layer4 结论，否则拼接前三层
+    let syndrome = '';
+    if (layer4Summary) {
+      syndrome = layer4Summary;
+    } else if (layer3Summary) {
+      syndrome = `${layer2Summary}，${layer3Summary}`;
+    } else if (layer2Summary) {
+      syndrome = layer2Summary;
+    } else if (layer1Summary) {
+      syndrome = layer1Summary;
+    }
     
     return {
       chainId: this.chainId,
@@ -456,10 +574,77 @@ export class InferenceChain {
       rootCause: this.inferRootCause(),
       transmissionPaths: this.extractTransmissionPaths(),
       organPatterns,
-      prescription: this.generatePrescription(),
+      prescription,
       executionTime: this.endTime && this.startTime 
         ? this.endTime - this.startTime 
         : undefined,
+    };
+  }
+  
+  /**
+   * 从节点列表提取脏腑辨证
+   */
+  private extractOrganPatternsFromNodes(nodes: InferenceNode[]): OrganPattern[] {
+    const organMap = new Map<string, OrganPattern>();
+    
+    for (const node of nodes) {
+      if (node.type === 'organ') {
+        const organ = node.metadata?.organLocation?.[0] || '';
+        if (organ) {
+          organMap.set(organ, {
+            organ,
+            pattern: node.conclusion.label,
+            nature: node.metadata?.pathogenicNature || '',
+            confidence: node.conclusion.confidence,
+            mainSymptoms: node.conclusion.evidence,
+            relatedNodeIds: [node.id, ...node.effects],
+          });
+        }
+      } else if (node.type === 'pattern') {
+        // 从 pattern 节点中提取脏腑
+        const organs = ['心', '肝', '脾', '肺', '肾', '胃', '胆'];
+        for (const organ of organs) {
+          if (node.conclusion.description.includes(organ)) {
+            const existing = organMap.get(organ);
+            if (!existing || node.conclusion.confidence > existing.confidence) {
+              organMap.set(organ, {
+                organ,
+                pattern: node.conclusion.label,
+                nature: node.conclusion.label.includes('虚') ? '虚证' : 
+                        node.conclusion.label.includes('实') ? '实证' : '虚实夹杂',
+                confidence: node.conclusion.confidence,
+                mainSymptoms: node.conclusion.evidence,
+                relatedNodeIds: [node.id],
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    return Array.from(organMap.values()).sort((a, b) => b.confidence - a.confidence);
+  }
+  
+  /**
+   * 从配穴节点解析配穴方案
+   */
+  private parsePrescriptionFromNode(node: InferenceNode): Prescription {
+    // 从节点结论中提取配穴信息
+    const label = node.conclusion.label;
+    const mainPoints = label.split('、').filter(p => p.trim());
+    
+    return {
+      id: node.id,
+      mainPoints,
+      secondaryPoints: [],
+      technique: '平补平泻',
+      needleRetention: 30,
+      moxibustion: '视情况而定',
+      frequency: '每周2-3次',
+      course: '4周为一疗程',
+      precautions: ['避开空腹和过饱', '治疗后注意保暖'],
+      basis: node.conclusion.evidence,
+      confidence: node.conclusion.confidence,
     };
   }
   
@@ -488,87 +673,29 @@ export class InferenceChain {
   }
   
   /**
-   * 生成配穴方案（占位）
+   * 生成可视化数据
    */
-  private generatePrescription(): Prescription | undefined {
-    // Layer4 会生成实际的配穴方案
-    return undefined;
-  }
-  
-  /**
-   * 获取推理链可视化数据
-   */
-  getVisualizationData(): ChainVisualization {
-    const nodes = Array.from(this.nodes.values()).map(n => ({
-      id: n.id,
-      label: n.name || n.conclusion.label,
-      layer: n.layer,
-      type: n.type,
-      confidence: n.conclusion.confidence,
-    }));
+  generateVisualizationData(): ChainVisualization {
+    const nodes: ChainVisualization['nodes'] = [];
+    const edges: ChainVisualization['edges'] = [];
     
-    const edges: Array<{ source: string; target: string; label?: string }> = [];
     for (const [id, node] of this.nodes) {
-      for (const effectId of node.effects) {
-        edges.push({ source: id, target: effectId });
+      nodes.push({
+        id,
+        label: node.conclusion.label || node.name,
+        layer: node.layer,
+        type: node.type,
+        confidence: node.conclusion.confidence,
+      });
+      
+      // 添加因果边
+      for (const causeId of node.causes) {
+        if (this.nodes.has(causeId)) {
+          edges.push({ source: causeId, target: id });
+        }
       }
     }
     
     return { nodes, edges };
-  }
-  
-  /**
-   * 重置推理链
-   */
-  reset(): void {
-    this.nodes.clear();
-    this.executionOrder = [];
-    this.status = InferenceChainStatus.Idle;
-    this.errorMessage = undefined;
-    this.startTime = undefined;
-    this.endTime = undefined;
-    this.executionTrace = [];
-    this.layerOutputs.clear();
-    this.finalOutput = undefined;
-  }
-  
-  /**
-   * 从上下文创建推理链
-   */
-  static fromContext(input: TongueAnalysisResult): InferenceChain {
-    const chain = new InferenceChain();
-    chain.status = InferenceChainStatus.Initialized;
-    return chain;
-  }
-  
-  /**
-   * 获取执行统计
-   */
-  getExecutionStats(): {
-    totalNodes: number;
-    nodesByLayer: Record<InferenceLayer, number>;
-    nodesByType: Record<string, number>;
-    avgConfidence: number;
-    executionTime?: number;
-  } {
-    const nodesByLayer: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
-    const nodesByType: Record<string, number> = {};
-    let totalConfidence = 0;
-    
-    for (const node of this.nodes.values()) {
-      nodesByLayer[node.layer] = (nodesByLayer[node.layer] || 0) + 1;
-      nodesByType[node.type] = (nodesByType[node.type] || 0) + 1;
-      totalConfidence += node.conclusion.confidence;
-    }
-    
-    return {
-      totalNodes: this.nodes.size,
-      nodesByLayer: nodesByLayer as Record<InferenceLayer, number>,
-      nodesByType,
-      avgConfidence: this.nodes.size > 0 ? totalConfidence / this.nodes.size : 0,
-      executionTime: this.endTime && this.startTime 
-        ? this.endTime - this.startTime 
-        : undefined,
-    };
   }
 }

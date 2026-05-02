@@ -170,7 +170,6 @@ export class ZoneSegmenter {
         position: 'upperThird',
         color: upperAnalysis.color as any,
         undulation: upperAnalysis.undulation,
-        confidence: upperAnalysis.confidence,
       });
     }
     
@@ -181,7 +180,6 @@ export class ZoneSegmenter {
         position: 'middleThird',
         color: middleAnalysis.color as any,
         undulation: middleAnalysis.undulation,
-        confidence: middleAnalysis.confidence,
       });
     }
     
@@ -192,7 +190,6 @@ export class ZoneSegmenter {
         position: 'lowerThird',
         color: lowerAnalysis.color as any,
         undulation: lowerAnalysis.undulation,
-        confidence: lowerAnalysis.confidence,
       });
     }
     

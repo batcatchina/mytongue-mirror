@@ -331,7 +331,7 @@ export function matchZoneRule(
   zone: ZonePosition,
   side?: SidePosition,
   undulation?: UndulationType,
-  colorPattern?: 'deep' | 'light' | 'normal'
+  _colorPattern?: 'deep' | 'light' | 'normal'
 ): ZoneRule | undefined {
   return zoneRules.find(rule => {
     // 检查区域

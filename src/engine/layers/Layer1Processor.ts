@@ -9,21 +9,13 @@
  */
 
 import type { LayerInput, LayerOutput, InferenceNode, InferenceConclusion } from '@/types/inference';
-import type { TongueAnalysisResult, TongueColorValue, CoatingColorValue, CoatingTextureValue } from '@/types/tongue';
+import type { TongueAnalysisResult } from '@/types/tongue';
 import { BaseLayerProcessor } from '../core/LayerProcessor';
 import { createTongueFeatureNode, createPatternNode } from '../core/InferenceNode';
 import {
-  Layer1Rules,
-  tongueBodyRules,
-  coatingRules,
-  coatingTextureRules,
-  compoundRules,
   matchTongueBodyRule,
   matchCoatingRule,
   matchCompoundRule,
-  type TongueBodyRule,
-  type CoatingRule,
-  type CompoundRule
 } from '../rules/tongueBody.rules';
 
 /**

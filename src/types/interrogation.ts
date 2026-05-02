@@ -3,6 +3,9 @@
  * 定义问题、问题树、问诊会话、年龄权重等核心类型
  */
 
+// 从 inference.ts 重新导出修正规则类型
+export type { CorrectionRule, CorrectionAnswer } from '@/types/inference';
+
 /**
  * 年龄段枚举
  */
