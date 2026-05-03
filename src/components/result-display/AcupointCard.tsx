@@ -1,29 +1,13 @@
 import React, { useState } from 'react';
 import clsx from 'clsx';
-
-export interface AcupointDetail {
-  name: string;
-  meridian: string;
-  specificPoint?: string;
-  effect: string;
-  location: string;
-  positioningMethod?: string;
-  technique: string;
-  angle?: string;
-  depth?: string;
-  manipulation?: string;
-  DeqiSensation?: string;
-  needleRetention?: string;
-  compatibility?: { point: string; effect: string }[];
-  precautions?: string[];
-}
+import { getAcupointInfo } from '@/services/acupoint_data';
 
 interface AcupointCardProps {
   point: string;
-  meridian: string;
-  effect: string;
+  meridian?: string;
+  effect?: string;
   location?: string;
-  technique: string;
+  technique?: string;
   precautions?: string;
   isMain?: boolean;
   color?: 'green' | 'blue';
@@ -31,14 +15,22 @@ interface AcupointCardProps {
 
 export const AcupointCard: React.FC<AcupointCardProps> = ({
   point,
-  meridian,
-  effect,
-  location,
-  technique,
+  meridian: propMeridian,
+  effect: propEffect,
+  location: propLocation,
+  technique: propTechnique,
   precautions,
   color = 'green',
 }) => {
   const [showModal, setShowModal] = useState(false);
+
+  // 从数据源获取完整穴位信息，prop 作为 fallback
+  const info = getAcupointInfo(point);
+  const meridian = propMeridian || info.meridian;
+  const effect = propEffect || info.effect;
+  const location = propLocation || info.location;
+  const technique = propTechnique || '常规针刺';
+  const indications = info.indications;
 
   const baseClasses = {
     green: {
@@ -122,8 +114,9 @@ export const AcupointCard: React.FC<AcupointCardProps> = ({
           point={point}
           meridian={meridian}
           effect={effect}
-          location={location || ''}
+          location={location}
           technique={technique}
+          indications={indications}
           precautions={precautions}
           onClose={() => setShowModal(false)}
         />
@@ -138,6 +131,7 @@ interface AcupointDetailModalProps {
   effect: string;
   location: string;
   technique: string;
+  indications: string;
   precautions?: string;
   onClose: () => void;
 }
@@ -148,110 +142,102 @@ const AcupointDetailModal: React.FC<AcupointDetailModalProps> = ({
   effect,
   location,
   technique,
+  indications,
   precautions,
   onClose,
 }) => {
+  // 从数据源获取完整穴位信息作为备用
+  const info = getAcupointInfo(point);
+  const finalMeridian = meridian || info.meridian;
+  const finalEffect = effect || info.effect;
+  const finalLocation = location || info.location;
+  const finalIndications = indications || info.indications;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden animate-scale-in">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden animate-scale-in">
         {/* 头部 */}
-        <div className="sticky top-0 bg-gradient-to-r from-primary-500 to-secondary-500 text-white p-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-primary-500 to-secondary-500 text-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl">
               📍
             </div>
             <div>
-              <h3 className="text-xl font-bold">{point}</h3>
-              <p className="text-sm text-white/80">{meridian}</p>
+              <h3 className="text-lg font-bold">{point}</h3>
+              <p className="text-sm text-white/80">{finalMeridian}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center text-white"
+            className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center text-white text-lg font-bold"
           >
             ✕
           </button>
         </div>
 
-        {/* 内容 */}
-        <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(85vh-80px)]">
-          {/* 定位图示区域 */}
-          <div className="bg-gradient-to-br from-primary-50 to-secondary-50 rounded-xl p-6">
-            <h4 className="text-lg font-semibold text-primary-700 mb-4">📍 定位图示</h4>
-            <div className="bg-white rounded-lg p-4 text-center">
-              <div className="text-6xl mb-4">🦶</div>
-              <p className="text-stone-600 text-sm">穴位定位示意图</p>
-              <p className="text-primary-600 font-medium mt-2">★ {point}</p>
-            </div>
-          </div>
-
-          {/* 文字定位 */}
+        {/* 内容 - 紧凑布局 */}
+        <div className="p-4 space-y-3 max-h-[calc(90vh-140px)] overflow-y-auto">
+          {/* 定位与基本信息合并 */}
           <div className="bg-stone-50 rounded-xl p-4">
-            <h4 className="text-lg font-semibold text-stone-700 mb-2">文字定位</h4>
-            <p className="text-stone-600 leading-relaxed">{location}</p>
-          </div>
-
-          {/* 基本信息 */}
-          <div className="bg-stone-50 rounded-xl p-4">
-            <h4 className="text-lg font-semibold text-stone-700 mb-3">基本信息</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <h4 className="text-sm font-semibold text-stone-700 mb-2">📍 定位与主治</h4>
+            <div className="space-y-2 text-sm">
               <div>
-                <span className="text-sm text-stone-500">穴位名称</span>
-                <p className="font-medium text-stone-800">{point}</p>
+                <span className="font-medium text-stone-600">定位：</span>
+                <span className="text-stone-600">{finalLocation}</span>
               </div>
               <div>
-                <span className="text-sm text-stone-500">经络归属</span>
-                <p className="font-medium text-stone-800">{meridian}</p>
+                <span className="font-medium text-stone-600">功效：</span>
+                <span className="text-stone-600">{finalEffect}</span>
               </div>
-              <div className="col-span-2">
-                <span className="text-sm text-stone-500">主治功效</span>
-                <p className="font-medium text-stone-800">{effect}</p>
+              <div>
+                <span className="font-medium text-primary-600">主治：</span>
+                <span className="text-stone-600">{finalIndications}</span>
               </div>
             </div>
           </div>
 
           {/* 操作方法 */}
           <div className="bg-stone-50 rounded-xl p-4">
-            <h4 className="text-lg font-semibold text-stone-700 mb-3">操作方法</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-lg p-3">
-                <span className="text-xs text-stone-500">刺法</span>
-                <p className="font-medium text-stone-800">{technique}</p>
+            <h4 className="text-sm font-semibold text-stone-700 mb-2">💉 操作方法</h4>
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="font-medium text-stone-600">刺法：</span>
+                <span className="text-stone-600">{technique}</span>
               </div>
-              <div className="bg-white rounded-lg p-3">
-                <span className="text-xs text-stone-500">角度</span>
-                <p className="font-medium text-stone-800">直刺（90°）</p>
+              <div>
+                <span className="font-medium text-stone-600">角度：</span>
+                <span className="text-stone-600">直刺或斜刺</span>
               </div>
-              <div className="bg-white rounded-lg p-3">
-                <span className="text-xs text-stone-500">深度</span>
-                <p className="font-medium text-stone-800">0.5-1寸</p>
+              <div>
+                <span className="font-medium text-stone-600">深度：</span>
+                <span className="text-stone-600">0.5-1寸</span>
               </div>
-              <div className="bg-white rounded-lg p-3">
-                <span className="text-xs text-stone-500">留针</span>
-                <p className="font-medium text-stone-800">30分钟</p>
+              <div>
+                <span className="font-medium text-stone-600">留针：</span>
+                <span className="text-stone-600">15-30分钟</span>
               </div>
             </div>
           </div>
 
           {/* 注意事项 */}
           {precautions && (
-            <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-              <h4 className="text-lg font-semibold text-amber-700 mb-2">⚠️ 注意事项</h4>
-              <p className="text-amber-800">{precautions}</p>
+            <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+              <h4 className="text-sm font-semibold text-amber-700 mb-2">⚠️ 注意事项</h4>
+              <p className="text-sm text-amber-600">{precautions}</p>
             </div>
           )}
-        </div>
 
-        {/* 底部 */}
-        <div className="sticky bottom-0 bg-white border-t border-stone-200 p-4 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition-colors"
-          >
-            关闭
-          </button>
+          {/* 底部关闭按钮 */}
+          <div className="pt-2">
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-600 font-medium text-sm transition-colors"
+            >
+              关闭
+            </button>
+          </div>
         </div>
       </div>
     </div>
