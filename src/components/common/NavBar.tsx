@@ -11,7 +11,6 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPath, onNavigate }) => {
     { path: '/', label: '辨证', icon: '🔍', shortLabel: '辨证' },
     { path: '/cases', label: '病例', icon: '📋', shortLabel: '病例' },
     { path: '/knowledge', label: '知识库', icon: '📚', shortLabel: '知识' },
-    { path: '/api-docs', label: 'API', icon: '🔗', shortLabel: 'API', external: true },
   ];
 
   return (
