@@ -12,9 +12,7 @@ import {
 import ImageUpload, { AIRecognitionResult } from '@/components/tongue-input/ImageUpload';
 import SymptomInput from '@/components/tongue-input/SymptomInput';
 import PatientInfoForm from '@/components/tongue-input/PatientInfoForm';
-import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
-import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
-import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
+import { PaidDiagnosisSection } from '@/components/paywall/PaidDiagnosisSection';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import { submitDiagnosis } from '@/services/api';
 
@@ -418,20 +416,25 @@ const DiagnosisPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 结果内容 */}
+            {/* 结果内容 - 付费分层展示 */}
             {diagnosisResult ? (
               <div className="space-y-4">
-                {activeTab === 'diagnosis' && (
-                  <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
-                )}
-                {activeTab === 'acupuncture' && (
-                  <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
-                )}
-                {activeTab === 'care' && (
-                  <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
-                )}
+                <PaidDiagnosisSection
+                  diagnosisOutput={diagnosisResult}
+                  inputFeatures={{
+                    tongueColor: inputFeatures.tongueColor.value,
+                    tongueShape: inputFeatures.tongueShape.value,
+                    tongueState: inputFeatures.tongueState.value,
+                    coatingColor: inputFeatures.coating.color,
+                    coatingTexture: inputFeatures.coating.texture,
+                    coatingMoisture: inputFeatures.coating.moisture,
+                  }}
+                  activeTab={activeTab}
+                  price={9.9}
+                  userCount={12847}
+                />
                 
-                {/* 保存按钮 */}
+                {/* 保存按钮 - 始终可见 */}
                 <button
                   onClick={handleSaveCase}
                   className="w-full tcm-btn-secondary flex items-center justify-center gap-2"
