@@ -11,6 +11,7 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPath, onNavigate }) => {
     { path: '/', label: '辨证', icon: '🔍', shortLabel: '辨证' },
     { path: '/cases', label: '病例', icon: '📋', shortLabel: '病例' },
     { path: '/knowledge', label: '知识库', icon: '📚', shortLabel: '知识' },
+    { path: '/api-docs', label: 'API', icon: '🔗', shortLabel: 'API', external: true },
   ];
 
   return (
@@ -34,18 +35,20 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPath, onNavigate }) => {
           {/* 导航链接 */}
           <div className="flex items-center gap-0.5 sm:gap-1">
             {navItems.map((item) => (
-              <button
+              <a
                 key={item.path}
-                onClick={() => onNavigate(item.path)}
+                href={item.path}
+                target={item.external ? "_blank" : undefined}
+                rel={item.external ? "noopener noreferrer" : undefined}
                 className={clsx(
                   'nav-link flex items-center gap-1 sm:gap-2 px-2 sm:px-3',
-                  currentPath === item.path && 'nav-link-active'
+                  currentPath === item.path && !item.external && 'nav-link-active'
                 )}
               >
                 <span className="text-sm sm:text-base">{item.icon}</span>
                 <span className="text-sm hidden sm:inline">{item.label}</span>
                 <span className="text-sm sm:hidden">{item.shortLabel}</span>
-              </button>
+              </a>
             ))}
           </div>
         </div>
