@@ -75,12 +75,44 @@ export interface SystemInfo {
   updateTime: string;
 }
 
+// 八大体质枚举
+export type ConstitutionEnum = '气虚' | '阴虚' | '阳虚' | '血瘀' | '痰湿' | '湿热' | '气郁' | '平和';
+
+// 体质判断结果（单一体质）
+export interface ConstitutionType {
+  type: ConstitutionEnum;
+  name: string;
+  description: string;
+  characteristics: string[];
+  carePrinciple: string;
+  careMethod: string;
+  dietary禁忌: string[];
+  lifestyle建议: string[];
+  matchedFeatures: string[];
+  confidence: number;
+}
+
+// 复合体质（主体质 + 兼夹体质）
+export interface CompoundConstitution {
+  primary: ConstitutionType;
+  secondary?: ConstitutionType[];
+  summary: string;
+}
+
+// 完整体质评估结果
+export interface ConstitutionAssessment {
+  constitution: CompoundConstitution;
+  isBalanced: boolean;
+  healthTips: string[];
+}
+
 // 完整输出数据
 export interface DiagnosisOutput {
   diagnosisResult: DiagnosisResult;
   acupuncturePlan: AcupuncturePlan;
   lifeCareAdvice: LifeCareAdvice;
   systemInfo: SystemInfo;
+  constitutionAssessment?: ConstitutionAssessment;
 }
 
 // 置信度等级
