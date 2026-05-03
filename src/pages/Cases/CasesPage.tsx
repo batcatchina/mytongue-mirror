@@ -51,7 +51,7 @@ const CasesPage: React.FC = () => {
 
                     <div className="text-sm text-stone-500 mb-2 sm:mb-3">
                       <span>
-                        {caseRecord.patientInfo.gender}，{caseRecord.patientInfo.age}岁
+                        {caseRecord.patientInfo.gender}{caseRecord.patientInfo.age && caseRecord.patientInfo.age > 0 ? `，${caseRecord.patientInfo.age}岁` : ''}
                       </span>
                       <span className="mx-2 text-stone-300">•</span>
                       <span className="text-stone-600 truncate block sm:inline">
