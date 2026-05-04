@@ -45,7 +45,7 @@ const CasesPage: React.FC = () => {
                         {caseRecord.diagnosisResult.primarySyndrome}
                       </h3>
                       <span className="tcm-tag-primary flex-shrink-0">
-                        {(caseRecord.diagnosisResult.confidence * 100).toFixed(0)}%
+                        {(() => { const c = caseRecord.diagnosisResult.confidence; return (c > 1 ? c : c * 100).toFixed(0); })()}%
                       </span>
                     </div>
 

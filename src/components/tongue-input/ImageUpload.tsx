@@ -42,7 +42,10 @@ function buildSummary(result: TongueRecognitionResult): string {
   if (result.tongue_shape?.teeth_mark?.has) parts.push('齿痕');
   if (result.tongue_shape?.crack?.has) parts.push('裂纹');
   if (result.tongue_state?.value && result.tongue_state.value !== '正常') parts.push(`舌态:${result.tongue_state.value}`);
-  if (result.overall_confidence) parts.push(`置信度:${Math.round(result.overall_confidence * 100)}%`);
+  if (result.overall_confidence) {
+    const conf = result.overall_confidence > 1 ? result.overall_confidence : result.overall_confidence * 100;
+    parts.push(`置信度:${Math.round(conf)}%`);
+  }
   return parts.join(' · ');
 }
 
