@@ -583,7 +583,7 @@ function searchAcupoints(keyword) {
 }
 
 // 导出所有数据
-export {
+module.exports = {
   ACUPOINT_MERIDIAN_MAP,
   ACUPOINT_LOCATION_MAP,
   ACUPOINT_EFFECT_MAP,

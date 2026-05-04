@@ -747,7 +747,7 @@ function getRulesSummary() {
 }
 
 // ==================== 导出 ====================
-export {
+module.exports = {
   DIAGNOSIS_RULES,
   VALUE_MAP,
   normalizeValue,

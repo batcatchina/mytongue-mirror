@@ -8,14 +8,14 @@ const {
   getAllAcupointNames, 
   getAcupointCount,
   searchAcupoints 
-} = require('./lib/acupoint-data.mjs');
+} = require('./lib/acupoint-data');
 
 const { 
   diagnoseTongue, 
   getRuleCount, 
   getAllSyndromes, 
   getRulesSummary 
-} = require('./lib/diagnosis-engine.mjs');
+} = require('./lib/diagnosis-engine');
 
 // ==================== Coze API配置 ====================
 const COZE_CONFIG = {
