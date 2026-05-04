@@ -664,8 +664,7 @@ function searchAcupoints(keyword) {
   return results;
 }
 
-// CommonJS导出
-module.exports = {
+export {
   ACUPOINT_MERIDIAN_MAP,
   ACUPOINT_LOCATION_MAP,
   ACUPOINT_EFFECT_MAP,

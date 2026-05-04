@@ -1,21 +1,10 @@
 // MCP协议路由 - 舌镜辨证能力引擎
 // 支持 JSON-RPC 2.0 协议
-// 使用 CommonJS 格式以兼容 Vercel Serverless Functions
+// ESM格式
 
 // ==================== 引用核心模块 ====================
-const { 
-  getAcupointInfo, 
-  getAllAcupointNames, 
-  getAcupointCount,
-  searchAcupoints 
-} = require('./lib/acupoint-data.cjs');
-
-const { 
-  diagnoseTongue, 
-  getRuleCount, 
-  getAllSyndromes, 
-  getRulesSummary 
-} = require('./lib/diagnosis-engine.cjs');
+import { getAcupointInfo, getAllAcupointNames, getAcupointCount, searchAcupoints } from './lib/acupoint-data.mjs';
+import { diagnoseTongue, getRuleCount, getAllSyndromes, getRulesSummary } from './lib/diagnosis-engine.mjs';
 
 // ==================== Coze API配置 ====================
 const COZE_CONFIG = {

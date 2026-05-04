@@ -1454,7 +1454,7 @@ function diagnoseTongue(features) {
 }
 
 // CommonJS导出
-module.exports = {
+export {
   // 规则数组
   tongueColorRules,
   tongueColorDistributionRules,
