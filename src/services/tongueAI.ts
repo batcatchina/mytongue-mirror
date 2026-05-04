@@ -31,8 +31,8 @@ export interface TongueRecognitionResult {
   message?: string;
 }
 
-const POLL_INTERVAL = 1000;
-const MAX_POLL = 20;
+const POLL_INTERVAL = 1500;
+const MAX_POLL = 40;
 
 // 获取进度文案 - 前置舌象检测步骤
 function getProgressMessage(elapsedSeconds: number): string {
