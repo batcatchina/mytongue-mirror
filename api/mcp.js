@@ -15,7 +15,7 @@ const {
   getRuleCount, 
   getAllSyndromes, 
   getRulesSummary 
-} = require('./lib/diagnosis-engine');
+} = require('./lib/diagnosis-engine.cjs');
 
 // ==================== Coze API配置 ====================
 const COZE_CONFIG = {
