@@ -8,7 +8,7 @@ const {
   getAllAcupointNames, 
   getAcupointCount,
   searchAcupoints 
-} = require('./lib/acupoint-data');
+} = require('./lib/acupoint-data.cjs');
 
 const { 
   diagnoseTongue, 
