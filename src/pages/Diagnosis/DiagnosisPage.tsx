@@ -546,17 +546,74 @@ const DiagnosisPage: React.FC = () => {
       } else {
         const aiResult = result.data || result.preliminaryResult;
         if (aiResult) {
-          setDiagnosisResult({
-            primarySyndrome: aiResult.mainSyndrome,
-            syndromeName: aiResult.mainSyndrome,
-            pathogenesis: aiResult.pathogenesis,
+          // 构建符合显示组件期望的嵌套结构
+          const diagResult = {
+            primarySyndrome: aiResult.mainSyndrome || '待明确',
+            syndromeScore: (aiResult.confidence || 0.8) * 100,
+            confidence: aiResult.confidence || 0.8,
+            secondarySyndromes: [],
+            pathogenesis: aiResult.pathogenesis || aiResult.uncertainty || '',
             organLocation: aiResult.organLocation?.primary
               ? [aiResult.organLocation.primary, ...(aiResult.organLocation.secondary || [])]
               : [],
-            confidence: aiResult.confidence || 0.8,
-            mainSyndrome: aiResult.mainSyndrome,
-            mainSyndromeDesc: aiResult.mainSyndromeDesc,
-            confidenceScore: aiResult.confidence,
+            diagnosisEvidence: [],
+            priority: '中',
+            diagnosisTime: new Date().toLocaleTimeString('zh-CN'),
+          };
+          
+          // 用本地规则引擎补充针灸方案
+          const engineInput: DiagnosisInput = {
+            tongueColor: inputFeatures.tongueColor.value,
+            tongueShape: inputFeatures.tongueShape.value || '正常',
+            tongueState: inputFeatures.tongueState.value || '正常',
+            coatingColor: inputFeatures.coating.color,
+            coatingTexture: inputFeatures.coating.texture || '薄',
+            coatingMoisture: inputFeatures.coating.moisture || '润',
+            teethMark: hasTeethMark,
+            crack: hasCrack,
+          };
+          
+          let acuPlan = { treatmentPrinciple: '', mainPoints: [] as any[], secondaryPoints: [] as any[], contraindications: [] as string[], treatmentAdvice: {} as any };
+          let lifeCare = { diet: [] as string[], lifestyle: [] as string[], mood: [] as string[] };
+          try {
+            const localResult = localDiagnose(engineInput, true);
+            const mainPts = (localResult.acupointSelection.mainPoints || []).map((n: string) => cleanAcupointName(n));
+            const secPts = (localResult.acupointSelection.secondaryPoints || []).map((n: string) => cleanAcupointName(n));
+            acuPlan = {
+              treatmentPrinciple: localResult.primaryResult.treatment || '',
+              mainPoints: mainPts.map((name: string) => ({
+                point: name,
+                meridian: acupointKnowledge[name]?.meridian || '待确认',
+                effect: acupointKnowledge[name]?.effect || '调理气血',
+                location: acupointKnowledge[name]?.location || '标准定位待确认',
+                technique: localResult.acupointSelection.method?.technique || '平补平泻',
+              })),
+              secondaryPoints: secPts.map((name: string) => ({
+                point: name,
+                meridian: acupointKnowledge[name]?.meridian || '待确认',
+                effect: acupointKnowledge[name]?.effect || '调理气血',
+                location: acupointKnowledge[name]?.location || '标准定位待确认',
+                technique: '补法',
+              })),
+              contraindications: [],
+              treatmentAdvice: {
+                techniquePrinciple: localResult.acupointSelection.method?.technique || '',
+                needleRetentionTime: `${localResult.acupointSelection.method?.needleRetention || 20}分钟`,
+                treatmentFrequency: localResult.acupointSelection.method?.frequency || '每日1次',
+                treatmentSessions: localResult.acupointSelection.method?.course || '5次为一疗程',
+                sessionInterval: '1-2天',
+                moxibustionSuggestion: localResult.acupointSelection.method?.moxibustion || '',
+              },
+            };
+            lifeCare = generateLifeCareAdvice(localResult);
+          } catch(e) {
+            console.error('[问诊] 本地引擎补充失败:', e);
+          }
+          
+          setDiagnosisResult({
+            diagnosisResult: diagResult,
+            acupuncturePlan: acuPlan,
+            lifeCareAdvice: lifeCare,
           });
           setCurrentStep('result');
         }
