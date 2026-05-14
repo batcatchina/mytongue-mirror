@@ -141,12 +141,72 @@ const DiagnosisPage: React.FC = () => {
       confidenceScore: aiResult.confidence,
     };
     
+    // 穴位知识库：名称→经脉/功效/定位映射
+    const acupointKnowledge: Record<string, { meridian: string; effect: string; location: string }> = {
+      '太冲': { meridian: '足厥阴肝经', effect: '疏肝理气、降血压', location: '足背第1、2跖骨结合部前方凹陷处' },
+      '行间': { meridian: '足厥阴肝经', effect: '清肝泻火', location: '足背第1、2趾间缝纹端' },
+      '肝俞': { meridian: '足太阳膀胱经', effect: '疏肝理气、养血明目', location: '第9胸椎棘突下旁开1.5寸' },
+      '期门': { meridian: '足厥阴肝经', effect: '疏肝理气、和胃降逆', location: '乳头直下第6肋间隙' },
+      '膻中': { meridian: '任脉', effect: '宽胸理气、止咳平喘', location: '前正中线两乳头连线中点' },
+      '内关': { meridian: '手厥阴心包经', effect: '宁心安神、和胃止呕', location: '腕横纹上2寸两筋间' },
+      '足三里': { meridian: '足阳明胃经', effect: '健脾和胃、补中益气', location: '犊鼻下3寸胫骨前嵴外1横指' },
+      '脾俞': { meridian: '足太阳膀胱经', effect: '健脾化湿、和胃止泻', location: '第11胸椎棘突下旁开1.5寸' },
+      '中脘': { meridian: '任脉', effect: '和胃健脾、降逆利水', location: '前正中线脐上4寸' },
+      '阴陵泉': { meridian: '足太阴脾经', effect: '健脾利湿、通利三焦', location: '胫骨内侧髁后下方凹陷处' },
+      '三阴交': { meridian: '足太阴脾经', effect: '健脾益血、调肝补肾', location: '内踝尖上3寸胫骨内侧后缘' },
+      '曲池': { meridian: '手阳明大肠经', effect: '清热解表、疏经活络', location: '屈肘肘横纹桡侧端凹陷处' },
+      '内庭': { meridian: '足阳明胃经', effect: '清胃泻火', location: '足背第2、3趾间缝纹端' },
+      '合谷': { meridian: '手阳明大肠经', effect: '镇痛安神、通经活络', location: '手背第1、2掌骨间第2掌骨桡侧中点' },
+      '气海': { meridian: '任脉', effect: '补气固本、温阳益气', location: '前正中线脐下1.5寸' },
+      '关元': { meridian: '任脉', effect: '补肾助阳、温固下元', location: '前正中线脐下3寸' },
+      '膈俞': { meridian: '足太阳膀胱经', effect: '理血宽胸、降逆止呕', location: '第7胸椎棘突下旁开1.5寸' },
+      '太溪': { meridian: '足少阴肾经', effect: '滋阴补肾、清虚热', location: '内踝尖与跟腱之间凹陷处' },
+      '照海': { meridian: '足少阴肾经', effect: '滋阴清热、调经安神', location: '内踝尖下方凹陷处' },
+      '肾俞': { meridian: '足太阳膀胱经', effect: '温补肾阳、益精填髓', location: '第2腰椎棘突下旁开1.5寸' },
+      '心俞': { meridian: '足太阳膀胱经', effect: '宁心安神、宽胸理气', location: '第5胸椎棘突下旁开1.5寸' },
+      '血海': { meridian: '足太阴脾经', effect: '活血化瘀、调经统血', location: '髌骨内上缘上2寸' },
+      '阳陵泉': { meridian: '足少阳胆经', effect: '疏肝利胆、舒筋活络', location: '腓骨小头前下方凹陷处' },
+      '命门': { meridian: '督脉', effect: '温肾壮阳、强腰固精', location: '后正中线第2腰椎棘突下凹陷处' },
+      '百会': { meridian: '督脉', effect: '升阳举陷、醒脑开窍', location: '两耳尖连线中点' },
+      '神门': { meridian: '手少阴心经', effect: '宁心安神、清心泻火', location: '腕横纹尺侧端凹陷处' },
+      '丰隆': { meridian: '足阳明胃经', effect: '健脾化痰、和胃降逆', location: '外踝尖上8寸条口穴外1寸' },
+      '肺俞': { meridian: '足太阳膀胱经', effect: '宣肺止咳、滋阴润燥', location: '第3胸椎棘突下旁开1.5寸' },
+    };
+
+    // 将字符串数组转为对象数组，填充穴位知识
+    const enrichPoints = (names: string[], defaultTechnique: string) => {
+      const arr = Array.isArray(names) ? names : [];
+      return arr.map((item: any) => {
+        if (typeof item === 'string') {
+          const info = acupointKnowledge[item] || {};
+          return {
+            point: item,
+            meridian: info.meridian || '待确认',
+            effect: info.effect || '调理气血',
+            location: info.location || '标准定位待确认',
+            technique: defaultTechnique,
+          };
+        }
+        return item; // 已经是对象格式
+      });
+    };
+
+    const defaultTechnique = aiResult.acupuncturePlan?.technique || '平补平泻';
     const acupuncturePlan = {
-      mainPoints: aiResult.acupuncturePlan?.mainPoints || [],
-      secondaryPoints: aiResult.acupuncturePlan?.secondaryPoints || [],
-      technique: aiResult.acupuncturePlan?.technique || '平补平泻',
+      treatmentPrinciple: aiResult.acupuncturePlan?.technique || '',
+      mainPoints: enrichPoints(aiResult.acupuncturePlan?.mainPoints || [], defaultTechnique),
+      secondaryPoints: enrichPoints(aiResult.acupuncturePlan?.secondaryPoints || [], defaultTechnique),
+      technique: defaultTechnique,
       description: aiResult.acupuncturePlan?.pointsDescription || '',
       pointsDescription: aiResult.acupuncturePlan?.pointsDescription || '',
+      contraindications: [],
+      treatmentAdvice: {
+        techniquePrinciple: defaultTechnique,
+        needleRetentionTime: '20分钟',
+        treatmentFrequency: '每日1次',
+        treatmentSessions: '5次为一疗程',
+        sessionInterval: '1-2天',
+      },
     };
     
     const lifeCareAdvice = {
