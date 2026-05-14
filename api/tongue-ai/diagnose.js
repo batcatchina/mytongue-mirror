@@ -34,20 +34,49 @@ function generateConversationId() {
 }
 
 /**
- * 从知识文件读取系统Prompt（热更新，无需重启）
+ * 知识文件路径配置（分层：核心层+完整层）
  */
-function loadSystemPrompt() {
-  const possiblePaths = [
+const KNOWLEDGE_PATHS = {
+  default: [
     join(__dirname, '..', '..', '舌镜', 'diagnose_knowledge.md'),
     join(__dirname, '..', '舌镜', 'diagnose_knowledge.md'),
     '/root/mytongue-mirror/舌镜/diagnose_knowledge.md',
-  ];
+  ],
+  core: [
+    join(__dirname, '..', '..', '舌镜', 'diagnose_knowledge_core.md'),
+    join(__dirname, '..', '舌镜', 'diagnose_knowledge_core.md'),
+    '/root/mytongue-mirror/舌镜/diagnose_knowledge_core.md',
+  ],
+  full: [
+    join(__dirname, '..', '..', '舌镜', 'diagnose_knowledge_full.md'),
+    join(__dirname, '..', '舌镜', 'diagnose_knowledge_full.md'),
+    '/root/mytongue-mirror/舌镜/diagnose_knowledge_full.md',
+  ],
+};
+
+/**
+ * 从知识文件读取系统Prompt（热更新，无需重启）
+ * mode='default'|'inquiry'|'confirm' → 核心层（快推理）
+ * mode='detail' → 完整层（详细配穴）
+ */
+function loadSystemPrompt(mode = 'default') {
+  const layer = (mode === 'detail') ? 'full' : 'core';
+  const paths = KNOWLEDGE_PATHS[layer] || KNOWLEDGE_PATHS.core;
   
-  for (const p of possiblePaths) {
+  for (const p of paths) {
     try {
-      const content = readFileSync(p, 'utf-8');
-      console.log('[舌镜AI诊断] 知识文件加载成功:', p);
-      return content;
+      const knowledge = readFileSync(p, 'utf-8');
+      console.log('[舌镜AI诊断] 知识文件加载成功:', p, '(层:', layer, ')');
+      return knowledge;
+    } catch (_) { /* 尝试下一个路径 */ }
+  }
+  
+  // 回退到默认知识文件
+  for (const p of KNOWLEDGE_PATHS.default) {
+    try {
+      const knowledge = readFileSync(p, 'utf-8');
+      console.log('[舌镜AI诊断] 回退到默认知识文件:', p);
+      return knowledge;
     } catch (_) { /* 尝试下一个路径 */ }
   }
   
@@ -209,7 +238,7 @@ async function handleDefaultMode(req) {
   console.log('[舌镜AI诊断] 默认模式请求:', JSON.stringify(tongueFeatures, null, 2));
   console.log('[舌镜AI诊断] 患者年龄:', age);
 
-  const systemPrompt = loadSystemPrompt();
+  const systemPrompt = loadSystemPrompt('default');
 
   const userMessage = `请根据以下舌象特征进行辨证：
 
@@ -283,7 +312,7 @@ async function handleInquiryMode(req) {
   console.log('[舌镜AI诊断] Inquiry模式请求');
   
   // Step 1: 先进行初步辨证
-  const systemPrompt = loadSystemPrompt();
+  const systemPrompt = loadSystemPrompt('inquiry');
   const preliminaryMessage = `请根据以下舌象特征进行初步辨证：
 
 舌象特征：
@@ -433,7 +462,7 @@ async function handleConfirmMode(req) {
   console.log('[舌镜AI诊断] 会话ID:', conversationId);
   console.log('[舌镜AI诊断] 回答数量:', answers.length);
 
-  const systemPrompt = loadSystemPrompt();
+  const systemPrompt = loadSystemPrompt('confirm');
   const userMessage = buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, answers);
 
   const assistantMessage = await callDeepSeek([
@@ -526,6 +555,9 @@ export default async function handler(req, res) {
         break;
       case 'confirm':
         result = await handleConfirmMode(req);
+        break;
+      case 'detail':
+        result = await handleDetailMode(req);
         break;
       default:
         result = await handleDefaultMode(req);
