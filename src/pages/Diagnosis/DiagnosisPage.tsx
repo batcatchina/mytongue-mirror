@@ -154,13 +154,131 @@ const DiagnosisPage: React.FC = () => {
     };
     
     return { diagnosisResult, acupuncturePlan, lifeCareAdvice };
+  };
 
   // ========== v3.2 问而确之：Inquiry模式调用 ==========
   const diagnoseWithInquiry = async () => {
-    console.log([DeepSeek诊断]
+    console.log('[DeepSeek诊断] 启动问诊模式...');
+    const shapeDist = inputFeatures.shapeDistribution;
+    const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
+                         shapeDist?.depression?.includes('齿痕') || false;
+    const hasCrack = inputFeatures.crack?.value === '是' ||
+                     shapeDist?.depression?.includes('裂纹') || false;
+    const tongueFeatures = {
+      tongueColor: inputFeatures.tongueColor.value,
+      tongueShape: inputFeatures.tongueShape.value || '正常',
+      coatingColor: inputFeatures.coating.color,
+      coatingTexture: inputFeatures.coating.texture || '薄',
+      coatingMoisture: inputFeatures.coating.moisture || '润',
+      teethMark: hasTeethMark,
+      crack: hasCrack,
+      tongueState: inputFeatures.tongueState.value || '正常',
+    };
+    try {
+      const response = await fetch('/api/tongue-ai/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tongueFeatures,
+          age: selectedAgeGroup || patientInfo.age,
+          mode: 'inquiry',
+        }),
+      });
+      const result = await response.json();
+      if (result.needsConfirmation && result.questions?.length > 0) {
+        setInquiryQuestions(result.questions);
+        setInquiryConversationId(result.conversationId);
+        setPreliminaryResult(result.preliminaryResult);
+        setShowInquiry(true);
+      } else {
+        const aiResult = result.data || result.preliminaryResult;
+        if (aiResult) {
+          setDiagnosisResult({
+            primarySyndrome: aiResult.mainSyndrome,
+            syndromeName: aiResult.mainSyndrome,
+            pathogenesis: aiResult.pathogenesis,
+            organLocation: aiResult.organLocation?.primary
+              ? [aiResult.organLocation.primary, ...(aiResult.organLocation.secondary || [])]
+              : [],
+            confidence: aiResult.confidence || 0.8,
+            mainSyndrome: aiResult.mainSyndrome,
+            mainSyndromeDesc: aiResult.mainSyndromeDesc,
+            confidenceScore: aiResult.confidence,
+          });
+          setCurrentStep('result');
+        }
+      }
+    } catch (err) {
+      console.error('[问诊] 调用失败:', err);
+      setError('问诊调用失败，请重试');
+    }
   };
- // v3.0默认使用DeepSeek API推理引擎
-  const [showEngineSwitch, setShowEngineSwitch] = useState(false); // 引擎切换默认折叠
+
+  // ========== v3.2 问诊提交处理 ==========
+  const handleInquirySubmit = async (answers: { questionId: string; selectedOption: string }[]) => {
+    console.log('[问诊] 用户回答:', answers);
+    setIsRefiningDiagnosis(true);
+    const shapeDist = inputFeatures.shapeDistribution;
+    const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
+                         shapeDist?.depression?.includes('齿痕') || false;
+    const hasCrack = inputFeatures.crack?.value === '是' ||
+                     shapeDist?.depression?.includes('裂纹') || false;
+    const tongueFeatures = {
+      tongueColor: inputFeatures.tongueColor.value,
+      tongueShape: inputFeatures.tongueShape.value || '正常',
+      coatingColor: inputFeatures.coating.color,
+      coatingTexture: inputFeatures.coating.texture || '薄',
+      coatingMoisture: inputFeatures.coating.moisture || '润',
+      teethMark: hasTeethMark,
+      crack: hasCrack,
+      tongueState: inputFeatures.tongueState.value || '正常',
+    };
+    try {
+      const response = await fetch('/api/tongue-ai/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tongueFeatures,
+          age: selectedAgeGroup || patientInfo.age,
+          mode: 'confirm',
+          conversationId: inquiryConversationId,
+          answers,
+        }),
+      });
+      const result = await response.json();
+      if (result.success && result.data) {
+        const aiResult = result.data;
+        setDiagnosisResult({
+          primarySyndrome: aiResult.mainSyndrome,
+          syndromeName: aiResult.mainSyndrome,
+          pathogenesis: aiResult.pathogenesis,
+          organLocation: aiResult.organLocation?.primary
+            ? [aiResult.organLocation.primary, ...(aiResult.organLocation.secondary || [])]
+            : [],
+          secondarySyndromes: aiResult.secondarySyndromes || [],
+          confidence: aiResult.confidence || 0.8,
+          transmissionType: aiResult.transmissionAnalysis?.type,
+          transmissionDescription: aiResult.transmissionAnalysis?.description,
+          mainSyndrome: aiResult.mainSyndrome,
+          mainSyndromeDesc: aiResult.mainSyndromeDesc,
+          confidenceScore: aiResult.confidence,
+        });
+        setShowInquiry(false);
+        setShowRefineButton(true);
+        setCurrentStep('result');
+      }
+    } catch (err) {
+      console.error('[问诊确认] 调用失败:', err);
+      setError('问诊确认失败，请重试');
+    } finally {
+      setIsRefiningDiagnosis(false);
+    }
+  };
+
+  // ========== v3.2 "想更准"按钮处理 ==========
+  const handleRefineDiagnosis = async () => {
+    await diagnoseWithInquiry();
+  };
   
   // AI识别状态 - 用于判断是否已通过AI识别填入数据
   const [isAIRecognized, setIsAIRecognized] = useState(false);
