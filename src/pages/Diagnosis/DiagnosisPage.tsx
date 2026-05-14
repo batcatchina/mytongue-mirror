@@ -637,15 +637,16 @@ const DiagnosisPage: React.FC = () => {
         
         try {
           const localResult = localDiagnose(engineInput, true);
+          const mainPointNames: string[] = (localResult.acupointSelection.mainPoints || []).map((n: string) => cleanAcupointName(n));
           const secondaryPointNames: string[] = (localResult.acupointSelection.secondaryPoints || []).map((n: string) => cleanAcupointName(n));
           
           const acupuncturePlan = {
             treatmentPrinciple: localResult.primaryResult.treatment || '',
-            mainPoints: (aiResult.mainPoints || []).map((name: string) => ({
-              point: cleanAcupointName(name),
-              meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
-              effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
-              location: acupointKnowledge[cleanAcupointName(name)]?.location || '标准定位待确认',
+            mainPoints: mainPointNames.map((name: string) => ({
+              point: name,
+              meridian: acupointKnowledge[name]?.meridian || '待确认',
+              effect: acupointKnowledge[name]?.effect || '调理气血',
+              location: acupointKnowledge[name]?.location || '标准定位待确认',
               technique: localResult.acupointSelection.method?.technique || '平补平泻',
             })),
             secondaryPoints: secondaryPointNames.map((name: string) => ({
@@ -668,8 +669,20 @@ const DiagnosisPage: React.FC = () => {
           
           const lifeCareAdvice = generateLifeCareAdvice(localResult);
           
+          // 合并原辨证结果与问诊结果，保留原病机信息
+          const mergedDiagnosisResult = {
+            ...diagnosisResultObj,
+            // 保留原辨证主病机作为参考
+            originalPrimarySyndrome: diagnosisResult?.diagnosisResult?.primarySyndrome || '',
+            // 合并病机：原病机 + 问诊补充
+            pathogenesis: [
+              diagnosisResult?.diagnosisResult?.pathogenesis,
+              aiResult.pathogenesis ? `【问诊补充】${aiResult.pathogenesis}` : ''
+            ].filter(Boolean).join('\n') || diagnosisResultObj.pathogenesis,
+          };
+          
           setDiagnosisResult({
-            diagnosisResult: diagnosisResultObj,
+            diagnosisResult: mergedDiagnosisResult,
             acupuncturePlan,
             lifeCareAdvice,
           });
@@ -679,7 +692,7 @@ const DiagnosisPage: React.FC = () => {
             diagnosisResult: diagnosisResultObj,
             acupuncturePlan: {
               treatmentPrinciple: aiResult.treatment || '',
-              mainPoints: (aiResult.mainPoints || []).map((name: string) => ({
+              mainPoints: mainPointNames.map((name: string) => ({
                 point: cleanAcupointName(name),
                 meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
                 effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
