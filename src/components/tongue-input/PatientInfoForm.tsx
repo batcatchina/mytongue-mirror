@@ -25,8 +25,8 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
             type="number"
             min="0"
             max="150"
-            value={patientInfo.age || ''}
-            onChange={(e) => onChange({ age: parseInt(e.target.value) || 0 })}
+            value={patientInfo.age > 0 ? patientInfo.age : ''}
+            onChange={(e) => onChange({ age: parseInt(e.target.value) || -1 })}
             placeholder="请输入年龄"
             className="tcm-input"
           />
