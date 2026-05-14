@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
+  base: process.env.GITHUB_PAGES ? '/mytongue-mirror/' : '/',
   plugins: [
     react(),
     // 修复微信WebView兼容性：去掉type="module"
