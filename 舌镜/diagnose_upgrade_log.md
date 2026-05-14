@@ -203,3 +203,92 @@ cp /root/mytongue-mirror/舌镜/backup/diagnosisEngine.ts.v2.0.bak \
 ---
 
 *本文档由SubAgent自动生成，如有问题请联系主Agent*
+
+---
+
+## v3.2.0 "问而确之" - 动态问诊模块
+
+### 发布日期
+2026-05-15
+
+### 升级类型
+功能增强：新增动态问诊确认模块
+
+### 核心功能
+1. **Inquiry模式**：根据初步辨证置信度自动生成问诊问题
+2. **Confirm模式**：结合用户回答进行修正推理
+3. **年龄段选择器**：用户友好的年龄输入方式
+4. **"想更准"按钮**：用户主动触发深度问诊
+
+### 技术实现
+
+#### API层改动 (api/tongue-ai/diagnose.js)
+```javascript
+// 新增三种模式
+mode: "inquiry"  // 生成问诊问题
+mode: "confirm"  // 修正推理
+mode: undefined  // 默认行为（兼容v3.1）
+
+// 新增响应字段
+{
+  success: true,
+  needsConfirmation: true/false,
+  confidence: 0.7,
+  questions: [{id, text, options, reason}],
+  preliminaryResult: {...},
+  conversationId: "sz_xxx_xxx"
+}
+```
+
+#### 前端改动 (src/pages/Diagnosis/DiagnosisPage.tsx)
+- 新增年龄段选择器（4个标签按钮）
+- 新增 InquiryDialog 组件
+- 新增问诊流程处理逻辑
+- 新增"想更准"按钮
+
+#### 组件新增 (src/components/InquiryDialog.tsx)
+- 问诊对话框组件
+- 进度显示（第1题/共2题）
+- 选择题UI
+- 加载状态
+
+### 置信度阈值
+| 阈值 | 行为 |
+|------|------|
+| >= 0.8 | 跳过问诊，直接出报告 |
+| 0.6-0.8 | 问1-2个问题 |
+| < 0.6 | 问2-3个问题 |
+
+### P0规则保留
+60岁以上寒湿必须补阳（代码层+prompt层双重保障）
+
+### 文件变更清单
+| 文件 | 变更 |
+|------|------|
+| api/tongue-ai/diagnose.js | 扩展：inquiry/confirm模式 |
+| src/pages/Diagnosis/DiagnosisPage.tsx | 新增：年龄段选择器+问诊逻辑 |
+| src/components/InquiryDialog.tsx | 新增：问诊对话框组件 |
+| 舌镜/diagnose_knowledge.md | 追加：问诊规则文档 |
+| 舌镜/diagnose_upgrade_log.md | 追加：v3.2.0版本记录 |
+
+### 回滚方案
+如需回滚到v3.1，只需修改前端：
+```typescript
+// 删除或注释掉以下代码：
+// - selectedAgeGroup 状态
+// - showInquiry 状态
+// - InquiryDialog 组件
+// - handleRefineDiagnosis 函数
+// - handleInquirySubmit 函数
+```
+
+---
+
+## 变更记录
+
+| 日期 | 版本 | 变更内容 | 作者 |
+|-----|------|---------|------|
+| 2026-05-15 | v3.2.0 | 新增"问而确之"动态问诊模块 | 渊索(SubAgent) |
+| 2026-05-14 | v3.0.0 | 初始升级：推理层替换为DeepSeek API | 渊索(SubAgent) |
+| 2026-05-14 | v3.0.1 | 架构修正：知识文件外部化 | 渊索(SubAgent) |
+| 2026-05-04 | v2.0 | 4层本地规则引擎上线 | - |

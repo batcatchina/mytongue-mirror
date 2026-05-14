@@ -15,6 +15,7 @@ import PatientInfoForm from '@/components/tongue-input/PatientInfoForm';
 import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
 import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
+import InquiryDialog, { InquiryQuestion } from '@/components/InquiryDialog';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import { submitDiagnosis } from '@/services/api';
 import { TongueRecognitionResult } from '@/services/tongueAI';
@@ -53,6 +54,23 @@ const DiagnosisPage: React.FC = () => {
 
 
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
+
+  // ========== v3.2 问而确之：年龄段选择器 ==========
+  const ageGroups = [
+    { label: '30以下', value: 25 },
+    { label: '30-50', value: 40 },
+    { label: '50-65', value: 57 },
+    { label: '65以上', value: 72 },
+  ] as const;
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<number | null>(null);
+
+  // ========== v3.2 问诊状态 ==========
+  const [showInquiry, setShowInquiry] = useState(false);
+  const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
+  const [inquiryConversationId, setInquiryConversationId] = useState<string | null>(null);
+  const [preliminaryResult, setPreliminaryResult] = useState<any>(null);
+  const [isRefiningDiagnosis, setIsRefiningDiagnosis] = useState(false);
+  const [showRefineButton, setShowRefineButton] = useState(false);
   const [useLocalEngine, setUseLocalEngine] = useState(false);
   
   /**
@@ -136,6 +154,10 @@ const DiagnosisPage: React.FC = () => {
     };
     
     return { diagnosisResult, acupuncturePlan, lifeCareAdvice };
+
+  // ========== v3.2 问而确之：Inquiry模式调用 ==========
+  const diagnoseWithInquiry = async () => {
+    console.log([DeepSeek诊断]
   };
  // v3.0默认使用DeepSeek API推理引擎
   const [showEngineSwitch, setShowEngineSwitch] = useState(false); // 引擎切换默认折叠
@@ -538,6 +560,31 @@ const DiagnosisPage: React.FC = () => {
           
           {/* ========== 左侧：输入区域 ========== */}
           <div className="space-y-4">
+            {/* ========== v3.2 年龄段选择器 ==========*/}
+            <div className="mb-4 p-4 bg-white rounded-xl shadow-sm border border-stone-100">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-stone-700 font-medium">您的年龄段</span>
+                <span className="text-xs text-stone-400">（帮助更准确辨证）</span>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {ageGroups.map((group) => (
+                  <button
+                    key={group.value}
+                    onClick={() => setSelectedAgeGroup(group.value)}
+                    className={`
+                      py-2.5 px-3 rounded-xl text-sm font-medium transition-all
+                      ${selectedAgeGroup === group.value
+                        ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                      }
+                    `}
+                  >
+                    {group.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* 核心入口：拍照/上传 - 最醒目 */}
             <div className="tcm-card p-4 bg-gradient-to-br from-primary-50 to-secondary-50 border-2 border-primary-200">
               <ImageUpload 
@@ -900,6 +947,36 @@ const DiagnosisPage: React.FC = () => {
                   >
                     获取深度辨证方案 ¥9.9
                   </button>
+                
+                {/* ========== v3.2 "想更准"按钮 ========== */}
+                {diagnosisResult && !showRefineButton && (
+                  <button
+                    onClick={handleRefineDiagnosis}
+                    disabled={isRefiningDiagnosis}
+                    className={`
+                      w-full py-2.5 rounded-xl text-sm font-medium transition-all mt-3
+                      ${isRefiningDiagnosis
+                        ? 'bg-stone-100 text-stone-400 cursor-wait'
+                        : 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 hover:from-amber-100 hover:to-orange-100 border border-amber-200'
+                      }
+                    `}
+                  >
+                    {isRefiningDiagnosis ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        生成问诊问题中...
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        🎯 想更准确？回答几个小问题
+                      </span>
+                    )}
+                  </button>
+                )}
+
                 </div>
                 </button>
               </div>
@@ -917,7 +994,19 @@ const DiagnosisPage: React.FC = () => {
           </div>
         </div>
       </main>
-    </div>
+    
+      {/* ========== v3.2 问诊对话框 ========== */}
+      {showInquiry && (
+        <InquiryDialog
+          questions={inquiryQuestions}
+          conversationId={inquiryConversationId || ''}
+          preliminaryResult={preliminaryResult}
+          onSubmit={handleInquirySubmit}
+          onCancel={() => setShowInquiry(false)}
+          isLoading={isRefiningDiagnosis}
+        />
+      )}
+</div>
   );
 };
 
