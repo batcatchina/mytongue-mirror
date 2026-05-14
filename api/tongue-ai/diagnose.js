@@ -312,6 +312,15 @@ ${age ? `- 患者年龄：${age}岁` : ''}
   ], 0.3);
 
   let preliminary = parseJSONResponse(preliminaryResponse);
+  
+  // 正常舌象（平和体质）自动提升置信度，避免误问诊
+  const isNormalTongue = preliminary.mainSyndrome?.includes('平和') || 
+                         preliminary.mainSyndrome?.includes('正常');
+  if (isNormalTongue && preliminary.confidence < 0.85) {
+    console.log('[舌镜AI诊断] 正常舌象，置信度自动提升:', preliminary.confidence, '→ 0.85');
+    preliminary.confidence = 0.85;
+  }
+  
   const confidence = preliminary.confidence || 0.7;
   
   console.log('[舌镜AI诊断] 初步辨证置信度:', confidence);
