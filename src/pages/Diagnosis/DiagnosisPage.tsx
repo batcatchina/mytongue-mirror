@@ -18,7 +18,7 @@ function diagCacheKey(f: any, _i: any): string {
   return String(h);
 }
 function diagCacheGet(k: string): any | null {
-  try { const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}'); return c[k] || null; } catch { return null; }
+  try { const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}'); return c[k]?.v || null; } catch { return null; }
 }
 function diagCacheSet(k: string, v: any): void {
   try {
