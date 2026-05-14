@@ -1472,7 +1472,7 @@ const DiagnosisPage: React.FC = () => {
                 {/* 📋 辨证结果 - 用户关注点2：怎么了+怎么办 */}
                 
                 {/* 证型结论 - 最醒目 */}
-                <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
+                <DiagnosisResultDisplay result={diagnosisResult?.diagnosisResult || { primarySyndrome: "分析中...", confidence: 0, pathogenesis: "", organLocation: [], priority: "中" }} />
                 
                 {/* Tab切换：病机 | 针灸 | 调理 */}
                 <div className="flex border-b border-stone-200">
@@ -1513,19 +1513,19 @@ const DiagnosisPage: React.FC = () => {
                   <div className="tcm-card p-4 space-y-3 animate-in">
                     <div>
                       <span className="text-xs text-stone-500 block mb-1">病机</span>
-                      <p className="text-sm text-primary-700 font-medium">{diagnosisResult.diagnosisResult?.pathogenesis || '-'}</p>
+                      <p className="text-sm text-primary-700 font-medium">{diagnosisResult?.diagnosisResult?.pathogenesis || '-'}</p>
                     </div>
                     <div>
                       <span className="text-xs text-stone-500 block mb-1">脏腑定位</span>
                       <div className="flex flex-wrap gap-1.5">
-                        {diagnosisResult.diagnosisResult?.organLocation?.map((organ: string, i: number) => (
+                        {diagnosisResult?.diagnosisResult?.organLocation?.map((organ: string, i: number) => (
                           <span key={i} className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
                             {organ}{i === 0 && <span className="ml-0.5 opacity-60">(主)</span>}
                           </span>
                         ))}
                       </div>
                     </div>
-                    {diagnosisResult.diagnosisResult?.secondarySyndromes?.length > 0 && (
+                    {diagnosisResult?.diagnosisResult?.secondarySyndromes?.length > 0 && (
                       <div>
                         <span className="text-xs text-stone-500 block mb-1">也需关注</span>
                         {diagnosisResult.diagnosisResult.secondarySyndromes.slice(0, 2).map((s: any, i: number) => (
