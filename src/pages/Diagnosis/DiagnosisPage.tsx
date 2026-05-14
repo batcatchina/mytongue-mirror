@@ -637,15 +637,17 @@ const DiagnosisPage: React.FC = () => {
         
         try {
           const localResult = localDiagnose(engineInput, true);
+          // 从本地规则引擎获取穴位，和secondaryPoints保持一致
+          const mainPointNames: string[] = (localResult.acupointSelection.mainPoints || []).map((n: string) => cleanAcupointName(n));
           const secondaryPointNames: string[] = (localResult.acupointSelection.secondaryPoints || []).map((n: string) => cleanAcupointName(n));
           
           const acupuncturePlan = {
             treatmentPrinciple: localResult.primaryResult.treatment || '',
-            mainPoints: (aiResult.mainPoints || []).map((name: string) => ({
-              point: cleanAcupointName(name),
-              meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
-              effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
-              location: acupointKnowledge[cleanAcupointName(name)]?.location || '标准定位待确认',
+            mainPoints: mainPointNames.map((name: string) => ({
+              point: name,
+              meridian: acupointKnowledge[name]?.meridian || '待确认',
+              effect: acupointKnowledge[name]?.effect || '调理气血',
+              location: acupointKnowledge[name]?.location || '标准定位待确认',
               technique: localResult.acupointSelection.method?.technique || '平补平泻',
             })),
             secondaryPoints: secondaryPointNames.map((name: string) => ({
@@ -668,8 +670,21 @@ const DiagnosisPage: React.FC = () => {
           
           const lifeCareAdvice = generateLifeCareAdvice(localResult);
           
+          // 合并原辨证结果与问诊结果，保留原辨证信息作为参考
+          const mergedDiagnosisResult = {
+            ...diagnosisResultObj,
+            // 保留原辨证主病机作为参考（标注为原辨证）
+            originalPrimarySyndrome: diagnosisResult?.diagnosisResult?.primarySyndrome || '',
+            // 如果原辨证有病机，合并到当前病机中
+            pathogenesis: aiResult.pathogenesis 
+              ? (diagnosisResult?.diagnosisResult?.pathogenesis 
+                  ? `${diagnosisResult.diagnosisResult.pathogenesis}\n---\n【问诊补充】${aiResult.pathogenesis}`
+                  : aiResult.pathogenesis)
+              : diagnosisResult?.diagnosisResult?.pathogenesis || '',
+          };
+          
           setDiagnosisResult({
-            diagnosisResult: diagnosisResultObj,
+            diagnosisResult: mergedDiagnosisResult,
             acupuncturePlan,
             lifeCareAdvice,
           });
@@ -891,36 +906,42 @@ const DiagnosisPage: React.FC = () => {
     
     // 构建诊断结果（严格匹配 DiagnosisResult 类型）
     const priorityMap: Record<string, '高' | '中' | '低'> = { high: '高', medium: '中', low: '低' };
+    // 确保主要结果有效，避免返回空结果
+    const primarySyndrome = result.primaryResult?.syndrome || '待明确';
+    const pathogenesis = result.primaryResult?.pathogenesis || '待分析';
+    const treatment = result.primaryResult?.treatment || '待确定';
     const diagnosisResultOut = {
-      primarySyndrome: result.primaryResult.syndrome,
-      syndromeScore: result.primaryResult.confidence || 0,
-      confidence: (result.primaryResult.confidence || 0) / 100, // 0-100 → 0-1
+      primarySyndrome,
+      syndromeScore: result.primaryResult?.confidence || 0,
+      confidence: (result.primaryResult?.confidence || 0) / 100, // 0-100 → 0-1
       secondarySyndromes: (result.alternativeResults || []).map((r: any) => ({
-        syndrome: r.syndrome,
-        score: r.confidence || 0,
-        confidence: (r.confidence || 0) / 100,
+        syndrome: r?.syndrome || '',
+        score: r?.confidence || 0,
+        confidence: (r?.confidence || 0) / 100,
         matchedFeatures: [],
       })),
-      pathogenesis: result.primaryResult.pathogenesis || '',
-      organLocation: Array.isArray(result.primaryResult.organLocation) 
-        ? result.primaryResult.organLocation : [result.primaryResult.organLocation || ''],
+      pathogenesis,
+      organLocation: Array.isArray(result.primaryResult?.organLocation) 
+        ? result.primaryResult.organLocation : [result.primaryResult?.organLocation || ''],
       diagnosisEvidence: [], // 本地引擎不提供详细依据表
-      priority: priorityMap[result.primaryResult.priority] || '中',
+      priority: priorityMap[result.primaryResult?.priority] || '中',
       diagnosisTime: new Date().toLocaleTimeString('zh-CN'),
     };
     
     // 构建针灸方案（严格匹配 AcupuncturePlan 类型）
-    // 清洗穴位名称并查询知识库
-    const mainPointNames: string[] = (result.acupointSelection.mainPoints || []).map((n: string) => cleanAcupointName(n));
-    const secondaryPointNames: string[] = (result.acupointSelection.secondaryPoints || []).map((n: string) => cleanAcupointName(n));
+    // 清洗穴位名称并查询知识库，确保穴位不会为空数组
+    const mainPointNames: string[] = (result.acupointSelection?.mainPoints?.length > 0 
+      ? result.acupointSelection.mainPoints : ['足三里']).map((n: string) => cleanAcupointName(n));
+    const secondaryPointNames: string[] = (result.acupointSelection?.secondaryPoints?.length > 0 
+      ? result.acupointSelection.secondaryPoints : ['三阴交']).map((n: string) => cleanAcupointName(n));
     const acupuncturePlan = {
-      treatmentPrinciple: result.primaryResult.treatment || '',
+      treatmentPrinciple: treatment,
       mainPoints: mainPointNames.map((name: string) => ({
         point: name,
         meridian: acupointKnowledge[name]?.meridian || '待确认',
         effect: acupointKnowledge[name]?.effect || '调理气血',
         location: acupointKnowledge[name]?.location || '标准定位待确认',
-        technique: result.acupointSelection.method?.technique || '泻法',
+        technique: result.acupointSelection?.method?.technique || '泻法',
       })),
       secondaryPoints: secondaryPointNames.map((name: string) => ({
         point: name,
