@@ -1099,6 +1099,7 @@ const DiagnosisPage: React.FC = () => {
     setIsAnalyzing(true);
     setError(null);
     setDiagnosisResult(null);
+    setShowRefineButton(false);
 
     if (useLocalEngine) {
       // ========== 路径A：本地规则引擎 ==========
