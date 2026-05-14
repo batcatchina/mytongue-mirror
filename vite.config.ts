@@ -6,11 +6,12 @@ export default defineConfig({
   base: process.env.GITHUB_PAGES ? '/mytongue-mirror/' : '/',
   plugins: [
     react(),
-    // 修复微信WebView兼容性：去掉type="module"
+    // 修复微信WebView兼容性：保留module但去掉crossorigin
     {
       name: 'fix-wechat-compat',
       transformIndexHtml(html) {
-        return html.replace(/type="module"\s+crossorigin/g, 'defer');
+        // crossorigin导致微信拦截跨域JS，去掉它
+        return html.replace(/type="module"\s+crossorigin/g, 'type="module"');
       },
     },
   ],
