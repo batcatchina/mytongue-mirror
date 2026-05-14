@@ -628,78 +628,47 @@ const DiagnosisPage: React.FC = () => {
           diagnosisTime: new Date().toLocaleTimeString('zh-CN'),
         };
         
-        // 使用本地规则引擎生成针灸方案
-        const engineInput: DiagnosisInput = {
-          tongueColor: inputFeatures.tongueColor.value,
-          tongueShape: inputFeatures.tongueShape.value || '正常',
-          tongueState: inputFeatures.tongueState.value || '正常',
-          coatingColor: inputFeatures.coating.color,
-          coatingTexture: inputFeatures.coating.texture || '薄',
-          coatingMoisture: inputFeatures.coating.moisture || '润',
-          teethMark: inputFeatures.teethMark?.value === '是' ||
-                     inputFeatures.shapeDistribution?.depression?.includes('齿痕') || false,
-          crack: inputFeatures.crack?.value === '是' ||
-                 inputFeatures.shapeDistribution?.depression?.includes('裂纹') || false,
-        };
+        // 问诊后整合结果：保留原辨证的针灸方案和养生建议，用问诊结果更新证型和病机
+        const prevAcupuncturePlan = diagnosisResult?.acupuncturePlan || { treatmentPrinciple: '', mainPoints: [], secondaryPoints: [], contraindications: [], treatmentAdvice: {} };
+        const prevLifeCareAdvice = diagnosisResult?.lifeCareAdvice || { diet: [], lifestyle: [], mood: [] };
         
-        try {
-          const localResult = localDiagnose(engineInput, true);
-          const secondaryPointNames: string[] = (localResult.acupointSelection.secondaryPoints || []).map((n: string) => cleanAcupointName(n));
-          
-          const acupuncturePlan = {
-            treatmentPrinciple: localResult.primaryResult.treatment || '',
-            mainPoints: (aiResult.mainPoints || []).map((name: string) => ({
-              point: cleanAcupointName(name),
-              meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
-              effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
-              location: acupointKnowledge[cleanAcupointName(name)]?.location || '标准定位待确认',
-              technique: localResult.acupointSelection.method?.technique || '平补平泻',
-            })),
-            secondaryPoints: secondaryPointNames.map((name: string) => ({
+        // 如果AI返回了额外穴位，补充到原方案配穴中（去重）
+        const aiExtraPoints = (aiResult.mainPoints || []).map((name: string) => cleanAcupointName(name)).filter(Boolean);
+        const existingPointNames = [
+          ...prevAcupuncturePlan.mainPoints.map((p: any) => p.point),
+          ...prevAcupuncturePlan.secondaryPoints.map((p: any) => p.point),
+        ];
+        const newSecondaryPoints = [...prevAcupuncturePlan.secondaryPoints];
+        for (const name of aiExtraPoints) {
+          if (!existingPointNames.includes(name)) {
+            newSecondaryPoints.push({
               point: name,
               meridian: acupointKnowledge[name]?.meridian || '待确认',
               effect: acupointKnowledge[name]?.effect || '调理气血',
               location: acupointKnowledge[name]?.location || '标准定位待确认',
-              technique: '补法',
-            })),
-            contraindications: [],
-            treatmentAdvice: {
-              techniquePrinciple: localResult.acupointSelection.method?.technique || '',
-              needleRetentionTime: `${localResult.acupointSelection.method?.needleRetention || 20}分钟`,
-              treatmentFrequency: localResult.acupointSelection.method?.frequency || '每日1次',
-              treatmentSessions: localResult.acupointSelection.method?.course || '5次为一疗程',
-              sessionInterval: '1-2天',
-              moxibustionSuggestion: localResult.acupointSelection.method?.moxibustion || '',
-            },
-          };
-          
-          const lifeCareAdvice = generateLifeCareAdvice(localResult);
-          
-          setDiagnosisResult({
-            diagnosisResult: diagnosisResultObj,
-            acupuncturePlan,
-            lifeCareAdvice,
-          });
-        } catch (e) {
-          // 如果规则引擎失败，使用简化版本
-          setDiagnosisResult({
-            diagnosisResult: diagnosisResultObj,
-            acupuncturePlan: {
-              treatmentPrinciple: aiResult.treatment || '',
-              mainPoints: (aiResult.mainPoints || []).map((name: string) => ({
-                point: cleanAcupointName(name),
-                meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
-                effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
-                location: acupointKnowledge[cleanAcupointName(name)]?.location || '标准定位待确认',
-                technique: '平补平泻',
-              })),
-              secondaryPoints: [],
-              contraindications: [],
-              treatmentAdvice: {},
-            },
-            lifeCareAdvice: { diet: [], lifestyle: [], mood: [] },
-          });
+              technique: '平补平泻',
+            });
+          }
         }
+        
+        // 合并病机：原病机 + 问诊补充
+        const prevPathogenesis = diagnosisResult?.diagnosisResult?.pathogenesis || '';
+        const aiPathogenesis = aiResult.pathogenesis || '';
+        const mergedPathogenesis = [prevPathogenesis, aiPathogenesis ? `【问诊补充】${aiPathogenesis}` : ''].filter(Boolean).join('\n');
+        
+        setDiagnosisResult({
+          diagnosisResult: {
+            ...diagnosisResultObj,
+            pathogenesis: mergedPathogenesis || diagnosisResultObj.pathogenesis,
+            originalPrimarySyndrome: diagnosisResult?.diagnosisResult?.primarySyndrome || '',
+          },
+          acupuncturePlan: {
+            ...prevAcupuncturePlan,
+            secondaryPoints: newSecondaryPoints,
+            treatmentPrinciple: prevAcupuncturePlan.treatmentPrinciple || aiResult.treatment || '',
+          },
+          lifeCareAdvice: prevLifeCareAdvice,
+        });
         
         setShowInquiry(false);
         setShowRefineButton(true);
