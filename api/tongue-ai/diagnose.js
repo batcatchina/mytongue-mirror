@@ -226,7 +226,9 @@ ${age ? `- 患者年龄：${age}岁` : ''}
 ${symptoms && symptoms.length > 0 ? `- 伴随症状：${symptoms.map(s => s.name).join('、')}` : ''}
 ${patientInfo?.gender ? `- 性别：${patientInfo.gender}` : ''}
 
-请返回JSON格式的辨证报告。`;
+请返回JSON格式的辨证报告。
+
+特别规则：如果舌象特征完全正常（淡红舌、薄白苔、正常舌形、无齿痕无裂纹），主证为"平和体质"，confidence必须≥0.85，因为正常舌象无需问诊验证。`;
 
   const assistantMessage = await callDeepSeek([
     { role: 'system', content: systemPrompt },
