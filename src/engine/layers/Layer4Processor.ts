@@ -5,6 +5,7 @@
  * 子盗母气 / 相克传变 / 经脉辨证 / 配穴组合
  * 
  * v2.1 修复：锚定脏腑定位、根因归因不指向"心"
+ * v2.2 修复：添加ACUPOINT_RULES定义、穴位名校验、新增5个证型配穴规则
  */
 
 import type { LayerInput, LayerOutput, InferenceNode, OrganPattern, Prescription } from '@/types/inference';
@@ -12,6 +13,7 @@ import type { TongueAnalysisResult } from '@/types/tongue';
 import { BaseLayerProcessor } from '../core/LayerProcessor';
 import { createPrescriptionNode, createPatternNode } from '../core/InferenceNode';
 import { TransmissionEngine } from '../core/TransmissionEngine';
+import { ACUPOINT_MERIDIAN_MAP } from '@/services/acupoint_data';
 
 /**
  * 证型推理规则配置（优先级从高到低）
@@ -86,6 +88,69 @@ const SYNDROME_RULES: Array<{
     method: '健脾化湿',
     confidence: 0.82,
   },
+  // 阳虚证
+  {
+    pattern: /阳虚/i,
+    organCheck: (patterns) => patterns.some(p => 
+      p.organ === '肾' || p.organ === '脾' || p.organ === '心'
+    ),
+    tongueCheck: (analysis) => analysis.bodyColor === '淡白' || analysis.hasTeethMark,
+    label: '阳虚证',
+    description: '阳气不足，温煦失职',
+    rootCause: '肾阳亏虚，命门火衰',
+    method: '温阳散寒，补肾助阳',
+    confidence: 0.83,
+  },
+  // 阴虚证
+  {
+    pattern: /阴虚/i,
+    organCheck: (patterns) => patterns.some(p => 
+      p.organ === '肾' || p.organ === '心' || p.organ === '肺'
+    ),
+    tongueCheck: (analysis) => analysis.bodyColor === '红' || analysis.hasCrack,
+    label: '阴虚证',
+    description: '阴液亏虚，虚热内生',
+    rootCause: '肾阴不足，虚火上炎',
+    method: '滋阴降火，填精益髓',
+    confidence: 0.84,
+  },
+  // 湿热证
+  {
+    pattern: /湿热/i,
+    organCheck: (patterns) => patterns.some(p => 
+      p.organ === '脾' || p.organ === '胃' || p.organ === '肝'
+    ),
+    tongueCheck: (analysis) => analysis.coatingColor === '黄' || analysis.coatingTexture === '厚',
+    label: '湿热证',
+    description: '湿热内蕴，熏蒸于舌',
+    rootCause: '湿热蕴结，脾胃升降失常',
+    method: '清热利湿，健脾和胃',
+    confidence: 0.85,
+  },
+  // 脾胃虚弱证
+  {
+    pattern: /脾胃.*虚|胃脾.*虚/i,
+    organCheck: (patterns) => patterns.some(p => 
+      p.organ === '脾' || p.organ === '胃'
+    ),
+    tongueCheck: (analysis) => analysis.hasTeethMark || analysis.bodyColor === '淡白',
+    label: '脾胃虚弱证',
+    description: '脾胃纳运失职，气血生化不足',
+    rootCause: '脾胃虚弱，运化失常',
+    method: '健脾和胃，补益气血',
+    confidence: 0.86,
+  },
+  // 肾虚证
+  {
+    pattern: /肾虚/i,
+    organCheck: (patterns) => patterns.some(p => p.organ === '肾'),
+    tongueCheck: (analysis) => analysis.bodyColor === '淡白' || analysis.hasTeethMark,
+    label: '肾虚证',
+    description: '肾精不足，肾气亏虚',
+    rootCause: '肾精亏虚，腰府失养',
+    method: '补肾填精，固本培元',
+    confidence: 0.85,
+  },
 ];
 
 /**
@@ -104,6 +169,139 @@ const ROOT_CAUSE_MAPPING: Record<string, string> = {
   '大肠': '大肠传导功能失常',
   '膀胱': '膀胱气化功能失常',
 };
+
+/**
+ * 脏腑基础配穴规则（降级使用）
+ * 当证型特异性配穴规则不匹配时使用
+ */
+const ACUPOINT_RULES: Record<string, {
+  mainPoints: string[];
+  secondaryPoints: string[];
+  technique: '补法' | '泻法' | '平补平泻';
+  basis: string[];
+}> = {
+  '气虚': {
+    mainPoints: ['足三里', '气海', '中脘'],
+    secondaryPoints: ['脾俞', '胃俞', '关元'],
+    technique: '补法',
+    basis: ['足三里为强壮要穴', '气海补气', '中脘和胃'],
+  },
+  '脾虚': {
+    mainPoints: ['足三里', '脾俞', '中脘'],
+    secondaryPoints: ['阴陵泉', '三阴交', '胃俞'],
+    technique: '补法',
+    basis: ['足三里益气健脾', '脾俞健脾', '中脘和胃'],
+  },
+  '肾虚': {
+    mainPoints: ['太溪', '肾俞', '关元'],
+    secondaryPoints: ['命门', '三阴交', '足三里'],
+    technique: '补法',
+    basis: ['太溪滋肾阴', '肾俞补肾气', '关元培元固本'],
+  },
+  '肝郁': {
+    mainPoints: ['太冲', '肝俞', '期门'],
+    secondaryPoints: ['膻中', '内关', '三阴交'],
+    technique: '平补平泻',
+    basis: ['太冲疏肝理气', '肝俞调肝', '期门疏肝解郁'],
+  },
+  '肝火': {
+    mainPoints: ['太冲', '行间', '肝俞'],
+    secondaryPoints: ['期门', '合谷', '曲池'],
+    technique: '泻法',
+    basis: ['行间清肝火', '太冲疏肝', '曲池清热'],
+  },
+  '阴虚': {
+    mainPoints: ['太溪', '三阴交', '照海'],
+    secondaryPoints: ['肾俞', '心俞', '内关'],
+    technique: '补法',
+    basis: ['太溪为肾经原穴', '照海滋阴', '三阴交健脾滋阴'],
+  },
+  '阳虚': {
+    mainPoints: ['关元', '气海', '命门'],
+    secondaryPoints: ['肾俞', '太溪', '足三里'],
+    technique: '补法',
+    basis: ['关元温阳', '气海补气', '命门壮阳'],
+  },
+  '湿盛': {
+    mainPoints: ['阴陵泉', '丰隆', '水分'],
+    secondaryPoints: ['脾俞', '三阴交', '中脘'],
+    technique: '平补平泻',
+    basis: ['阴陵泉利湿', '丰隆化痰湿', '水分分利水湿'],
+  },
+  '湿热': {
+    mainPoints: ['阴陵泉', '曲池', '内庭'],
+    secondaryPoints: ['合谷', '足三里', '三阴交'],
+    technique: '泻法',
+    basis: ['曲池清热', '内庭清胃热', '阴陵泉利湿'],
+  },
+  '血瘀': {
+    mainPoints: ['血海', '膈俞', '三阴交'],
+    secondaryPoints: ['太冲', '肝俞', '合谷'],
+    technique: '泻法',
+    basis: ['血海活血化瘀', '膈俞为血会', '三阴交活血'],
+  },
+  '心肾不交': {
+    mainPoints: ['神门', '太溪', '照海'],
+    secondaryPoints: ['心俞', '肾俞', '内关'],
+    technique: '平补平泻',
+    basis: ['神门安神', '太溪补肾', '照海滋阴交通心肾'],
+  },
+};
+
+/**
+ * 非穴位名模式（用于过滤）
+ * 这些通常是治疗目的或功效描述，不是真实穴位名
+ */
+const NON_ACUPOINT_PATTERNS = [
+  /^调和/,
+  /^解表/,
+  /^化湿/,
+  /^清热/,
+  /^补益/,
+  /^疏肝/,
+  /^健脾/,
+  /^和胃/,
+  /^活血/,
+  /^滋阴/,
+  /^温阳/,
+  /^利湿/,
+  /^泻火/,
+  /^化痰/,
+  /XX$/, // 以XX结尾
+];
+
+/**
+ * 检查是否为有效穴位名
+ */
+function isValidAcupoint(pointName: string): boolean {
+  // 首先检查是否在经脉映射表中
+  if (ACUPOINT_MERIDIAN_MAP[pointName]) {
+    return true;
+  }
+  
+  // 检查是否匹配非穴位名模式
+  for (const pattern of NON_ACUPOINT_PATTERNS) {
+    if (pattern.test(pointName)) {
+      return false;
+    }
+  }
+  
+  // 默认返回false，除非明确在映射表中
+  return false;
+}
+
+/**
+ * 过滤穴位列表，移除非穴位名
+ */
+function filterValidAcupoints(points: string[]): string[] {
+  return points.filter(point => {
+    if (!isValidAcupoint(point)) {
+      console.warn(`[Layer4] 过滤非穴位名: ${point}`);
+      return false;
+    }
+    return true;
+  });
+}
 
 /**
  * 证型特异性配穴规则
@@ -144,6 +342,37 @@ const SYNDROME_PRESCRIPTION_RULES: Record<string, {
     secondaryPoints: ['脾俞', '三阴交', '胃俞'],
     technique: '补法',
     basis: ['足三里益气健脾', '阴陵泉利湿', '中脘和胃化湿'],
+  },
+  // ========== 新增证型配穴规则 v2.2 ==========
+  '阳虚证': {
+    mainPoints: ['关元', '气海', '命门'],
+    secondaryPoints: ['肾俞', '太溪', '足三里'],
+    technique: '补法',
+    basis: ['关元温补肾阳', '气海益气助阳', '命门温肾壮阳'],
+  },
+  '阴虚证': {
+    mainPoints: ['太溪', '照海', '三阴交'],
+    secondaryPoints: ['肾俞', '复溜', '阴郄'],
+    technique: '补法',
+    basis: ['太溪滋肾阴', '照海滋阴清热', '三阴交健脾养阴'],
+  },
+  '湿热证': {
+    mainPoints: ['阴陵泉', '足三里', '中脘'],
+    secondaryPoints: ['丰隆', '内庭', '曲池'],
+    technique: '泻法',
+    basis: ['阴陵泉健脾利湿', '足三里和胃化湿', '中脘和胃化湿'],
+  },
+  '脾胃虚弱证': {
+    mainPoints: ['足三里', '中脘', '脾俞'],
+    secondaryPoints: ['胃俞', '三阴交', '关元'],
+    technique: '补法',
+    basis: ['足三里益气健脾', '中脘和胃健脾', '脾俞健脾益气'],
+  },
+  '肾虚证': {
+    mainPoints: ['太溪', '肾俞', '关元'],
+    secondaryPoints: ['命门', '三阴交', '足三里'],
+    technique: '补法',
+    basis: ['太溪滋肾填精', '肾俞补肾益气', '关元培元固本'],
   },
 };
 
@@ -508,6 +737,7 @@ export class Layer4Processor extends BaseLayerProcessor {
   
   /**
    * 生成配穴方案（优先使用证型特异性配穴）
+   * v2.2 修复：添加穴位名校验，过滤非穴位名
    */
   private generatePrescription(patterns: OrganPattern[], analysis: TongueAnalysisResult): Prescription | undefined {
     if (patterns.length === 0) return undefined;
@@ -515,10 +745,15 @@ export class Layer4Processor extends BaseLayerProcessor {
     // 找到当前证型对应的配穴规则
     if (this.currentSyndrome && SYNDROME_PRESCRIPTION_RULES[this.currentSyndrome.label]) {
       const syndromeRule = SYNDROME_PRESCRIPTION_RULES[this.currentSyndrome.label];
+      
+      // 过滤非穴位名
+      const mainPoints = filterValidAcupoints(syndromeRule.mainPoints);
+      const secondaryPoints = filterValidAcupoints(syndromeRule.secondaryPoints);
+      
       return {
         id: `prescription-${Date.now()}`,
-        mainPoints: syndromeRule.mainPoints,
-        secondaryPoints: syndromeRule.secondaryPoints,
+        mainPoints,
+        secondaryPoints,
         technique: syndromeRule.technique,
         needleRetention: 30,
         moxibustion: syndromeRule.technique === '补法' ? '建议艾灸' : '慎用艾灸',
@@ -564,10 +799,14 @@ export class Layer4Processor extends BaseLayerProcessor {
       technique = '泻法';
     }
     
+    // 过滤非穴位名
+    const mainPoints = filterValidAcupoints(matchedRule.mainPoints);
+    const secondaryPoints = filterValidAcupoints(matchedRule.secondaryPoints);
+    
     return {
       id: `prescription-${Date.now()}`,
-      mainPoints: matchedRule.mainPoints,
-      secondaryPoints: matchedRule.secondaryPoints,
+      mainPoints,
+      secondaryPoints,
       technique,
       needleRetention: 30,
       moxibustion: primaryPattern.nature === '虚证' ? '建议艾灸' : '慎用艾灸',
