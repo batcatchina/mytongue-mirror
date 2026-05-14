@@ -5,6 +5,13 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react(),
+    // 修复微信WebView兼容性：去掉type="module"
+    {
+      name: 'fix-wechat-compat',
+      transformIndexHtml(html) {
+        return html.replace(/type="module"\s+crossorigin/g, 'defer');
+      },
+    },
   ],
   build: {
     // 兼容微信内置浏览器（基于Chrome 62+）
