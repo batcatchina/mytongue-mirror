@@ -72,6 +72,7 @@ const DiagnosisPage: React.FC = () => {
   const [isRefiningDiagnosis, setIsRefiningDiagnosis] = useState(false);
   const [showRefineButton, setShowRefineButton] = useState(false);
   const [useLocalEngine, setUseLocalEngine] = useState(false);
+  const [showEngineSwitch, setShowEngineSwitch] = useState(false);
   const [isAIRecognized, setIsAIRecognized] = useState(false);
   
   /**
@@ -281,8 +282,7 @@ const DiagnosisPage: React.FC = () => {
     await diagnoseWithInquiry();
   };
   
-  // AI识别状态 - 用于判断是否已通过AI识别填入数据
-  // (已移至组件顶部与其他useState一起)
+
   
   const {
     inputFeatures,
