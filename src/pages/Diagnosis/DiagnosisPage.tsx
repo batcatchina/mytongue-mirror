@@ -1,3 +1,25 @@
+// ========== 辨证结果缓存 ==========
+const DIAG_CACHE = 'tcm_diag_cache';
+const MAX_CACHE = 50;
+function diagCacheKey(f: any, i: any): string {
+  const s = JSON.stringify({ f, i }); let h = 0;
+  for (let c = 0; c < s.length; c++) { h = ((h << 5) - h) + s.charCodeAt(c); h |= 0; }
+  return String(h);
+}
+function diagCacheGet(k: string): any | null {
+  try { const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}'); return c[k] || null; } catch { return null; }
+}
+function diagCacheSet(k: string, v: any): void {
+  try {
+    const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}');
+    c[k] = { v, t: Date.now() };
+    const ks = Object.keys(c);
+    if (ks.length > MAX_CACHE) { ks.sort((a, b) => c[a].t - c[b].t); ks.slice(0, ks.length - MAX_CACHE).forEach(x => delete c[x]); }
+    localStorage.setItem(DIAG_CACHE, JSON.stringify(c));
+  } catch {}
+}
+// ========== 缓存结束 ==========
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
@@ -738,6 +760,10 @@ const DiagnosisPage: React.FC = () => {
     acupuncturePlan: any;
     lifeCareAdvice: any;
   } => {
+    // 缓存检查
+    const _ck = diagCacheKey(inputFeatures, patientInfo);
+    const _cached = diagCacheGet(_ck);
+    if (_cached) { console.log('[缓存命中]'); return _cached; }
     console.log('[本地规则引擎] 开始辨证...');
     
     // 检查齿痕和裂纹（同时兼容AI回填的teethMark/crack和手动选择的shapeDistribution）
