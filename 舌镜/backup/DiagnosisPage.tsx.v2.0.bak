@@ -27,7 +27,7 @@ import {
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   // 版本标记 - v1.3.0 UI优化版
-  console.log('[舌镜] 版本: v3.0.0 方案A-DeepSeek推理');
+  console.log('[舌镜] 版本: v1.3.0 v2.5高下');
   // 社会证明 - v2.5
   const [userCount] = useState(12847);
 
@@ -53,91 +53,7 @@ const DiagnosisPage: React.FC = () => {
 
 
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
-  const [useLocalEngine, setUseLocalEngine] = useState(false);
-  
-  /**
-   * DeepSeek API辨证推理 v3.0
-   * 调用舌镜AI诊断接口
-   */
-  const diagnoseWithDeepSeek = async () => {
-    console.log('[DeepSeek诊断] 开始AI辨证推理...');
-    
-    // 构建舌象特征对象
-    const shapeDist = inputFeatures.shapeDistribution;
-    const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
-                         shapeDist?.depression?.includes('齿痕') || 
-                         shapeDist?.bulge?.includes('齿痕') || false;
-    const hasCrack = inputFeatures.crack?.value === '是' ||
-                     shapeDist?.depression?.includes('裂纹') || 
-                     shapeDist?.bulge?.includes('裂纹') || false;
-    
-    const tongueFeatures = {
-      tongueColor: inputFeatures.tongueColor.value,
-      tongueShape: inputFeatures.tongueShape.value || '正常',
-      coatingColor: inputFeatures.coating.color,
-      coatingTexture: inputFeatures.coating.texture || '薄',
-      coatingMoisture: inputFeatures.coating.moisture || '润',
-      teethMark: hasTeethMark,
-      crack: hasCrack,
-      tongueState: inputFeatures.tongueState.value || '正常',
-    };
-    
-    const response = await fetch('/api/tongue-ai/diagnose', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tongueFeatures,
-        age: patientInfo.age,
-        symptoms,
-        patientInfo,
-      }),
-    });
-    
-    const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'DeepSeek诊断失败');
-    }
-    
-    // 转换DeepSeek返回格式为前端期望的格式
-    const aiResult = result.data;
-    
-    const diagnosisResult = {
-      primarySyndrome: aiResult.mainSyndrome,
-      syndromeName: aiResult.mainSyndrome,
-      pathogenesis: aiResult.pathogenesis,
-      organLocation: aiResult.organLocation?.primary 
-        ? [aiResult.organLocation.primary, ...(aiResult.organLocation.secondary || [])]
-        : [],
-      secondarySyndromes: aiResult.secondarySyndromes || [],
-      confidence: aiResult.confidence || 0.8,
-      transmissionType: aiResult.transmissionAnalysis?.type,
-      transmissionDescription: aiResult.transmissionAnalysis?.description,
-      diagnosisEvidence: [],
-      diagnosisTime: new Date().toLocaleTimeString('zh-CN'),
-      // 兼容旧格式
-      mainSyndrome: aiResult.mainSyndrome,
-      mainSyndromeDesc: aiResult.mainSyndromeDesc,
-      confidenceScore: aiResult.confidence,
-    };
-    
-    const acupuncturePlan = {
-      mainPoints: aiResult.acupuncturePlan?.mainPoints || [],
-      secondaryPoints: aiResult.acupuncturePlan?.secondaryPoints || [],
-      technique: aiResult.acupuncturePlan?.technique || '平补平泻',
-      description: aiResult.acupuncturePlan?.pointsDescription || '',
-      pointsDescription: aiResult.acupuncturePlan?.pointsDescription || '',
-    };
-    
-    const lifeCareAdvice = {
-      diet: aiResult.lifeCareAdvice?.diet || [],
-      lifestyle: aiResult.lifeCareAdvice?.lifestyle || [],
-      precautions: aiResult.lifeCareAdvice?.precautions || [],
-    };
-    
-    return { diagnosisResult, acupuncturePlan, lifeCareAdvice };
-  };
- // v3.0默认使用DeepSeek API推理引擎
+  const [useLocalEngine, setUseLocalEngine] = useState(true); // 默认使用本地规则引擎
   const [showEngineSwitch, setShowEngineSwitch] = useState(false); // 引擎切换默认折叠
   
   // AI识别状态 - 用于判断是否已通过AI识别填入数据
@@ -799,7 +715,7 @@ const DiagnosisPage: React.FC = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  {useLocalEngine ? '本地规则引擎分析中...' : 'DeepSeek AI推理中...'}
+                  {useLocalEngine ? '规则引擎分析中...' : 'AI分析中...'}
                 </div>
               </div>
             )}
