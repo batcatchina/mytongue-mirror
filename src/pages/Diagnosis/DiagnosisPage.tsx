@@ -687,18 +687,13 @@ const DiagnosisPage: React.FC = () => {
             lifeCareAdvice,
           });
         } catch (e) {
-          // 如果规则引擎失败，使用简化版本
+          // 如果规则引擎失败，使用简化版本（不引用try块内的变量）
+          console.error('[问诊] 规则引擎失败:', e);
           setDiagnosisResult({
             diagnosisResult: diagnosisResultObj,
             acupuncturePlan: {
               treatmentPrinciple: aiResult.treatment || '',
-              mainPoints: mainPointNames.map((name: string) => ({
-                point: cleanAcupointName(name),
-                meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
-                effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
-                location: acupointKnowledge[cleanAcupointName(name)]?.location || '标准定位待确认',
-                technique: '平补平泻',
-              })),
+              mainPoints: [],
               secondaryPoints: [],
               contraindications: [],
               treatmentAdvice: {},
