@@ -1,5 +1,5 @@
 // ========== 辨证结果缓存 ==========
-const DIAG_CACHE = 'tcm_diag_cache_v2';
+const DIAG_CACHE = 'tcm_diag_cache_v3';
 const MAX_CACHE = 50;
 function diagCacheKey(f: any, _i: any): string {
   // 只用核心舌象字段生成key，忽略年龄/性别/主诉等非核心字段
