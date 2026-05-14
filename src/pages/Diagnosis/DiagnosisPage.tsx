@@ -601,21 +601,99 @@ const DiagnosisPage: React.FC = () => {
       const result = await response.json();
       if (result.success && result.data) {
         const aiResult = result.data;
-        setDiagnosisResult({
-          primarySyndrome: aiResult.mainSyndrome,
-          syndromeName: aiResult.mainSyndrome,
-          pathogenesis: aiResult.pathogenesis,
+        // 构建符合显示组件期望的完整结果对象
+        const diagnosisResultObj = {
+          primarySyndrome: aiResult.mainSyndrome || '待明确',
+          syndromeScore: (aiResult.confidence || 0.8) * 100,
+          confidence: aiResult.confidence || 0.8,
+          secondarySyndromes: (aiResult.secondarySyndromes || []).map((s: any) => ({
+            syndrome: typeof s === 'string' ? s : s.syndrome || '',
+            score: s.score || 50,
+            confidence: (s.score || 50) / 100,
+            matchedFeatures: [],
+          })),
+          pathogenesis: aiResult.pathogenesis || '',
           organLocation: aiResult.organLocation?.primary
             ? [aiResult.organLocation.primary, ...(aiResult.organLocation.secondary || [])]
             : [],
-          secondarySyndromes: aiResult.secondarySyndromes || [],
-          confidence: aiResult.confidence || 0.8,
-          transmissionType: aiResult.transmissionAnalysis?.type,
-          transmissionDescription: aiResult.transmissionAnalysis?.description,
-          mainSyndrome: aiResult.mainSyndrome,
-          mainSyndromeDesc: aiResult.mainSyndromeDesc,
-          confidenceScore: aiResult.confidence,
-        });
+          diagnosisEvidence: [],
+          priority: aiResult.priority || '中',
+          diagnosisTime: new Date().toLocaleTimeString('zh-CN'),
+        };
+        
+        // 使用本地规则引擎生成针灸方案
+        const engineInput: DiagnosisInput = {
+          tongueColor: inputFeatures.tongueColor.value,
+          tongueShape: inputFeatures.tongueShape.value || '正常',
+          tongueState: inputFeatures.tongueState.value || '正常',
+          coatingColor: inputFeatures.coating.color,
+          coatingTexture: inputFeatures.coating.texture || '薄',
+          coatingMoisture: inputFeatures.coating.moisture || '润',
+          teethMark: inputFeatures.teethMark?.value === '是' ||
+                     inputFeatures.shapeDistribution?.depression?.includes('齿痕') || false,
+          crack: inputFeatures.crack?.value === '是' ||
+                 inputFeatures.shapeDistribution?.depression?.includes('裂纹') || false,
+        };
+        
+        try {
+          const localResult = localDiagnose(engineInput, true);
+          const secondaryPointNames: string[] = (localResult.acupointSelection.secondaryPoints || []).map((n: string) => cleanAcupointName(n));
+          
+          const acupuncturePlan = {
+            treatmentPrinciple: localResult.primaryResult.treatment || '',
+            mainPoints: (aiResult.mainPoints || []).map((name: string) => ({
+              point: cleanAcupointName(name),
+              meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
+              effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
+              location: acupointKnowledge[cleanAcupointName(name)]?.location || '标准定位待确认',
+              technique: localResult.acupointSelection.method?.technique || '平补平泻',
+            })),
+            secondaryPoints: secondaryPointNames.map((name: string) => ({
+              point: name,
+              meridian: acupointKnowledge[name]?.meridian || '待确认',
+              effect: acupointKnowledge[name]?.effect || '调理气血',
+              location: acupointKnowledge[name]?.location || '标准定位待确认',
+              technique: '补法',
+            })),
+            contraindications: [],
+            treatmentAdvice: {
+              techniquePrinciple: localResult.acupointSelection.method?.technique || '',
+              needleRetentionTime: `${localResult.acupointSelection.method?.needleRetention || 20}分钟`,
+              treatmentFrequency: localResult.acupointSelection.method?.frequency || '每日1次',
+              treatmentSessions: localResult.acupointSelection.method?.course || '5次为一疗程',
+              sessionInterval: '1-2天',
+              moxibustionSuggestion: localResult.acupointSelection.method?.moxibustion || '',
+            },
+          };
+          
+          const lifeCareAdvice = generateLifeCareAdvice(localResult);
+          
+          setDiagnosisResult({
+            diagnosisResult: diagnosisResultObj,
+            acupuncturePlan,
+            lifeCareAdvice,
+          });
+        } catch (e) {
+          // 如果规则引擎失败，使用简化版本
+          setDiagnosisResult({
+            diagnosisResult: diagnosisResultObj,
+            acupuncturePlan: {
+              treatmentPrinciple: aiResult.treatment || '',
+              mainPoints: (aiResult.mainPoints || []).map((name: string) => ({
+                point: cleanAcupointName(name),
+                meridian: acupointKnowledge[cleanAcupointName(name)]?.meridian || '待确认',
+                effect: acupointKnowledge[cleanAcupointName(name)]?.effect || '调理气血',
+                location: acupointKnowledge[cleanAcupointName(name)]?.location || '标准定位待确认',
+                technique: '平补平泻',
+              })),
+              secondaryPoints: [],
+              contraindications: [],
+              treatmentAdvice: {},
+            },
+            lifeCareAdvice: { diet: [], lifestyle: [], mood: [] },
+          });
+        }
+        
         setShowInquiry(false);
         setShowRefineButton(true);
         setCurrentStep('result');
@@ -1158,12 +1236,18 @@ const DiagnosisPage: React.FC = () => {
                     {inputFeatures.tongueState.value}
                   </span>
                 )}
-                {inputFeatures.teethMark?.value === '是' && (
+                {(inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) && (
                   <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">齿痕</span>
                 )}
-                {inputFeatures.crack?.value === '是' && (
+                {(inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) && (
                   <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">裂纹</span>
                 )}
+                {inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')).map((item: string, idx: number) => (
+                  <span key={`dep-${idx}`} className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">{item}</span>
+                ))}
+                {inputFeatures.shapeDistribution?.bulge?.map((item: string, idx: number) => (
+                  <span key={`bul-${idx}`} className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">{item}</span>
+                ))}
               </div>
 
               {/* 识别详情编辑 - 默认隐藏，点"修改"才出现 */}
@@ -1196,12 +1280,18 @@ const DiagnosisPage: React.FC = () => {
                     {inputFeatures.coating.moisture}
                   </span>
                 )}
-                {inputFeatures.teethMark?.value === '是' && (
+                {(inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) && (
                   <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">齿痕</span>
                 )}
-                {inputFeatures.crack?.value === '是' && (
+                {(inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) && (
                   <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">裂纹</span>
                 )}
+                {inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')).map((item: string, idx: number) => (
+                  <span key={`dep2-${idx}`} className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">{item}</span>
+                ))}
+                {inputFeatures.shapeDistribution?.bulge?.map((item: string, idx: number) => (
+                  <span key={`bul2-${idx}`} className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">{item}</span>
+                ))}
               </div>
 
               {/* 各特征折叠编辑 */}
@@ -1413,6 +1503,7 @@ const DiagnosisPage: React.FC = () => {
                   className="w-full py-2 rounded-xl text-xs font-medium bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors"
                 >
                   保存此病例
+                </button>
                 
                 {/* 付费解锁入口 - 社会证明 */}
                 <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
@@ -1426,6 +1517,7 @@ const DiagnosisPage: React.FC = () => {
                   >
                     获取深度辨证方案 ¥9.9
                   </button>
+                </div>
                 
                 {/* ========== v3.2 "想更准"按钮 ========== */}
                 {diagnosisResult && !showRefineButton && (
@@ -1455,9 +1547,6 @@ const DiagnosisPage: React.FC = () => {
                     )}
                   </button>
                 )}
-
-                </div>
-                </button>
               </div>
             ) : (
               <div className="tcm-card p-8 flex flex-col items-center justify-center text-center">
