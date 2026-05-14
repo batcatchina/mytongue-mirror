@@ -548,7 +548,7 @@ const DiagnosisPage: React.FC = () => {
         if (aiResult) {
           // 构建符合显示组件期望的嵌套结构
           const diagResult = {
-            primarySyndrome: aiResult.mainSyndrome || '待明确',
+            primarySyndrome: aiResult.mainSyndrome || diagnosisResult?.diagnosisResult?.primarySyndrome || '待明确',
             syndromeScore: (aiResult.confidence || 0.8) * 100,
             confidence: aiResult.confidence || 0.8,
             secondarySyndromes: [],
@@ -660,7 +660,7 @@ const DiagnosisPage: React.FC = () => {
         const aiResult = result.data;
         // 构建符合显示组件期望的完整结果对象
         const diagnosisResultObj = {
-          primarySyndrome: aiResult.mainSyndrome || '待明确',
+          primarySyndrome: aiResult.mainSyndrome || diagnosisResult?.diagnosisResult?.primarySyndrome || '待明确',
           syndromeScore: (aiResult.confidence || 0.8) * 100,
           confidence: aiResult.confidence || 0.8,
           secondarySyndromes: (aiResult.secondarySyndromes || []).map((s: any) => ({
