@@ -1,16 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import legacy from '@vitejs/plugin-legacy'
 import path from 'path'
 
 export default defineConfig({
   plugins: [
     react(),
-    legacy({
-      targets: ['defaults', 'not IE 11', 'iOS >= 12', 'Android >= 5'],
-      additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
-    }),
   ],
+  build: {
+    // 兼容微信内置浏览器（基于Chrome 62+）
+    target: ['es2015', 'safari11'],
+    // 不用ES Module格式，用IIFE兼容旧WebView
+    rollupOptions: {
+      output: {
+        format: 'es',
+        manualChunks: undefined,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
