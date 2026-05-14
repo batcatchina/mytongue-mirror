@@ -386,6 +386,7 @@ ${age ? `- 患者年龄：${age}岁` : ''}
       data: { 
         success: true, 
         needsConfirmation: false, 
+        hasDetailedPlan: true,
         confidence,
         preliminaryResult: preliminary,
         questions: [],
@@ -436,6 +437,7 @@ ${age ? `- 患者年龄：${age}岁` : ''}
     data: { 
       success: true, 
       needsConfirmation: true, 
+      hasDetailedPlan: true,
       confidence,
       questions: finalQuestions,
       preliminaryResult: preliminary,
