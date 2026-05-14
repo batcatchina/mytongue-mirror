@@ -1,8 +1,19 @@
 // ========== 辨证结果缓存 ==========
 const DIAG_CACHE = 'tcm_diag_cache';
 const MAX_CACHE = 50;
-function diagCacheKey(f: any, i: any): string {
-  const s = JSON.stringify({ f, i }); let h = 0;
+function diagCacheKey(f: any, _i: any): string {
+  // 只用核心舌象字段生成key，忽略年龄/性别/主诉等非核心字段
+  const core = {
+    tongueColor: f.tongueColor?.value,
+    tongueShape: f.tongueShape?.value,
+    tongueState: f.tongueState?.value,
+    coatingColor: f.coating?.color,
+    coatingTexture: f.coating?.texture,
+    coatingMoisture: f.coating?.moisture,
+    teethMark: f.teethMark?.value,
+    crack: f.crack?.value,
+  };
+  const s = JSON.stringify(core); let h = 0;
   for (let c = 0; c < s.length; c++) { h = ((h << 5) - h) + s.charCodeAt(c); h |= 0; }
   return String(h);
 }
