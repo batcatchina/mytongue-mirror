@@ -854,7 +854,9 @@ const DiagnosisPage: React.FC = () => {
     // 构建生活调护建议（严格匹配 LifeCareAdvice 类型）
     const lifeCareAdvice = generateLifeCareAdvice(result);
     
-    return { diagnosisResult: diagnosisResultOut, acupuncturePlan, lifeCareAdvice };
+    const _result = { diagnosisResult: diagnosisResultOut, acupuncturePlan, lifeCareAdvice };
+    diagCacheSet(_ck, _result);
+    return _result;
   };
   
   /**
