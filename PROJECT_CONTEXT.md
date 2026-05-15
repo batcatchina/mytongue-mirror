@@ -112,3 +112,22 @@ src/
 - API调用统一走services/api.ts
 - 辨证规则100%忠实于主人临床规则，不含AI自由发挥
 - 所有生成类任务调DeepSeek（70倍成本差距），复杂推理自己来
+
+## 更新日志
+
+### 2026-05-16 展示区格式统一
+- 新增 `getStructuredTongueDisplay()` 函数，生成结构化展示数据
+- 新增 `TONGUE_CATEGORY_COLORS` 颜色配置（舌色红/苔色绿/苔质蓝/舌形橙/舌态紫/特殊琥珀）
+- 手动选择和AI识别统一为结构化展示格式
+- 添加 `aiConfidence` 到 InputFeatures 接口
+- **已知问题**：region名(tip/sides/middle/root)未映射为中文，正在修复中
+- **已知问题**：针灸方案主穴显示"待确认"，配穴缺失，正在修复中
+- **设计决策**：lifeCareAdvice用dietSuggestions/dailyRoutine/precautions，因为对应后端接口字段，不是diet/lifestyle/mood
+- **DeepSeek评审6.5/10**：核心批评是数据模型未统一（渲染层映射而非状态层统一），正在架构优化中
+
+### 2026-05-16 Bug修复（第一轮）
+- 主穴丢失：问诊整合时fallback到preliminaryResult
+- 凹凸回填：从shape_distribution提取，而非tongue_shape旧格式
+- lifeCareAdvice字段映射修正
+- DiagnosisStep添加'result'
+- **根因**：tongue_shape.depression/bulge是旧API格式，新API用shape_distribution.depression/bulge（数组格式）
