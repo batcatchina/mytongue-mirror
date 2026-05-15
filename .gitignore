@@ -26,3 +26,9 @@ npm-debug.log*
 # Cache
 .cache/
 .vercel
+
+# 知识文件私有层（公开层core版保留）
+舌镜/diagnose_knowledge.md
+舌镜/diagnose_knowledge_full.md
+舌镜/diagnose_upgrade_log.md
+舌镜/backup/
