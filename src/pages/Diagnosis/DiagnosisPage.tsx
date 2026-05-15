@@ -616,6 +616,7 @@ const DiagnosisPage: React.FC = () => {
   // ========== v3.2 问而确之：Inquiry模式调用 ==========
   const diagnoseWithInquiry = async () => {
     console.log('[DeepSeek诊断] 启动问诊模式...');
+    setShowRefineButton(true); // 问诊开始时隐藏按钮，防止重复点击
     const shapeDist = inputFeatures.shapeDistribution;
     const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
                          shapeDist?.depression?.includes('齿痕') || false;
@@ -777,7 +778,7 @@ const DiagnosisPage: React.FC = () => {
         } as any);
         
         setShowInquiry(false);
-        setShowRefineButton(true);
+        setShowRefineButton(false); // 问诊完成后恢复按钮显示
         setCurrentStep('result');
       }
     } catch (err) {
@@ -1675,7 +1676,10 @@ const DiagnosisPage: React.FC = () => {
           conversationId={inquiryConversationId || ''}
           preliminaryResult={preliminaryResult}
           onSubmit={handleInquirySubmit}
-          onCancel={() => setShowInquiry(false)}
+          onCancel={() => {
+            setShowInquiry(false);
+            setShowRefineButton(false); // 取消问诊时恢复按钮显示
+          }}
           isLoading={isRefiningDiagnosis}
         />
       )}

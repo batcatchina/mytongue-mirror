@@ -63,12 +63,12 @@ export const AcupunctureDisplay: React.FC<AcupunctureDisplayProps> = ({ plan }) 
       </div>
 
       {/* 配穴 */}
-      {secondaryPoints.length > 0 && (
-        <div className="tcm-card p-4">
-          <h4 className="tcm-section-title text-base">
-            <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">🔵</span>
-            配穴 ({secondaryPoints.length}个)
-          </h4>
+      <div className="tcm-card p-4">
+        <h4 className="tcm-section-title text-base">
+          <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">🔵</span>
+          配穴 ({secondaryPoints?.length || 0}个)
+        </h4>
+        {secondaryPoints && secondaryPoints.length > 0 ? (
           <div className="space-y-3">
             {secondaryPoints.map((point, index) => (
               <AcupointCard
@@ -83,8 +83,10 @@ export const AcupunctureDisplay: React.FC<AcupunctureDisplayProps> = ({ plan }) 
               />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-stone-500 text-sm">暂无配穴推荐</p>
+        )}
+      </div>
 
       {/* 配伍禁忌 */}
       {contraindications.length > 0 && (
