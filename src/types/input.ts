@@ -83,7 +83,7 @@ export interface Symptom {
 
 // 患者信息类型
 export interface PatientInfo {
-  age: number;
+  age: number | null;
   gender: '男' | '女' | '其他';
   chiefComplaint: string;
   medicalHistory?: string;

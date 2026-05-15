@@ -29,7 +29,7 @@ export const DiagnosisResultDisplay: React.FC<DiagnosisResultDisplayProps> = ({ 
   const matchText = confidence >= 0.8 ? '高度匹配' : confidence >= 0.6 ? '较好匹配' : '初步判断';
 
   return (
-    <div className="space-y-3 animate-in">
+    <div className="space-y-3 animate-in" style={{animationDelay: '0ms'}}>
       {/* ===== 核心结论：用户第一眼看到的 ===== */}
       <div className="tcm-card p-5 bg-gradient-to-br from-primary-50 to-secondary-50 border-2 border-primary-200">
         {/* 证型名称 - 最醒目 */}

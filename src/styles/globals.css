@@ -192,6 +192,42 @@
   .animate-in {
     animation: fadeSlideIn 0.3s ease-out;
   }
+  /* Stagger fade-in 延迟类 */
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+  .animation-delay-400 { animation-delay: 400ms; }
+  .animation-delay-500 { animation-delay: 500ms; }
+  
+  .animate-fade-in {
+    animation: fadeSlideIn 0.4s ease-out both;
+  }
+
+  /* Stagger fade-in 延迟类 */
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  .animate-fade-in {
+    animation: fadeSlideIn 0.4s ease-out both;
+  }
+
 
   @keyframes fadeSlideIn {
     from {

@@ -600,17 +600,17 @@ export const ACUPOINT_INDICATIONS_MAP: Record<string, string> = {
 
 // 获取穴位经脉归属
 export function getMeridian(pointName: string): string {
-  return ACUPOINT_MERIDIAN_MAP[pointName] || '待确认';
+  return ACUPOINT_MERIDIAN_MAP[pointName] || '';
 }
 
 // 获取穴位功效
 export function getEffect(pointName: string): string {
-  return ACUPOINT_EFFECT_MAP[pointName] || '调理气血';
+  return ACUPOINT_EFFECT_MAP[pointName] || '';
 }
 
 // 获取穴位定位
 export function getLocation(pointName: string): string {
-  return ACUPOINT_LOCATION_MAP[pointName] || '标准定位待确认';
+  return ACUPOINT_LOCATION_MAP[pointName] || '';
 }
 
 // 获取穴位主治

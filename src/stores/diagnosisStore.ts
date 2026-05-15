@@ -21,7 +21,7 @@ const initialFeatures: InputFeatures = {
 
 // 初始患者信息
 const initialPatientInfo: PatientInfo = {
-  age: -1,
+  age: null,
   gender: '男' as const,
   chiefComplaint: '',
 };

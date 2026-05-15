@@ -29,7 +29,7 @@ export const AcupunctureDisplay: React.FC<AcupunctureDisplayProps> = ({ plan }) 
   };
 
   return (
-    <div className="space-y-4 animate-in">
+    <div className="space-y-4 animate-in" style={{animationDelay: '100ms'}}>
       {/* 治疗原则 */}
       <div className="tcm-card p-4 bg-gradient-to-r from-secondary-50 to-white border-l-4 border-secondary-400">
         <h4 className="tcm-section-title text-base">

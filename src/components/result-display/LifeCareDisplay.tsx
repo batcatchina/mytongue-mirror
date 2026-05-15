@@ -9,7 +9,7 @@ export const LifeCareDisplay: React.FC<LifeCareDisplayProps> = ({ advice }) => {
   const { dietSuggestions, dailyRoutine, precautions } = advice;
 
   return (
-    <div className="space-y-4 animate-in">
+    <div className="space-y-4 animate-in" style={{animationDelay: '200ms'}}>
       {/* 饮食建议 */}
       <div className="tcm-card p-4">
         <h4 className="tcm-section-title text-base">
