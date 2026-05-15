@@ -1127,6 +1127,7 @@ const DiagnosisPage: React.FC = () => {
               <ImageUpload 
                 onChange={(imageData) => setImageData(imageData)} 
                 onRecognize={handleRecognize}
+                useLocalEngine={useLocalEngine}
               />
               {/* 引擎切换按钮 - 折叠到设置入口 */}
               <div className="mt-3 pt-3 border-t border-primary-100">

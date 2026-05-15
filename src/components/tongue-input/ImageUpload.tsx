@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import clsx from 'clsx';
 import { recognizeTongue, TongueRecognitionResult, ProgressInfo, TongueNotDetectedError } from '@/services/tongueAI';
 
@@ -6,6 +6,7 @@ interface ImageUploadProps {
   value?: string;
   onChange: (imageData: string | null) => void;
   onRecognize?: (result: TongueRecognitionResult) => void;
+  useLocalEngine?: boolean; // 本地引擎模式：不调用Coze API
 }
 
 // 压缩图片：最大宽度800px，质量0.7
@@ -49,7 +50,12 @@ function buildSummary(result: TongueRecognitionResult): string {
   return parts.join(' · ');
 }
 
-export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRecognize }) => {
+export const ImageUpload: React.FC<ImageUploadProps> = ({ 
+  value, 
+  onChange, 
+  onRecognize,
+  useLocalEngine = false 
+}) => {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
   const [isRecognizing, setIsRecognizing] = useState(false);
@@ -57,6 +63,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
   const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
   const [recognizeResult, setRecognizeResult] = useState<TongueRecognitionResult | null>(null);
   const [autoRecognize, setAutoRecognize] = useState(true); // 默认自动识别
+
+  // 本地引擎模式下不自动识别AI
+  const shouldAutoRecognize = useMemo(() => {
+    return autoRecognize && !useLocalEngine;
+  }, [autoRecognize, useLocalEngine]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -79,18 +90,30 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       setPreview(imageData);
       onChange(imageData);
       setRecognizeResult(null);
-      console.log(`[图片上传] 成功，大小: ${Math.round(file.size / 1024)}KB`);
+      setRecognizeStatus('');
+      console.log(`[图片上传] 成功，大小: ${Math.round(file.size / 1024)}KB${useLocalEngine ? '（本地引擎模式，不调用AI识别）' : ''}`);
       
-      // 自动触发AI识别（如果开启）
-      if (autoRecognize) {
+      // 本地引擎模式下不上传识别，只显示引导提示
+      if (useLocalEngine) {
+        setRecognizeStatus('请手动选择舌象特征');
+      }
+      // 自动触发AI识别（如果开启且不是本地引擎模式）
+      else if (shouldAutoRecognize) {
         setTimeout(() => handleRecognize(imageData), 300);
       }
     } catch (error) {
       console.error('图片处理失败:', error);
     }
-  }, [onChange, autoRecognize]);
+  }, [onChange, useLocalEngine, shouldAutoRecognize]);
 
   const handleRecognize = useCallback(async (imageData?: string) => {
+    // 本地引擎模式下禁止调用API
+    if (useLocalEngine) {
+      console.log('[ImageUpload] 本地引擎模式，禁止调用AI识别API');
+      setRecognizeStatus('本地引擎模式，请手动选择舌象特征');
+      return;
+    }
+
     const dataToRecognize = imageData || preview;
     if (!dataToRecognize) {
       alert('请先上传舌象图片');
@@ -123,7 +146,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       setIsRecognizing(false);
       setProgressInfo(null);
     }
-  }, [preview, onRecognize]);
+  }, [preview, onRecognize, useLocalEngine]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -159,17 +182,22 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-stone-700">
           📷 舌象图片
+          {useLocalEngine && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs bg-primary-100 text-primary-700 rounded">本地引擎</span>
+          )}
         </label>
-        {/* 自动识别开关 */}
-        <label className="flex items-center gap-1.5 text-xs text-stone-500 cursor-pointer">
-          <input 
-            type="checkbox" 
-            checked={autoRecognize}
-            onChange={(e) => setAutoRecognize(e.target.checked)}
-            className="rounded border-stone-300 text-primary-500 focus:ring-primary-400"
-          />
-          <span>拍照后自动识别</span>
-        </label>
+        {/* 自动识别开关 - 本地引擎模式下隐藏 */}
+        {!useLocalEngine && (
+          <label className="flex items-center gap-1.5 text-xs text-stone-500 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={autoRecognize}
+              onChange={(e) => setAutoRecognize(e.target.checked)}
+              className="rounded border-stone-300 text-primary-500 focus:ring-primary-400"
+            />
+            <span>拍照后自动识别</span>
+          </label>
+        )}
       </div>
       
       {preview ? (
@@ -199,43 +227,61 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
             </div>
           </div>
 
-          {/* AI识别按钮 - 醒目 */}
-          <button
-            onClick={() => handleRecognize()}
-            disabled={isRecognizing}
-            className={clsx(
-              'w-full py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2',
-              isRecognizing
-                ? 'bg-stone-100 text-stone-400 cursor-wait'
-                : recognizeResult
-                  ? 'bg-green-50 text-green-600 border border-green-200 hover:bg-green-100'
-                  : 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white hover:from-primary-600 hover:to-secondary-600 shadow-md hover:shadow-lg'
-            )}
-          >
-            {isRecognizing ? (
-              <>
-                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                {recognizeStatus || '识别中...'}
-              </>
-            ) : recognizeResult ? (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                重新识别
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-                AI智能识别
-              </>
-            )}
-          </button>
+          {/* 本地引擎模式引导提示 */}
+          {useLocalEngine ? (
+            <div className="px-3 py-3 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-sm text-amber-800">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">💡</span>
+                <span className="font-medium">本地引擎模式</span>
+              </div>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                拍照完成，请点击下方按钮手动选择舌象特征进行辨证分析。
+                {recognizeStatus && recognizeStatus.includes('手动选择') && (
+                  <span className="block mt-1 text-amber-900 font-medium">
+                    → 请向下滑动，手动选择您的舌象特征
+                  </span>
+                )}
+              </p>
+            </div>
+          ) : (
+            /* AI识别按钮 - 非本地引擎模式 */
+            <button
+              onClick={() => handleRecognize()}
+              disabled={isRecognizing}
+              className={clsx(
+                'w-full py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2',
+                isRecognizing
+                  ? 'bg-stone-100 text-stone-400 cursor-wait'
+                  : recognizeResult
+                    ? 'bg-green-50 text-green-600 border border-green-200 hover:bg-green-100'
+                    : 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white hover:from-primary-600 hover:to-secondary-600 shadow-md hover:shadow-lg'
+              )}
+            >
+              {isRecognizing ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {recognizeStatus || '识别中...'}
+                </>
+              ) : recognizeResult ? (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  重新识别
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                  </svg>
+                  AI智能识别
+                </>
+              )}
+            </button>
+          )}
 
           {/* 识别进度条 */}
           {isRecognizing && progressInfo && (
@@ -272,7 +318,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
           )}
 
           {/* 识别状态（失败时显示） */}
-          {recognizeStatus && !isRecognizing && !recognizeStatus.includes('✓') && (
+          {recognizeStatus && !isRecognizing && !recognizeStatus.includes('✓') && !recognizeStatus.includes('手动选择') && (
             <div className="px-3 py-2 rounded-lg text-sm text-center bg-red-50 text-red-700">
               {recognizeStatus}
             </div>
