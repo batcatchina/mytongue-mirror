@@ -228,7 +228,7 @@ const DiagnosisPage: React.FC = () => {
   const [preliminaryResult, setPreliminaryResult] = useState<any>(null);
   const [isRefiningDiagnosis, setIsRefiningDiagnosis] = useState(false);
   const [showRefineButton, setShowRefineButton] = useState(false);
-  const [useLocalEngine, setUseLocalEngine] = useState(false);
+  const [useLocalEngine, setUseLocalEngine] = useState(true);
   const [showEngineSwitch, setShowEngineSwitch] = useState(false);
   const [isAIRecognized, setIsAIRecognized] = useState(false);
 
