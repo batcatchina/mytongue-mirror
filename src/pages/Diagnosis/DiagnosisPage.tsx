@@ -490,7 +490,16 @@ const DiagnosisPage: React.FC = () => {
         const prevLifeCareAdvice = diagnosisResult?.lifeCareAdvice || preliminaryResult?.lifeCareAdvice || { diet: [], lifestyle: [], mood: [] };
         
         // 如果AI返回了额外穴位，补充到原方案配穴中（去重）
-        const aiExtraPoints = (aiResult.mainPoints || []).map((name: string) => cleanAcupointName(name)).filter(Boolean);
+        const aiAcupuncturePlan = aiResult.acupuncturePlan || {};
+        // 从acupuncturePlan获取主穴和配穴
+        const aiMainPoints = aiAcupuncturePlan.mainPoints || aiResult.mainPoints || [];
+        const aiSecondaryPoints = aiAcupuncturePlan.secondaryPoints || aiResult.secondaryPoints || [];
+        // 合并主穴中的额外穴位 + 配穴作为新的配穴
+        const aiExtraPoints = [
+          ...aiMainPoints.map((name: string) => cleanAcupointName(name)),
+          ...aiSecondaryPoints.map((name: string) => cleanAcupointName(typeof name === 'string' ? name : name.point || name.name || ''))
+        ].filter(Boolean);
+        
         const existingPointNames = [
           ...prevAcupuncturePlan.mainPoints.map((p: any) => p.point),
           ...prevAcupuncturePlan.secondaryPoints.map((p: any) => p.point),
