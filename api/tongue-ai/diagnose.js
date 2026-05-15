@@ -282,6 +282,16 @@ ${symptoms ? `- 伴随症状：${symptoms}` : ''}
       }
     }
 
+    // 将 acupoints 转换为 acupuncturePlan.mainPoints/secondaryPoints
+    if (!diagnosisResult.acupuncturePlan && diagnosisResult.acupoints) {
+      const points = Array.isArray(diagnosisResult.acupoints) ? diagnosisResult.acupoints : [];
+      diagnosisResult.acupuncturePlan = {
+        mainPoints: points.slice(0, 3),
+        secondaryPoints: points.slice(3, 6),
+        technique: '平补平泻'
+      };
+    }
+
     console.log('[舌镜AI诊断] Diagnose模式完成:', JSON.stringify(diagnosisResult, null, 2));
     
     // 直接返回完整结果，不走问诊流程

@@ -348,6 +348,8 @@ import { getMeridian, getEffect } from './acupoint_data';
 
 // Vercel Function的API地址
 
+const VERCE_API_URL = '/api/tongue-ai/diagnose';
+
 /**
  * 清理穴位名称（去除编号、括号等）
  */
@@ -367,16 +369,17 @@ function transformToDiagnosisOutput(apiResult: any): DiagnosisOutput {
   const patternAnalysis = apiResult.patternAnalysis || apiResult.analysis || '';
   const pathogenesis = apiResult.pathogenesis || '';
 
-  // 提取穴位数组
-  const acupointNames = apiResult.acupoints || 
-    apiResult.acupuncturePlan?.mainPoints || 
-    apiResult.acupuncturePlan?.pointsDescription?.match(/[足中关命肾阴陵阳陵百会合谷内三阴太冲]/g) || 
-    [];
-
-  // 处理主穴（取前3个）
-  const mainPointNames = Array.isArray(acupointNames) 
-    ? acupointNames.slice(0, 3).map(cleanAcupointName)
+  // 提取穴位数组：优先用 acupuncturePlan.mainPoints/secondaryPoints，退化用 acupoints
+  // 直接使用 acupuncturePlan 中的 mainPoints 和 secondaryPoints
+  const planMainPoints = Array.isArray(apiResult.acupuncturePlan?.mainPoints) 
+    ? apiResult.acupuncturePlan.mainPoints 
     : [];
+  const planSecondaryPoints = Array.isArray(apiResult.acupuncturePlan?.secondaryPoints) 
+    ? apiResult.acupuncturePlan.secondaryPoints 
+    : [];
+  
+  // 处理主穴
+  const mainPointNames = planMainPoints.map((name: string) => cleanAcupointName(name));
   const mainPoints = mainPointNames.map((name: string) => ({
     point: name,
     meridian: getMeridian(name) || '',
@@ -385,9 +388,7 @@ function transformToDiagnosisOutput(apiResult: any): DiagnosisOutput {
   }));
 
   // 处理配穴
-  const secondaryPointNames = Array.isArray(acupointNames)
-    ? acupointNames.slice(3, 6).map(cleanAcupointName)
-    : [];
+  const secondaryPointNames = planSecondaryPoints.map((name: string) => cleanAcupointName(name));
   const secondaryPoints = secondaryPointNames.map((name: string) => ({
     point: name,
     meridian: getMeridian(name) || '',
