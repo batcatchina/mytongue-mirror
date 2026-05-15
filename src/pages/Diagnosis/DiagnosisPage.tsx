@@ -1300,7 +1300,31 @@ const DiagnosisPage: React.FC = () => {
                     <svg className="w-3.5 h-3.5 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </summary>
-                <div className="mt-2"><TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={setTongueShape} teethMark={inputFeatures.teethMark?.value === '是'} crack={inputFeatures.crack?.value === '是'} onTeethMarkChange={(checked) => checked ? setTeethMark('是') : setTeethMark('否')} onCrackChange={(checked) => checked ? setCrack('是') : setCrack('否')} /></div>
+                <div className="mt-2"><TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={setTongueShape} teethMark={inputFeatures.teethMark?.value === '是'} crack={inputFeatures.crack?.value === '是'} onTeethMarkChange={(checked) => {
+                      if (checked) {
+                        setTeethMark('是');
+                      } else {
+                        setTeethMark('否');
+                        // 同步清理 shapeDistribution 中的齿痕
+                        const currentShape = inputFeatures.shapeDistribution || { depression: [], bulge: [] };
+                        const newDepression = currentShape.depression.filter(d => d !== '齿痕');
+                        if (newDepression.length !== currentShape.depression.length) {
+                          setShapeDistribution({ ...currentShape, depression: newDepression });
+                        }
+                      }
+                    }} onCrackChange={(checked) => {
+                      if (checked) {
+                        setCrack('是');
+                      } else {
+                        setCrack('否');
+                        // 同步清理 shapeDistribution 中的裂纹
+                        const currentShape = inputFeatures.shapeDistribution || { depression: [], bulge: [] };
+                        const newDepression = currentShape.depression.filter(d => d !== '裂纹');
+                        if (newDepression.length !== currentShape.depression.length) {
+                          setShapeDistribution({ ...currentShape, depression: newDepression });
+                        }
+                      }
+                    }} /></div>
               </details>
 
               <details className="group">
