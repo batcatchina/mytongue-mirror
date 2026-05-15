@@ -596,6 +596,34 @@ async function handleConfirmMode(req) {
     }
   }
 
+  // 将 acupoints 转换为 acupuncturePlan.mainPoints/secondaryPoints（与 Diagnose 模式一致）
+  if (!diagnosisResult.acupuncturePlan && diagnosisResult.acupoints) {
+    const points = Array.isArray(diagnosisResult.acupoints) ? diagnosisResult.acupoints : [];
+    diagnosisResult.acupuncturePlan = {
+      mainPoints: points.slice(0, 3),
+      secondaryPoints: points.slice(3, 6),
+      technique: '平补平泻'
+    };
+  }
+
+  // 兼容下划线格式 secondary_points / main_points
+  if (!diagnosisResult.acupuncturePlan?.secondaryPoints && diagnosisResult.secondary_points) {
+    if (!diagnosisResult.acupuncturePlan) {
+      diagnosisResult.acupuncturePlan = {};
+    }
+    diagnosisResult.acupuncturePlan.secondaryPoints = Array.isArray(diagnosisResult.secondary_points) 
+      ? diagnosisResult.secondary_points 
+      : [];
+  }
+  if (!diagnosisResult.acupuncturePlan?.mainPoints && diagnosisResult.main_points) {
+    if (!diagnosisResult.acupuncturePlan) {
+      diagnosisResult.acupuncturePlan = {};
+    }
+    diagnosisResult.acupuncturePlan.mainPoints = Array.isArray(diagnosisResult.main_points) 
+      ? diagnosisResult.main_points 
+      : [];
+  }
+
   console.log('[舌镜AI诊断] 修正辨证完成:', JSON.stringify(diagnosisResult, null, 2));
 
   return { 
