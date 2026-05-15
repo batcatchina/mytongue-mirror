@@ -1,7 +1,7 @@
 // ========== 辨证结果缓存 ==========
 const DIAG_CACHE = 'tcm_diag_cache_v3';
 const MAX_CACHE = 50;
-function diagCacheKey(f: any, _i: any): string {
+function diagCacheKey(f: DiagnosisInput['input_features'], _i: DiagnosisInput): string {
   // 只用核心舌象字段生成key，忽略年龄/性别/主诉等非核心字段
   const core = {
     tongueColor: f.tongueColor?.value,
@@ -17,10 +17,10 @@ function diagCacheKey(f: any, _i: any): string {
   for (let c = 0; c < s.length; c++) { h = ((h << 5) - h) + s.charCodeAt(c); h |= 0; }
   return String(h);
 }
-function diagCacheGet(k: string): any | null {
+function diagCacheGet(k: string): DiagnosisOutput | null {
   try { const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}'); return c[k]?.v || null; } catch { return null; }
 }
-function diagCacheSet(k: string, v: any): void {
+function diagCacheSet(k: string, v: DiagnosisOutput): void {
   try {
     const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}');
     c[k] = { v, t: Date.now() };
@@ -42,7 +42,7 @@ const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; border:
 };
 
 // 生成结构化展示数据
-function getStructuredTongueDisplay(inputFeatures: any, isAIRecognized: boolean, aiConfidence: number = 0.8): {
+function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized: boolean, aiConfidence: number = 0.8): {
   categories: Array<{
     label: string;
     items: Array<{ name: string; confidence: string; category: string }>;
@@ -117,13 +117,13 @@ function getStructuredTongueDisplay(inputFeatures: any, isAIRecognized: boolean,
 
   // 舌色分布特征（舌尖红点、舌边瘀斑等）
   if (inputFeatures.distributionFeatures && inputFeatures.distributionFeatures.length > 0) {
-    const regionFeatureItems = inputFeatures.distributionFeatures.map((item: any) => {
+    const regionFeatureItems = inputFeatures.distributionFeatures?.map((item: DistributionFeature) => {
       const regionName = getRegionChineseName(item.part);
       const displayName = `${regionName}${item.feature}`;
       return { name: displayName, confidence, category: 'distribution' };
     });
     categories.push({ label: '舌色分布', items: regionFeatureItems });
-    regionFeatureItems.forEach((item: any) => parts.push(item.name));
+    regionFeatureItems.forEach((item) => parts.push(item.name));
   }
 
   // 凹凸形态
@@ -466,7 +466,7 @@ const DiagnosisPage: React.FC = () => {
           primarySyndrome: aiResult.mainSyndrome || diagnosisResult?.diagnosisResult?.primarySyndrome || '待明确',
           syndromeScore: (aiResult.confidence || 0.8) * 100,
           confidence: aiResult.confidence || 0.8,
-          secondarySyndromes: (aiResult.secondarySyndromes || []).map((s: any) => ({
+          secondarySyndromes: (aiResult.secondarySyndromes || []).map((s: { syndrome: string; score?: number }) => ({
             syndrome: typeof s === 'string' ? s : s.syndrome || '',
             score: s.score || 50,
             confidence: (s.score || 50) / 100,
@@ -770,7 +770,7 @@ const DiagnosisPage: React.FC = () => {
       primarySyndrome: result.primaryResult.syndrome,
       syndromeScore: result.primaryResult.confidence || 0,
       confidence: (result.primaryResult.confidence || 0) / 100, // 0-100 → 0-1
-      secondarySyndromes: (result.alternativeResults || []).map((r: any) => ({
+      secondarySyndromes: (result.alternativeResults || []).map((r: { syndrome: string; score?: number }) => ({
         syndrome: r.syndrome,
         score: r.confidence || 0,
         confidence: (r.confidence || 0) / 100,
@@ -886,7 +886,7 @@ const DiagnosisPage: React.FC = () => {
   /**
    * 根据辨证结果生成生活调护建议
    */
-  const generateLifeCareAdvice = (result: any): any => {
+  const generateLifeCareAdvice = (result: DiagnosisOutput): LifeCareAdvice => {
     const advice: string[] = [];
     const syndrome = result.primaryResult.syndrome;
     
@@ -1550,7 +1550,7 @@ const DiagnosisPage: React.FC = () => {
                     {diagnosisResult?.diagnosisResult?.secondarySyndromes?.length > 0 && (
                       <div>
                         <span className="text-xs text-stone-500 block mb-1">也需关注</span>
-                        {diagnosisResult.diagnosisResult.secondarySyndromes.slice(0, 2).map((s: any, i: number) => (
+                        {diagnosisResult.diagnosisResult.secondarySyndromes.slice(0, 2).map((s: SecondarySyndrome, i: number) => (
                           <span key={i} className="text-sm text-stone-600 mr-2">· {s.syndrome}</span>
                         ))}
                       </div>
