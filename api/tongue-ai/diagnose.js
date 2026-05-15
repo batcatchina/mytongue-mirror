@@ -108,6 +108,37 @@ function loadInquiryPrompt() {
 注意：只返回JSON，不要额外解释。`;
 }
 
+
+// ============================================
+// 公共函数 - 提取到文件顶部避免重复定义
+// ============================================
+
+/**
+ * 构建凹凸形态描述文本
+ */
+function buildShapeDistributionText(shapeDist) {
+  if (!shapeDist) return '';
+  const parts = [];
+  if (shapeDist.depression && shapeDist.depression.length > 0) {
+    const otherDepression = shapeDist.depression.filter(d => !d.includes('teeth') && !d.includes('crack'));
+    if (otherDepression.length > 0) {
+      parts.push('depression:' + otherDepression.join(','));
+    }
+  }
+  if (shapeDist.bulge && shapeDist.bulge.length > 0) {
+    parts.push('bulge:' + shapeDist.bulge.join(','));
+  }
+  return parts.length > 0 ? parts.join(';') : '';
+}
+
+/**
+ * 构建舌色分布特征描述文本
+ */
+function buildDistributionFeaturesText(distFeatures) {
+  if (!distFeatures || !Array.isArray(distFeatures) || distFeatures.length === 0) return '';
+  return distFeatures.map(f => f.part + f.feature).join(',');
+}
+
 async function callDeepSeek(messages, temperature = 0.3, maxTokens = 2000) {
   const response = await fetch(DEEPSEEK_CONFIG.apiUrl, {
     method: 'POST',
@@ -215,30 +246,7 @@ async function handleDiagnoseMode(req) {
 
   const systemPrompt = loadSystemPrompt('core');
 
-  // 构建凹凸形态描述（舌尖凹陷、舌边鼓胀等）
-  const buildShapeDistributionText = (shapeDist) => {
-    if (!shapeDist) return '';
-    const parts = [];
-    // 凹陷特征
-    if (shapeDist.depression && shapeDist.depression.length > 0) {
-      const otherDepression = shapeDist.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
-      if (otherDepression.length > 0) {
-        parts.push(`凹陷区域：${otherDepression.join('、')}`);
-      }
-    }
-    // 鼓胀特征
-    if (shapeDist.bulge && shapeDist.bulge.length > 0) {
-      parts.push(`鼓胀区域：${shapeDist.bulge.join('、')}`);
-    }
-    return parts.length > 0 ? parts.join('；') : '';
-  };
-
-  // 构建舌色分布特征描述（舌尖红点、舌边瘀斑等）
-  const buildDistributionFeaturesText = (distFeatures) => {
-    if (!distFeatures || !Array.isArray(distFeatures) || distFeatures.length === 0) return '';
-    return distFeatures.map(f => `${f.part}${f.feature}`).join('、');
-  };
-
+  // 使用公共函数
   const shapeDistText = buildShapeDistributionText(tongueFeatures.shapeDistribution);
   const distFeaturesText = buildDistributionFeaturesText(tongueFeatures.distributionFeatures);
 
@@ -458,22 +466,9 @@ async function handleInquiryMode(req) {
   // Step 1: 先进行初步辨证
   const systemPrompt = loadSystemPrompt('inquiry');
   // 构建凹凸形态和舌色分布特征
-  const inquiryShapeDistText = (() => {
-    if (!tongueFeatures.shapeDistribution) return '';
-    const parts = [];
-    if (tongueFeatures.shapeDistribution.depression?.length > 0) {
-      const otherDep = tongueFeatures.shapeDistribution.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
-      if (otherDep.length > 0) parts.push(`凹陷区域：${otherDep.join('、')}`);
-    }
-    if (tongueFeatures.shapeDistribution.bulge?.length > 0) {
-      parts.push(`鼓胀区域：${tongueFeatures.shapeDistribution.bulge.join('、')}`);
-    }
-    return parts.length > 0 ? parts.join('；') : '';
-  })();
-  const inquiryDistFeaturesText = (() => {
-    if (!tongueFeatures.distributionFeatures?.length) return '';
-    return tongueFeatures.distributionFeatures.map(f => `${f.part}${f.feature}`).join('、');
-  })();
+  // 使用公共函数
+  const inquiryShapeDistText = buildShapeDistributionText(tongueFeatures.shapeDistribution);
+  const inquiryDistFeaturesText = buildDistributionFeaturesText(tongueFeatures.distributionFeatures);
 
   const preliminaryMessage = `请根据以下舌象特征进行初步辨证：
 
@@ -624,23 +619,9 @@ async function handleConfirmMode(req) {
   console.log('[舌镜AI诊断] 回答数量:', answers.length);
 
   const systemPrompt = loadSystemPrompt('confirm');
-  // handleConfirmMode 中也需要构建凹凸形态描述
-  const confirmShapeDistText = (() => {
-    if (!tongueFeatures.shapeDistribution) return '';
-    const parts = [];
-    if (tongueFeatures.shapeDistribution.depression?.length > 0) {
-      const otherDep = tongueFeatures.shapeDistribution.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
-      if (otherDep.length > 0) parts.push(`凹陷区域：${otherDep.join('、')}`);
-    }
-    if (tongueFeatures.shapeDistribution.bulge?.length > 0) {
-      parts.push(`鼓胀区域：${tongueFeatures.shapeDistribution.bulge.join('、')}`);
-    }
-    return parts.length > 0 ? parts.join('；') : '';
-  })();
-  const confirmDistFeaturesText = (() => {
-    if (!tongueFeatures.distributionFeatures?.length) return '';
-    return tongueFeatures.distributionFeatures.map(f => `${f.part}${f.feature}`).join('、');
-  })();
+  // 使用公共函数
+  const confirmShapeDistText = buildShapeDistributionText(tongueFeatures.shapeDistribution);
+  const confirmDistFeaturesText = buildDistributionFeaturesText(tongueFeatures.distributionFeatures);
 
   const userMessage = buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, answers, confirmShapeDistText, confirmDistFeaturesText);
 
@@ -739,23 +720,9 @@ async function handleDetailMode(req) {
   console.log('[舌镜AI诊断] Detail模式请求');
 
   const systemPrompt = loadSystemPrompt('detail');
-  // handleDetailMode 中也需要构建凹凸形态描述
-  const detailShapeDistText = (() => {
-    if (!tongueFeatures.shapeDistribution) return '';
-    const parts = [];
-    if (tongueFeatures.shapeDistribution.depression?.length > 0) {
-      const otherDep = tongueFeatures.shapeDistribution.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
-      if (otherDep.length > 0) parts.push(`凹陷区域：${otherDep.join('、')}`);
-    }
-    if (tongueFeatures.shapeDistribution.bulge?.length > 0) {
-      parts.push(`鼓胀区域：${tongueFeatures.shapeDistribution.bulge.join('、')}`);
-    }
-    return parts.length > 0 ? parts.join('；') : '';
-  })();
-  const detailDistFeaturesText = (() => {
-    if (!tongueFeatures.distributionFeatures?.length) return '';
-    return tongueFeatures.distributionFeatures.map(f => `${f.part}${f.feature}`).join('、');
-  })();
+  // 使用公共函数
+  const detailShapeDistText = buildShapeDistributionText(tongueFeatures.shapeDistribution);
+  const detailDistFeaturesText = buildDistributionFeaturesText(tongueFeatures.distributionFeatures);
 
   const userMessage = `请根据以下舌象特征，生成详细的配穴方案：
 
