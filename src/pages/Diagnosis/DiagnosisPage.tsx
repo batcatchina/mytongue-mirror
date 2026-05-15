@@ -558,13 +558,13 @@ const DiagnosisPage: React.FC = () => {
                 ? [aiResult.organLocation.primary, ...(aiResult.organLocation.secondary || [])]
                 : [],
               diagnosisEvidence: [],
-              priority: '中',
+              priority: '中' as const,
               diagnosisTime: new Date().toLocaleTimeString('zh-CN'),
             },
             acupuncturePlan: diagnosisResult?.acupuncturePlan || { treatmentPrinciple: '', mainPoints: [], secondaryPoints: [], contraindications: [], treatmentAdvice: {} },
-            lifeCareAdvice: diagnosisResult?.lifeCareAdvice || { diet: [], lifestyle: [], mood: [] },
+            lifeCareAdvice: diagnosisResult?.lifeCareAdvice || { dietSuggestions: [], dailyRoutine: [], precautions: [] },
           };
-          setDiagnosisResult(wrappedResult);
+          setDiagnosisResult(wrappedResult as any);
           setCurrentStep('result');
         }
       }
@@ -629,8 +629,11 @@ const DiagnosisPage: React.FC = () => {
         };
         
         // 问诊后整合结果：保留原辨证的针灸方案和养生建议，用问诊结果更新证型和病机
-        const prevAcupuncturePlan = diagnosisResult?.acupuncturePlan || { treatmentPrinciple: '', mainPoints: [], secondaryPoints: [], contraindications: [], treatmentAdvice: {} };
-        const prevLifeCareAdvice = diagnosisResult?.lifeCareAdvice || { diet: [], lifestyle: [], mood: [] };
+        // 优先使用原辨证的针灸方案，其次使用preliminaryResult中的方案，避免主穴丢失
+        const prevAcupuncturePlan = diagnosisResult?.acupuncturePlan 
+          || preliminaryResult?.acupuncturePlan
+          || { treatmentPrinciple: '', mainPoints: [], secondaryPoints: [], contraindications: [], treatmentAdvice: {} };
+        const prevLifeCareAdvice = diagnosisResult?.lifeCareAdvice || preliminaryResult?.lifeCareAdvice || { diet: [], lifestyle: [], mood: [] };
         
         // 如果AI返回了额外穴位，补充到原方案配穴中（去重）
         const aiExtraPoints = (aiResult.mainPoints || []).map((name: string) => cleanAcupointName(name)).filter(Boolean);
@@ -660,7 +663,6 @@ const DiagnosisPage: React.FC = () => {
           diagnosisResult: {
             ...diagnosisResultObj,
             pathogenesis: mergedPathogenesis || diagnosisResultObj.pathogenesis,
-            originalPrimarySyndrome: diagnosisResult?.diagnosisResult?.primarySyndrome || '',
           },
           acupuncturePlan: {
             ...prevAcupuncturePlan,
@@ -668,7 +670,7 @@ const DiagnosisPage: React.FC = () => {
             treatmentPrinciple: prevAcupuncturePlan.treatmentPrinciple || aiResult.treatment || '',
           },
           lifeCareAdvice: prevLifeCareAdvice,
-        });
+        } as any);
         
         setShowInquiry(false);
         setShowRefineButton(true);
@@ -815,31 +817,25 @@ const DiagnosisPage: React.FC = () => {
     try {
       const depression: string[] = [];
       const bulge: string[] = [];
-      // 从AI识别结果中提取凹陷信息
-      if (result.tongue_shape?.depression) {
-        const dep = result.tongue_shape.depression;
-        if (dep.tip) depression.push('舌尖');
-        if (dep.middle) depression.push('舌中');
-        if (dep.sides) depression.push('舌边');
-        if (dep.root) depression.push('舌根');
-        if (dep.teeth_mark) depression.push('齿痕');
-        if (dep.crack) depression.push('裂纹');
+      // 从AI识别结果的shape_distribution中提取凹陷信息
+      // shape_distribution格式: { depression: Array<{region, degree}>, bulge: Array<{region, degree}> }
+      if (result.shape_distribution?.depression) {
+        result.shape_distribution.depression.forEach((d: { region: string; degree: string }) => {
+          if (d.region && !depression.includes(d.region)) depression.push(d.region);
+        });
       }
-      // 从AI识别结果中提取鼓胀信息
-      if (result.tongue_shape?.bulge) {
-        const bul = result.tongue_shape.bulge;
-        if (bul.tip) bulge.push('舌尖');
-        if (bul.middle) bulge.push('舌中');
-        if (bul.sides) bulge.push('舌边');
-        if (bul.root) bulge.push('舌根');
+      // 从shape_distribution中提取鼓胀信息
+      if (result.shape_distribution?.bulge) {
+        result.shape_distribution.bulge.forEach((b: { region: string; degree: string }) => {
+          if (b.region && !bulge.includes(b.region)) bulge.push(b.region);
+        });
       }
-      // 从红点/瘀斑等特征补充
-      if (result.tongue_color?.red_spots) {
-        if (result.tongue_color.red_spots.tip) depression.push('舌尖红点');
-        if (result.tongue_color.red_spots.sides) depression.push('舌边红点');
+      // 从齿痕和裂纹补充凹陷信息（如果不在shape_distribution中）
+      if (result.tongue_shape?.teeth_mark?.has && !depression.includes('齿痕')) {
+        depression.push('齿痕');
       }
-      if (result.tongue_color?.spots) {
-        depression.push('瘀斑');
+      if (result.tongue_shape?.crack?.has && !depression.includes('裂纹')) {
+        depression.push('裂纹');
       }
       if (depression.length > 0 || bulge.length > 0) {
         setShapeDistribution({ depression, bulge });

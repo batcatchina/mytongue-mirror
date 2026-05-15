@@ -33,7 +33,8 @@ export type DiagnosisStep =
   | 'recognizing'    // 识别舌象特征
   | 'analyzing'      // 分析舌色舌苔
   | 'reasoning'      // 辨证推理
-  | 'matching';      // 匹配针灸方案
+  | 'matching'       // 匹配针灸方案
+  | 'result';        // 显示结果
 
 interface DiagnosisState {
   // 输入状态
