@@ -115,18 +115,31 @@ function getStructuredTongueDisplay(inputFeatures: any, isAIRecognized: boolean,
     categories.push({ label: '特殊', items: specialItems });
   }
 
+  // 舌色分布特征（舌尖红点、舌边瘀斑等）
+  if (inputFeatures.distributionFeatures && inputFeatures.distributionFeatures.length > 0) {
+    const regionFeatureItems = inputFeatures.distributionFeatures.map((item: any) => {
+      const regionName = getRegionChineseName(item.part);
+      const displayName = `${regionName}${item.feature}`;
+      return { name: displayName, confidence, category: 'distribution' };
+    });
+    categories.push({ label: '舌色分布', items: regionFeatureItems });
+    regionFeatureItems.forEach((item: any) => parts.push(item.name));
+  }
+
   // 凹凸形态
   const shapeItems: Array<{ name: string; confidence: string; category: string }> = [];
   const otherDepression = inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')) || [];
-  // 凹陷项加"凹陷"后缀（已有"凹陷"的不重复加）
+  // 凹陷项加"凹陷"后缀，先映射region为中文
   otherDepression.forEach((rawItem: string) => {
-    const displayItem = rawItem.includes('凹陷') ? rawItem : rawItem + '凹陷';
+    const regionName = getRegionChineseName(rawItem.replace('凹陷', ''));
+    const displayItem = regionName.includes('凹陷') ? regionName : regionName + '凹陷';
     shapeItems.push({ name: displayItem, confidence, category: 'special' });
     parts.push(displayItem);
   });
-  // 鼓胀项加"鼓胀"后缀（已有"鼓胀"的不重复加）
+  // 鼓胀项加"鼓胀"后缀，先映射region为中文
   inputFeatures.shapeDistribution?.bulge?.forEach((rawItem: string) => {
-    const displayItem = rawItem.includes('鼓胀') ? rawItem : rawItem + '鼓胀';
+    const regionName = getRegionChineseName(rawItem.replace('鼓胀', ''));
+    const displayItem = regionName.includes('鼓胀') ? regionName : regionName + '鼓胀';
     shapeItems.push({ name: displayItem, confidence, category: 'special' });
     parts.push(displayItem);
   });
@@ -525,7 +538,7 @@ const DiagnosisPage: React.FC = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tongueFeatures,
-        age: patientInfo.age,
+        age: patientInfo.age > 0 ? patientInfo.age : null,
         symptoms,
         patientInfo,
       }),
@@ -643,7 +656,7 @@ const DiagnosisPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tongueFeatures,
-          age: selectedAgeGroup || patientInfo.age,
+          age: (selectedAgeGroup && selectedAgeGroup !== '未选择') ? undefined : (patientInfo.age > 0 ? patientInfo.age : undefined),
           mode: 'inquiry',
         }),
       });
@@ -709,7 +722,7 @@ const DiagnosisPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tongueFeatures,
-          age: selectedAgeGroup || patientInfo.age,
+          age: (selectedAgeGroup && selectedAgeGroup !== '未选择') ? undefined : (patientInfo.age > 0 ? patientInfo.age : undefined),
           mode: 'confirm',
           conversationId: inquiryConversationId,
           answers,
@@ -1443,7 +1456,7 @@ const DiagnosisPage: React.FC = () => {
                     <svg className="w-3.5 h-3.5 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </summary>
-                <div className="mt-2"><TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={setTongueShape} /></div>
+                <div className="mt-2"><TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={setTongueShape} teethMark={inputFeatures.teethMark?.value === '是'} crack={inputFeatures.crack?.value === '是'} onTeethMarkChange={(checked) => checked ? setTeethMark('是') : setTeethMark('否')} onCrackChange={(checked) => checked ? setCrack('是') : setCrack('否')} /></div>
               </details>
 
               <details className="group">

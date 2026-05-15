@@ -71,9 +71,21 @@ interface TongueShapeSelectorProps {
   value: string;
   onChange: (value: string, confidence?: number) => void;
   isAI?: boolean;
+  teethMark?: boolean;
+  crack?: boolean;
+  onTeethMarkChange?: (checked: boolean) => void;
+  onCrackChange?: (checked: boolean) => void;
 }
 
-export const TongueShapeSelector: React.FC<TongueShapeSelectorProps> = ({ value, onChange, isAI }) => {
+export const TongueShapeSelector: React.FC<TongueShapeSelectorProps> = ({ 
+  value, 
+  onChange, 
+  isAI,
+  teethMark = false,
+  crack = false,
+  onTeethMarkChange,
+  onCrackChange,
+}) => {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -108,11 +120,21 @@ export const TongueShapeSelector: React.FC<TongueShapeSelectorProps> = ({ value,
         </summary>
         <div className="flex gap-4 mt-2 pl-4">
           <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            <input 
+              type="checkbox" 
+              checked={teethMark}
+              onChange={(e) => onTeethMarkChange?.(e.target.checked)}
+              className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" 
+            />
             齿痕
           </label>
           <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            <input 
+              type="checkbox" 
+              checked={crack}
+              onChange={(e) => onCrackChange?.(e.target.checked)}
+              className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" 
+            />
             裂纹
           </label>
         </div>
