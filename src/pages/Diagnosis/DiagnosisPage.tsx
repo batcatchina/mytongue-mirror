@@ -1151,7 +1151,7 @@ const DiagnosisPage: React.FC = () => {
                           : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                       }`}
                     >
-                      本地规则引擎 ✓
+                      本地规则引擎{useLocalEngine ? ' ✓' : ''}
                     </button>
                     <button
                       onClick={() => setUseLocalEngine(false)}
@@ -1161,7 +1161,7 @@ const DiagnosisPage: React.FC = () => {
                           : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                       }`}
                     >
-                      AI Bot推理
+                      AI Bot推理{!useLocalEngine ? ' ✓' : ''}
                     </button>
                   </div>
                 )}
