@@ -69,6 +69,7 @@ export interface InputFeatures {
   ecchymosis?: Ecchymosis;
   distributionFeatures?: { part: string; feature: string; degree: string }[]; // 区域诊断
   shapeDistribution?: TongueShapeDistribution; // 凹凸形态
+  aiConfidence?: number; // AI识别置信度（0-1）
 }
 
 // 伴随症状类型

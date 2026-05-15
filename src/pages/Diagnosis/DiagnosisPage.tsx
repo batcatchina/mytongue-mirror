@@ -30,6 +30,110 @@ function diagCacheSet(k: string, v: any): void {
   } catch {}
 }
 // ========== 缓存结束 ==========
+// ========== 舌象特征结构化展示 ==========
+// 分类颜色配置
+const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  tongueColor: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },      // 舌色-红色系
+  tongueShape: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' }, // 舌形-橙色系
+  tongueState: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' }, // 舌态-紫色系
+  coating: { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },      // 苔色/苔质-绿色系
+  moisture: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },       // 润燥-蓝色系
+  special: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },     // 齿痕裂纹-琥珀色系
+};
+
+// 生成结构化展示数据
+function getStructuredTongueDisplay(inputFeatures: any, isAIRecognized: boolean, aiConfidence: number = 0.8): {
+  categories: Array<{
+    label: string;
+    items: Array<{ name: string; confidence: string; category: string }>;
+  }>;
+  rawText: string;
+} {
+  const categories: Array<{
+    label: string;
+    items: Array<{ name: string; confidence: string; category: string }>;
+  }> = [];
+  const parts: string[] = [];
+  const confidence = isAIRecognized ? `AI ${Math.round(aiConfidence * 100)}%` : '手动选择';
+
+  // 舌色
+  if (inputFeatures.tongueColor.value) {
+    categories.push({
+      label: '舌色',
+      items: [{ name: inputFeatures.tongueColor.value, confidence, category: 'tongueColor' }]
+    });
+    parts.push(`舌色:${inputFeatures.tongueColor.value}`);
+  }
+
+  // 舌苔
+  const coatItems: Array<{ name: string; confidence: string; category: string }> = [];
+  if (inputFeatures.coating.color) {
+    coatItems.push({ name: inputFeatures.coating.color, confidence, category: 'coating' });
+    parts.push(`苔色:${inputFeatures.coating.color}`);
+  }
+  if (inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常') {
+    coatItems.push({ name: inputFeatures.coating.texture, confidence, category: 'coating' });
+    parts.push(`苔质:${inputFeatures.coating.texture}`);
+  }
+  if (inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常') {
+    coatItems.push({ name: inputFeatures.coating.moisture, confidence, category: 'moisture' });
+    parts.push(`润燥:${inputFeatures.coating.moisture}`);
+  }
+  if (coatItems.length > 0) {
+    categories.push({ label: '舌苔', items: coatItems });
+  }
+
+  // 舌形
+  if (inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常') {
+    categories.push({
+      label: '舌形',
+      items: [{ name: inputFeatures.tongueShape.value, confidence, category: 'tongueShape' }]
+    });
+    parts.push(`舌形:${inputFeatures.tongueShape.value}`);
+  }
+
+  // 舌态
+  if (inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常') {
+    categories.push({
+      label: '舌态',
+      items: [{ name: inputFeatures.tongueState.value, confidence, category: 'tongueState' }]
+    });
+    parts.push(`舌态:${inputFeatures.tongueState.value}`);
+  }
+
+  // 特殊特征（齿痕、裂纹等）
+  const specialItems: Array<{ name: string; confidence: string; category: string }> = [];
+  if (inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) {
+    specialItems.push({ name: '齿痕', confidence, category: 'special' });
+    parts.push('齿痕');
+  }
+  if (inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) {
+    specialItems.push({ name: '裂纹', confidence, category: 'special' });
+    parts.push('裂纹');
+  }
+  if (specialItems.length > 0) {
+    categories.push({ label: '特殊', items: specialItems });
+  }
+
+  // 凹凸形态
+  const shapeItems: Array<{ name: string; confidence: string; category: string }> = [];
+  const otherDepression = inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')) || [];
+  otherDepression.forEach((item: string) => {
+    shapeItems.push({ name: item, confidence, category: 'special' });
+    parts.push(item);
+  });
+  inputFeatures.shapeDistribution?.bulge?.forEach((item: string) => {
+    shapeItems.push({ name: item, confidence, category: 'special' });
+    parts.push(item);
+  });
+  if (shapeItems.length > 0) {
+    categories.push({ label: '形态', items: shapeItems });
+  }
+
+  return { categories, rawText: parts.join('·') };
+}
+// ========== 结构化展示结束 ==========
+
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -705,6 +809,7 @@ const DiagnosisPage: React.FC = () => {
     setTeethMark,
     setDistributionFeatures,
     setShapeDistribution,
+    setInputFeatures,
     addSymptom,
     removeSymptom,
     updateSymptom,
@@ -843,8 +948,9 @@ const DiagnosisPage: React.FC = () => {
       }
     } catch (e) { console.error('[AI识别] 凹凸形态回填异常:', e); }
 
-    // 标记AI已识别
+    // 标记AI已识别并保存置信度
     setIsAIRecognized(true);
+    setInputFeatures({ aiConfidence: result.overall_confidence || 0.8 });
     toast.success('AI识别完成，已自动填入舌象特征 ✓');
   };
 
@@ -1216,91 +1322,79 @@ const DiagnosisPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* 识别结果一览 - 彩色标签 */}
-              <div className="flex flex-wrap gap-1.5 min-h-[28px]">
-                {inputFeatures.tongueColor.value ? (
-                  <span className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
-                    {inputFeatures.tongueColor.value}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
-                  </span>
-                ) : (
-                  <span className="text-xs text-stone-400">未识别</span>
-                )}
-                {inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常' && (
-                  <span className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">
-                    {inputFeatures.tongueShape.value}
-                  </span>
-                )}
-                {inputFeatures.coating.color && (
-                  <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded-full border border-green-200">
-                    {inputFeatures.coating.color}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
-                  </span>
-                )}
-                {inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常' && (
-                  <span className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">
-                    {inputFeatures.coating.moisture}
-                  </span>
-                )}
-                {inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常' && (
-                  <span className="px-2 py-1 text-xs bg-purple-50 text-purple-600 rounded-full border border-purple-200">
-                    {inputFeatures.tongueState.value}
-                  </span>
-                )}
-                {(inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) && (
-                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">齿痕</span>
-                )}
-                {(inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) && (
-                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">裂纹</span>
-                )}
-                {inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')).map((item: string, idx: number) => (
-                  <span key={`dep-${idx}`} className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">{item}</span>
-                ))}
-                {inputFeatures.shapeDistribution?.bulge?.map((item: string, idx: number) => (
-                  <span key={`bul-${idx}`} className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">{item}</span>
-                ))}
+              {/* 识别结果一览 - 结构化分组展示 */}
+              <div className="space-y-2">
+                {/* 结构化文本行 */}
+                <div className="text-xs text-stone-600 bg-stone-50 rounded-lg p-2 px-3 font-mono leading-relaxed">
+                  {(() => {
+                    const display = getStructuredTongueDisplay(inputFeatures, isAIRecognized, inputFeatures.aiConfidence || 0.8);
+                    return display.rawText ? (
+                      <span>{display.rawText}</span>
+                    ) : (
+                      <span className="text-stone-400">未识别</span>
+                    );
+                  })()}
+                </div>
+                
+                {/* 分组彩色标签 */}
+                <div className="flex flex-wrap gap-2">
+                  {(() => {
+                    const display = getStructuredTongueDisplay(inputFeatures, isAIRecognized, inputFeatures.aiConfidence || 0.8);
+                    if (display.categories.length === 0) return null;
+                    return display.categories.map((cat, catIdx) => (
+                      <div key={catIdx} className="flex items-center gap-1.5">
+                        <span className="text-xs text-stone-400">{cat.label}:</span>
+                        {cat.items.map((item, itemIdx) => {
+                          const colors = TONGUE_CATEGORY_COLORS[item.category] || TONGUE_CATEGORY_COLORS.special;
+                          return (
+                            <span key={itemIdx} className={`px-2 py-0.5 text-xs rounded-full border ${colors.bg} ${colors.text} ${colors.border}`}>
+                              {item.name}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
 
               {/* 识别详情编辑 - 默认隐藏，点"修改"才出现 */}
               <div id="feature-edit" className="hidden mt-3 pt-3 border-t border-stone-200 space-y-1">
 
-              {/* 当前特征一览 - 彩色标签一行看完 */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {inputFeatures.tongueColor.value && (
-                  <span className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded-full border border-red-200">
-                    {inputFeatures.tongueColor.value}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
-                  </span>
-                )}
-                {inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常' && (
-                  <span className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">
-                    {inputFeatures.tongueShape.value}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
-                  </span>
-                )}
-                {inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常' && (
-                  <span className="px-2 py-1 text-xs bg-purple-50 text-purple-600 rounded-full border border-purple-200">
-                    {inputFeatures.tongueState.value}
-                  </span>
-                )}
-                {inputFeatures.coating.color && (
-                  <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded-full border border-green-200">
-                    {inputFeatures.coating.color}{isAIRecognized && <sup className="ml-0.5 text-blue-500 text-[10px]">AI</sup>}
-                  </span>
-                )}
-                {inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常' && (
-                  <span className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">
-                    {inputFeatures.coating.moisture}
-                  </span>
-                )}
-                {(inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) && (
-                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">齿痕</span>
-                )}
-                {(inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) && (
-                  <span className="px-2 py-1 text-xs bg-amber-50 text-amber-600 rounded-full border border-amber-200">裂纹</span>
-                )}
-                {inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')).map((item: string, idx: number) => (
-                  <span key={`dep2-${idx}`} className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-200">{item}</span>
-                ))}
-                {inputFeatures.shapeDistribution?.bulge?.map((item: string, idx: number) => (
-                  <span key={`bul2-${idx}`} className="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-full border border-orange-200">{item}</span>
-                ))}
+              {/* 当前特征一览 - 结构化分组展示 */}
+              <div className="space-y-2 mb-3">
+                {/* 结构化文本行 */}
+                <div className="text-xs text-stone-600 bg-stone-50 rounded-lg p-2 px-3 font-mono leading-relaxed">
+                  {(() => {
+                    const display = getStructuredTongueDisplay(inputFeatures, isAIRecognized, inputFeatures.aiConfidence || 0.8);
+                    return display.rawText ? (
+                      <span>{display.rawText}</span>
+                    ) : (
+                      <span className="text-stone-400">未识别</span>
+                    );
+                  })()}
+                </div>
+                
+                {/* 分组彩色标签 */}
+                <div className="flex flex-wrap gap-2">
+                  {(() => {
+                    const display = getStructuredTongueDisplay(inputFeatures, isAIRecognized, inputFeatures.aiConfidence || 0.8);
+                    if (display.categories.length === 0) return null;
+                    return display.categories.map((cat, catIdx) => (
+                      <div key={catIdx} className="flex items-center gap-1.5">
+                        <span className="text-xs text-stone-400">{cat.label}:</span>
+                        {cat.items.map((item, itemIdx) => {
+                          const colors = TONGUE_CATEGORY_COLORS[item.category] || TONGUE_CATEGORY_COLORS.special;
+                          return (
+                            <span key={itemIdx} className={`px-2 py-0.5 text-xs rounded-full border ${colors.bg} ${colors.text} ${colors.border}`}>
+                              {item.name}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
 
               {/* 各特征折叠编辑 */}
