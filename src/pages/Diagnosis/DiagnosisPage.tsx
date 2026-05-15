@@ -1011,43 +1011,6 @@ const DiagnosisPage: React.FC = () => {
     setDiagnosisResult(null);
     setShowRefineButton(false);
 
-    if (useLocalEngine) {
-      // ========== 路径A：本地规则引擎 ==========
-      const startTime = Date.now();
-      const MIN_DISPLAY_TIME = 800;
-      
-      setTimeout(() => {
-        setCurrentStep('recognizing', 25);
-        setTimeout(() => setCurrentStep('analyzing', 50), 100);
-        setTimeout(() => setCurrentStep('reasoning', 75), 200);
-        
-        setTimeout(() => {
-          try {
-            const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
-            const remainingTime = Math.max(0, MIN_DISPLAY_TIME - (Date.now() - startTime));
-            
-            setTimeout(() => {
-              setCurrentStep('matching', 90);
-              setDiagnosisResult({ 
-                diagnosisResult: diagResult, 
-                acupuncturePlan, 
-                lifeCareAdvice 
-              } as any);
-              setCurrentStep('result', 100);
-              toast.success(`辨证完成！${diagResult?.primarySyndrome || ''}`);
-            }, remainingTime);
-          } catch (error) {
-            console.error('[本地引擎] 异常:', error);
-            const message = error instanceof Error ? error.message : '规则引擎分析失败';
-            setError(message);
-            toast.error(message);
-          } finally {
-            setIsAnalyzing(false);
-          }
-        }, 300);
-      });
-      return;
-    }
 
     try {
       // ========== 路径B：远程Bot API（异步，需要进度指示） ==========
@@ -1073,6 +1036,33 @@ const DiagnosisPage: React.FC = () => {
       const message = error instanceof Error ? error.message : '辨证分析失败';
       setError(message);
       toast.error(message);
+      // ========== 降级：submitDiagnosis 失败时使用本地规则引擎 ==========
+      console.log('[降级] 远程辨证失败，切换到本地规则引擎');
+      toast('远程辨证失败，切换到本地快速分析...', { icon: '⚡' });
+      
+      const startTime = Date.now();
+      const MIN_DISPLAY_TIME = 800;
+      
+      setCurrentStep('analyzing', 50);
+      setTimeout(() => setCurrentStep('reasoning', 75), 100);
+      
+      try {
+        const { diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } = handleLocalDiagnosis();
+        const remainingTime = Math.max(0, MIN_DISPLAY_TIME - (Date.now() - startTime));
+        
+        setTimeout(() => {
+          setCurrentStep('matching', 90);
+          setDiagnosisResult({ diagnosisResult: diagResult, acupuncturePlan, lifeCareAdvice } as any);
+          setCurrentStep('result', 100);
+          toast.success(`本地辨证完成！${diagResult?.primarySyndrome || ''}`);
+          setError(null); // 清除错误，因为降级成功
+        }, remainingTime);
+      } catch (localError) {
+        console.error('[降级] 本地引擎也失败:', localError);
+        const localMessage = localError instanceof Error ? localError.message : '本地规则引擎也失败了';
+        setError(localMessage);
+        toast.error(localMessage);
+      }
     } finally {
       setIsAnalyzing(false);
       resetProgress();
