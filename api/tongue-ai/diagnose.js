@@ -170,7 +170,7 @@ ${age ? `- 患者年龄：${age}岁` : ''}
 请生成1-3个选择题来帮助确认或排除初步辨证结果。`;
 }
 
-function buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, answers) {
+function buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, answers, shapeDistText = '', distFeaturesText = '') {
   const answersText = answers.map(a => 
     `- ${a.questionId}: ${a.selectedOption}${a.reason ? ` (原因: ${a.reason})` : ''}`
   ).join('\n');
@@ -186,6 +186,8 @@ function buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, an
 - 齿痕：${tongueFeatures.teethMark ? '有' : '无'}
 - 裂纹：${tongueFeatures.crack ? '有' : '无'}
 - 舌态：${tongueFeatures.tongueState || '正常'}
+${shapeDistText ? `- 凹凸形态：${shapeDistText}` : ''}
+${distFeaturesText ? `- 舌色分布：${distFeaturesText}` : ''}
 ${age ? `- 患者年龄：${age}岁` : ''}
 
 问诊回答：
@@ -213,6 +215,33 @@ async function handleDiagnoseMode(req) {
 
   const systemPrompt = loadSystemPrompt('core');
 
+  // 构建凹凸形态描述（舌尖凹陷、舌边鼓胀等）
+  const buildShapeDistributionText = (shapeDist) => {
+    if (!shapeDist) return '';
+    const parts = [];
+    // 凹陷特征
+    if (shapeDist.depression && shapeDist.depression.length > 0) {
+      const otherDepression = shapeDist.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
+      if (otherDepression.length > 0) {
+        parts.push(`凹陷区域：${otherDepression.join('、')}`);
+      }
+    }
+    // 鼓胀特征
+    if (shapeDist.bulge && shapeDist.bulge.length > 0) {
+      parts.push(`鼓胀区域：${shapeDist.bulge.join('、')}`);
+    }
+    return parts.length > 0 ? parts.join('；') : '';
+  };
+
+  // 构建舌色分布特征描述（舌尖红点、舌边瘀斑等）
+  const buildDistributionFeaturesText = (distFeatures) => {
+    if (!distFeatures || !Array.isArray(distFeatures) || distFeatures.length === 0) return '';
+    return distFeatures.map(f => `${f.part}${f.feature}`).join('、');
+  };
+
+  const shapeDistText = buildShapeDistributionText(tongueFeatures.shapeDistribution);
+  const distFeaturesText = buildDistributionFeaturesText(tongueFeatures.distributionFeatures);
+
   // 构建用户消息，包含更完整的上下文
   const userMessage = `请根据以下舌象特征进行专业中医辨证分析：
 
@@ -225,6 +254,8 @@ async function handleDiagnoseMode(req) {
 - 齿痕：${tongueFeatures.teethMark ? '有' : '无'}
 - 裂纹：${tongueFeatures.crack ? '有' : '无'}
 - 舌态：${tongueFeatures.tongueState || '正常'}
+${shapeDistText ? `- 凹凸形态：${shapeDistText}` : ''}
+${distFeaturesText ? `- 舌色分布特征：${distFeaturesText}` : ''}
 
 ## 患者信息
 ${age ? `- 年龄：${age}岁` : ''}
@@ -333,6 +364,24 @@ async function handleDefaultMode(req) {
 
   const systemPrompt = loadSystemPrompt('default');
 
+  // 构建凹凸形态和舌色分布特征
+  const shapeDistText = (() => {
+    if (!tongueFeatures.shapeDistribution) return '';
+    const parts = [];
+    if (tongueFeatures.shapeDistribution.depression?.length > 0) {
+      const otherDep = tongueFeatures.shapeDistribution.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
+      if (otherDep.length > 0) parts.push(`凹陷区域：${otherDep.join('、')}`);
+    }
+    if (tongueFeatures.shapeDistribution.bulge?.length > 0) {
+      parts.push(`鼓胀区域：${tongueFeatures.shapeDistribution.bulge.join('、')}`);
+    }
+    return parts.length > 0 ? parts.join('；') : '';
+  })();
+  const distFeaturesText = (() => {
+    if (!tongueFeatures.distributionFeatures?.length) return '';
+    return tongueFeatures.distributionFeatures.map(f => `${f.part}${f.feature}`).join('、');
+  })();
+
   const userMessage = `请根据以下舌象特征进行辨证：
 
 舌象特征：
@@ -344,6 +393,8 @@ async function handleDefaultMode(req) {
 - 齿痕：${tongueFeatures.teethMark ? '有' : '无'}
 - 裂纹：${tongueFeatures.crack ? '有' : '无'}
 - 舌态：${tongueFeatures.tongueState || '正常'}
+${shapeDistText ? `- 凹凸形态：${shapeDistText}` : ''}
+${distFeaturesText ? `- 舌色分布：${distFeaturesText}` : ''}
 ${age ? `- 患者年龄：${age}岁` : ''}
 ${symptoms && symptoms.length > 0 ? `- 伴随症状：${typeof symptoms === 'string' ? symptoms : symptoms.map(s => s.name).join('、')}` : ''}
 ${patientInfo?.gender ? `- 性别：${patientInfo.gender}` : ''}
@@ -406,6 +457,24 @@ async function handleInquiryMode(req) {
   
   // Step 1: 先进行初步辨证
   const systemPrompt = loadSystemPrompt('inquiry');
+  // 构建凹凸形态和舌色分布特征
+  const inquiryShapeDistText = (() => {
+    if (!tongueFeatures.shapeDistribution) return '';
+    const parts = [];
+    if (tongueFeatures.shapeDistribution.depression?.length > 0) {
+      const otherDep = tongueFeatures.shapeDistribution.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
+      if (otherDep.length > 0) parts.push(`凹陷区域：${otherDep.join('、')}`);
+    }
+    if (tongueFeatures.shapeDistribution.bulge?.length > 0) {
+      parts.push(`鼓胀区域：${tongueFeatures.shapeDistribution.bulge.join('、')}`);
+    }
+    return parts.length > 0 ? parts.join('；') : '';
+  })();
+  const inquiryDistFeaturesText = (() => {
+    if (!tongueFeatures.distributionFeatures?.length) return '';
+    return tongueFeatures.distributionFeatures.map(f => `${f.part}${f.feature}`).join('、');
+  })();
+
   const preliminaryMessage = `请根据以下舌象特征进行初步辨证：
 
 舌象特征：
@@ -417,6 +486,8 @@ async function handleInquiryMode(req) {
 - 齿痕：${tongueFeatures.teethMark ? '有' : '无'}
 - 裂纹：${tongueFeatures.crack ? '有' : '无'}
 - 舌态：${tongueFeatures.tongueState || '正常'}
+${inquiryShapeDistText ? `- 凹凸形态：${inquiryShapeDistText}` : ''}
+${inquiryDistFeaturesText ? `- 舌色分布：${inquiryDistFeaturesText}` : ''}
 ${age ? `- 患者年龄：${age}岁` : ''}
 
 请返回JSON格式的初步辨证报告，标注不确定性：
@@ -553,7 +624,25 @@ async function handleConfirmMode(req) {
   console.log('[舌镜AI诊断] 回答数量:', answers.length);
 
   const systemPrompt = loadSystemPrompt('confirm');
-  const userMessage = buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, answers);
+  // handleConfirmMode 中也需要构建凹凸形态描述
+  const confirmShapeDistText = (() => {
+    if (!tongueFeatures.shapeDistribution) return '';
+    const parts = [];
+    if (tongueFeatures.shapeDistribution.depression?.length > 0) {
+      const otherDep = tongueFeatures.shapeDistribution.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
+      if (otherDep.length > 0) parts.push(`凹陷区域：${otherDep.join('、')}`);
+    }
+    if (tongueFeatures.shapeDistribution.bulge?.length > 0) {
+      parts.push(`鼓胀区域：${tongueFeatures.shapeDistribution.bulge.join('、')}`);
+    }
+    return parts.length > 0 ? parts.join('；') : '';
+  })();
+  const confirmDistFeaturesText = (() => {
+    if (!tongueFeatures.distributionFeatures?.length) return '';
+    return tongueFeatures.distributionFeatures.map(f => `${f.part}${f.feature}`).join('、');
+  })();
+
+  const userMessage = buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, answers, confirmShapeDistText, confirmDistFeaturesText);
 
   const assistantMessage = await callDeepSeek([
     { role: 'system', content: systemPrompt },
@@ -650,6 +739,24 @@ async function handleDetailMode(req) {
   console.log('[舌镜AI诊断] Detail模式请求');
 
   const systemPrompt = loadSystemPrompt('detail');
+  // handleDetailMode 中也需要构建凹凸形态描述
+  const detailShapeDistText = (() => {
+    if (!tongueFeatures.shapeDistribution) return '';
+    const parts = [];
+    if (tongueFeatures.shapeDistribution.depression?.length > 0) {
+      const otherDep = tongueFeatures.shapeDistribution.depression.filter(d => !d.includes('齿痕') && !d.includes('裂纹'));
+      if (otherDep.length > 0) parts.push(`凹陷区域：${otherDep.join('、')}`);
+    }
+    if (tongueFeatures.shapeDistribution.bulge?.length > 0) {
+      parts.push(`鼓胀区域：${tongueFeatures.shapeDistribution.bulge.join('、')}`);
+    }
+    return parts.length > 0 ? parts.join('；') : '';
+  })();
+  const detailDistFeaturesText = (() => {
+    if (!tongueFeatures.distributionFeatures?.length) return '';
+    return tongueFeatures.distributionFeatures.map(f => `${f.part}${f.feature}`).join('、');
+  })();
+
   const userMessage = `请根据以下舌象特征，生成详细的配穴方案：
 
 舌象特征：
@@ -660,6 +767,8 @@ async function handleDetailMode(req) {
 - 润燥：${tongueFeatures.coatingMoisture || '未提供'}
 - 齿痕：${tongueFeatures.teethMark ? '有' : '无'}
 - 裂纹：${tongueFeatures.crack ? '有' : '无'}
+${detailShapeDistText ? `- 凹凸形态：${detailShapeDistText}` : ''}
+${detailDistFeaturesText ? `- 舌色分布：${detailDistFeaturesText}` : ''}
 ${age ? `- 患者年龄：${age}岁` : ''}
 
 ${preliminaryResult ? `初步辨证结果：${JSON.stringify(preliminaryResult, null, 2)}` : ''}
