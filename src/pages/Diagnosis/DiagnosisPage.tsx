@@ -363,7 +363,7 @@ const DiagnosisPage: React.FC = () => {
 
   // ========== v3.2 问而确之：Inquiry模式调用 ==========
   const diagnoseWithInquiry = async () => {
-    console.log('[DeepSeek诊断] 启动问诊模式...');
+    // console.log('[DeepSeek诊断] 启动问诊模式...');
     setShowRefineButton(true); // 问诊开始时隐藏按钮，防止重复点击
     const shapeDist = inputFeatures.shapeDistribution;
     const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
@@ -429,7 +429,7 @@ const DiagnosisPage: React.FC = () => {
 
   // ========== v3.2 问诊提交处理 ==========
   const handleInquirySubmit = async (answers: { questionId: string; selectedOption: string }[]) => {
-    console.log('[问诊] 用户回答:', answers);
+    // console.log('[问诊] 用户回答:', answers);
     setIsRefiningDiagnosis(true);
     const shapeDist = inputFeatures.shapeDistribution;
     const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
@@ -627,19 +627,19 @@ const DiagnosisPage: React.FC = () => {
 
   // AI识别结果回填（每个字段独立try/catch，一个失败不影响其他）
   const handleRecognize = (result: TongueRecognitionResult) => {
-    console.log('[AI识别] 原始结果:', JSON.stringify(result, null, 2));
+    // console.log('[AI识别] 原始结果:', JSON.stringify(result, null, 2));
 
     // 舌色
     try {
       const colorVal = mapToEnum(result.tongue_color?.value || '', ['淡红', '淡白', '红', '绛', '紫', '青紫']);
-      console.log('[AI识别] 舌色:', result.tongue_color?.value, '→', colorVal);
+      // console.log('[AI识别] 舌色:', result.tongue_color?.value, '→', colorVal);
       setTongueColor(colorVal || '淡红');
     } catch (e) { console.error('[AI识别] 舌色回填异常:', e); }
 
     // 舌形
     try {
       const shapeVal = mapToEnum(result.tongue_shape?.value || '', ['胖大', '瘦薄', '正常']);
-      console.log('[AI识别] 舌形:', result.tongue_shape?.value, '→', shapeVal);
+      // console.log('[AI识别] 舌形:', result.tongue_shape?.value, '→', shapeVal);
       setTongueShape(shapeVal || '正常');
     } catch (e) { console.error('[AI识别] 舌形回填异常:', e); }
 
@@ -666,14 +666,14 @@ const DiagnosisPage: React.FC = () => {
       const coatColor = mapToEnum(result.tongue_coating?.color || '', ['薄白', '白厚', '黄', '灰黑', '剥落']);
       const coatTexture = mapToEnum(result.tongue_coating?.texture || '', ['薄', '厚', '正常']);
       const coatMoisture = mapToEnum(result.tongue_coating?.moisture || '', ['润', '燥', '正常']);
-      console.log('[AI识别] 苔色:', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
+      // console.log('[AI识别] 苔色:', coatColor, '苔质:', coatTexture, '润燥:', coatMoisture);
       setCoating(coatColor || '薄白', coatTexture || '薄', coatMoisture || '润');
     } catch (e) { console.error('[AI识别] 舌苔回填异常:', e); }
 
     // 舌态
     try {
       const stateVal = mapToEnum(result.tongue_state?.value || '', ['强硬', '痿软', '歪斜', '颤动', '正常']);
-      console.log('[AI识别] 舌态:', result.tongue_state?.value, '→', stateVal);
+      // console.log('[AI识别] 舌态:', result.tongue_state?.value, '→', stateVal);
       setTongueState(stateVal || '正常');
     } catch (e) { console.error('[AI识别] 舌态回填异常:', e); }
 
@@ -705,7 +705,7 @@ const DiagnosisPage: React.FC = () => {
       }
       if (depression.length > 0 || bulge.length > 0) {
         setShapeDistribution({ depression, bulge });
-        console.log('[AI识别] 凹凸形态 - 凹陷:', depression, '鼓胀:', bulge);
+        // console.log('[AI识别] 凹凸形态 - 凹陷:', depression, '鼓胀:', bulge);
       }
     } catch (e) { console.error('[AI识别] 凹凸形态回填异常:', e); }
 
@@ -727,8 +727,8 @@ const DiagnosisPage: React.FC = () => {
     // 缓存检查
     const _ck = diagCacheKey(inputFeatures, patientInfo);
     const _cached = diagCacheGet(_ck);
-    if (_cached) { console.log('[缓存命中]'); return _cached; }
-    console.log('[本地规则引擎] 开始辨证...');
+    if (_cached) { return _cached; }
+    // console.log('[本地规则引擎] 开始辨证...');
     
     // 检查齿痕和裂纹（同时兼容AI回填的teethMark/crack和手动选择的shapeDistribution）
     const shapeDist = inputFeatures.shapeDistribution;
@@ -760,9 +760,9 @@ const DiagnosisPage: React.FC = () => {
     
     // 打印规则统计
     const stats = getRuleStatistics();
-    console.log(`[本地规则引擎] 规则统计: 共${stats.totalRules}条规则`);
-    console.log(`[本地规则引擎] 主要结果: ${result.primaryResult.syndrome}`);
-    console.log(`[本地规则引擎] 匹配规则: ${result.primaryResult.matchedRuleName}`);
+    // console.log(`[本地规则引擎] 规则统计: 共${stats.totalRules}条规则`);
+    // console.log(`[本地规则引擎] 主要结果: ${result.primaryResult.syndrome}`);
+    // console.log(`[本地规则引擎] 匹配规则: ${result.primaryResult.matchedRuleName}`);
     
     // 构建诊断结果（严格匹配 DiagnosisResult 类型）
     const priorityMap: Record<string, '高' | '中' | '低'> = { high: '高', medium: '中', low: '低' };
@@ -864,7 +864,7 @@ const DiagnosisPage: React.FC = () => {
         }
       }
       if (fallbackPoints.length > 0) {
-        console.log(`[配穴安全网] 证型「${syndrome}」补充配穴: ${fallbackPoints.join(', ')}`);
+        // console.log(`[配穴安全网] 证型「${syndrome}」补充配穴: ${fallbackPoints.join(', ')}`);
         acupuncturePlan.secondaryPoints = fallbackPoints.map((name: string) => ({
           point: name,
           meridian: acupointKnowledge[name]?.meridian || '',
@@ -934,7 +934,7 @@ const DiagnosisPage: React.FC = () => {
 
   // 超时降级到本地引擎
   const handleFallbackToLocal = () => {
-    console.log('[降级] 切换到本地规则引擎');
+    // console.log('[降级] 切换到本地规则引擎');
     toast('正在切换到本地快速分析...', { icon: '⚡' });
     setUseLocalEngine(true);
     const startTime = Date.now();
@@ -1054,7 +1054,7 @@ const DiagnosisPage: React.FC = () => {
       setError(message);
       toast.error(message);
       // ========== 降级：submitDiagnosis 失败时使用本地规则引擎 ==========
-      console.log('[降级] 远程辨证失败，切换到本地规则引擎');
+      // console.log('[降级] 远程辨证失败，切换到本地规则引擎');
       toast('远程辨证失败，切换到本地快速分析...', { icon: '⚡' });
       
       const startTime = Date.now();
