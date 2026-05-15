@@ -165,7 +165,6 @@ import {
 } from '@/components/tongue-input/TongueFeatureSelectors';
 import ImageUpload from '@/components/tongue-input/ImageUpload';
 import SymptomInput from '@/components/tongue-input/SymptomInput';
-import PatientInfoForm from '@/components/tongue-input/PatientInfoForm';
 import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
 import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
@@ -972,22 +971,30 @@ const DiagnosisPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    // ========== 简化必填验证 ==========
-    // 有AI识别数据时：只要求舌色+苔色（其他已有默认值或AI填入）
-    // 无AI识别数据时：只要求舌色+苔色
-    
+    // ========== 必填验证 ==========
+    // 舌象必填
     const hasTongueColor = !!inputFeatures.tongueColor.value;
     const hasCoatingColor = !!inputFeatures.coating.color;
     
-    // 舌色必填
     if (!hasTongueColor) {
       toast.error('请选择舌色');
       return;
     }
     
-    // 苔色必填
     if (!hasCoatingColor) {
       toast.error('请选择苔色');
+      return;
+    }
+    
+    // 性别必填（女性需要月经三期辨证）
+    if (!patientInfo.gender) {
+      toast.error('请选择性别');
+      return;
+    }
+    
+    // 年龄段必填
+    if (!selectedAgeGroup) {
+      toast.error('请选择年龄段');
       return;
     }
     
@@ -1006,16 +1013,26 @@ const DiagnosisPage: React.FC = () => {
     }
     // 主诉改为选填，不阻断流程
 
+    // 将年龄段映射到 patientInfo.age
+    const ageToSet = selectedAgeGroup ? selectedAgeGroup : patientInfo.age;
+    
     setIsAnalyzing(true);
     setError(null);
     setDiagnosisResult(null);
     setShowRefineButton(false);
-
-
     try {
       // ========== 路径B：远程Bot API（异步，需要进度指示） ==========
       {
-        const input = getDiagnosisInput();
+        // 构建输入数据，确保年龄段被正确传入
+        const baseInput = getDiagnosisInput();
+        const input = {
+          ...baseInput,
+          patientInfo: {
+            ...baseInput.patientInfo,
+            // selectedAgeGroup 优先于 patientInfo.age
+            age: selectedAgeGroup || baseInput.patientInfo.age,
+          }
+        };
         setCurrentStep('analyzing', 35);
         
         const result = await submitDiagnosis(input, (step) => {
@@ -1097,28 +1114,62 @@ const DiagnosisPage: React.FC = () => {
           
           {/* ========== 左侧：输入区域 ========== */}
           <div className="space-y-4">
-            {/* ========== v3.2 年龄段选择器 ==========*/}
+            {/* ========== v3.2 性别 + 年龄段选择器 ==========*/}
             <div className="mb-4 p-4 bg-white rounded-xl shadow-sm border border-stone-100">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-stone-700 font-medium">您的年龄段</span>
-                <span className="text-xs text-stone-400">（帮助更准确辨证）</span>
+                <span className="text-sm text-stone-700 font-medium">基本信息</span>
+                <span className="text-xs text-red-500">* 为必填项</span>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                {ageGroups.map((group) => (
-                  <button
-                    key={group.value}
-                    onClick={() => setSelectedAgeGroup(group.value)}
-                    className={`
-                      py-2.5 px-3 rounded-xl text-sm font-medium transition-all
-                      ${selectedAgeGroup === group.value
-                        ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
-                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                      }
-                    `}
-                  >
-                    {group.label}
-                  </button>
-                ))}
+              
+              {/* 性别 + 年龄段 一行排列 */}
+              <div className="flex gap-3">
+                {/* 性别选择 - 必填 */}
+                <div className="flex-shrink-0">
+                  <span className="text-xs text-stone-500 block mb-1.5">
+                    性别 <span className="text-red-500">*</span>
+                  </span>
+                  <div className="flex gap-2">
+                    {(['男', '女'] as const).map((g) => (
+                      <button
+                        key={g}
+                        onClick={() => setPatientInfo({ gender: g })}
+                        className={`
+                          px-5 py-2.5 rounded-xl text-sm font-medium transition-all
+                          ${patientInfo.gender === g
+                            ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
+                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                          }
+                        `}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* 年龄段选择 - 必填 */}
+                <div className="flex-1">
+                  <span className="text-xs text-stone-500 block mb-1.5">
+                    年龄段 <span className="text-red-500">*</span>
+                  </span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {ageGroups.map((group) => (
+                      <button
+                        key={group.value}
+                        onClick={() => setSelectedAgeGroup(group.value)}
+                        className={`
+                          py-2 px-2 rounded-xl text-sm font-medium transition-all
+                          ${selectedAgeGroup === group.value
+                            ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
+                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                          }
+                        `}
+                      >
+                        {group.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1350,25 +1401,20 @@ const DiagnosisPage: React.FC = () => {
             </div>
 
 
-            {/* 补充信息 - 合并折叠 */}
-            <details className="tcm-card group">
-              <summary className="p-4 flex items-center justify-between cursor-pointer text-sm text-stone-500 hover:text-stone-700">
-                <span>补充信息（选填）</span>
-                <svg className="w-4 h-4 text-stone-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </summary>
-              <div className="px-4 pb-4 space-y-4">
-                <div>
-                  <span className="text-xs text-stone-500 block mb-2">患者信息</span>
-                  <PatientInfoForm patientInfo={patientInfo} onChange={setPatientInfo} />
-                </div>
-                <div className="border-t border-stone-100 pt-3">
-                  <span className="text-xs text-stone-500 block mb-2">伴随症状 {symptoms.length > 0 && <span className="text-stone-400">({symptoms.length}项)</span>}</span>
-                  <SymptomInput symptoms={symptoms} onAdd={addSymptom} onRemove={removeSymptom} onUpdate={updateSymptom} />
-                </div>
+            {/* 主诉输入 - 选填，不显眼 */}
+            <div className="p-4 bg-white rounded-xl shadow-sm border border-stone-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-stone-500">主诉</span>
+                <span className="text-xs text-stone-400">(选填，不填不影响辨证)</span>
               </div>
-            </details>
+              <input
+                type="text"
+                value={patientInfo.chiefComplaint}
+                onChange={(e) => setPatientInfo({ chiefComplaint: e.target.value })}
+                placeholder="简单描述主要不适，如：头痛、胃胀..."
+                className="mt-2 w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 transition-all"
+              />
+            </div>
 
             {/* 提交按钮 - 大而醒目 */}
             <button
