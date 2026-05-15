@@ -333,255 +333,266 @@ function getUserFriendlyError(error: any, context: string = ''): Error {
 
 export type DiagnosisProgressStep = 'recognizing' | 'analyzing' | 'reasoning' | 'matching';
 
+/**
+ * 舌镜辨证主流程 - DeepSeek直连版本
+ * 
+ * 修改历史：
+ * - v1.0: 初始版本，调用Coze Bot API
+ * - v2.0: 改为调用Vercel Function直连DeepSeek，砍掉Coze中间商
+ * 
+ * Vercel Function路径: /api/tongue-ai/diagnose
+ */
+
+import type { DiagnosisInput, DiagnosisOutput } from '@/types';
+import { getMeridian, getEffect } from './acupoint_data';
+
+// Vercel Function的API地址
+
+/**
+ * 清理穴位名称（去除编号、括号等）
+ */
+function cleanAcupointName(name: string): string {
+  if (!name) return '';
+  return String(name).replace(/[【】\[\]（）\(\)0-9.#*]/g, '').trim();
+}
+
+/**
+ * 将API返回的数据转换为前端期望的DiagnosisOutput格式
+ */
+function transformToDiagnosisOutput(apiResult: any): DiagnosisOutput {
+  // 提取证型信息
+  const syndrome = apiResult.syndrome || apiResult.mainSyndrome || '辨证分析完成';
+  const syndromeType = apiResult.syndromeType || apiResult.mainSyndromeType || '其他';
+  const confidence = apiResult.confidence || 0.8;
+  const patternAnalysis = apiResult.patternAnalysis || apiResult.analysis || '';
+  const pathogenesis = apiResult.pathogenesis || '';
+
+  // 提取穴位数组
+  const acupointNames = apiResult.acupoints || 
+    apiResult.acupuncturePlan?.mainPoints || 
+    apiResult.acupuncturePlan?.pointsDescription?.match(/[足中关命肾阴陵阳陵百会合谷内三阴太冲]/g) || 
+    [];
+
+  // 处理主穴（取前3个）
+  const mainPointNames = Array.isArray(acupointNames) 
+    ? acupointNames.slice(0, 3).map(cleanAcupointName)
+    : [];
+  const mainPoints = mainPointNames.map((name: string) => ({
+    point: name,
+    meridian: getMeridian(name) || '',
+    effect: getEffect(name) || '',
+    technique: apiResult.acupuncturePlan?.technique || '平补平泻',
+  }));
+
+  // 处理配穴
+  const secondaryPointNames = Array.isArray(acupointNames)
+    ? acupointNames.slice(3, 6).map(cleanAcupointName)
+    : [];
+  const secondaryPoints = secondaryPointNames.map((name: string) => ({
+    point: name,
+    meridian: getMeridian(name) || '',
+    effect: getEffect(name) || '',
+    technique: apiResult.acupuncturePlan?.technique || '平补平泻',
+  }));
+
+  // 提取养生建议
+  const lifestyleAdvice = apiResult.lifestyleAdvice || apiResult.lifeCareAdvice || [];
+
+  // 判断优先级
+  let priority: '高' | '中' | '低' = '中';
+  if (confidence >= 0.85) priority = '高';
+  else if (confidence < 0.6) priority = '低';
+
+  return {
+    diagnosisResult: {
+      primarySyndrome: syndrome,
+      syndromeScore: Math.round(confidence * 10),
+      confidence,
+      secondarySyndromes: [],
+      pathogenesis,
+      organLocation: apiResult.organLocation || [],
+      diagnosisEvidence: [],
+      priority,
+      diagnosisTime: new Date().toISOString(),
+    },
+    acupuncturePlan: {
+      treatmentPrinciple: apiResult.treatmentPrinciple || apiResult.acupuncturePlan?.treatmentPrinciple || '',
+      mainPoints,
+      secondaryPoints,
+      contraindications: [],
+      treatmentAdvice: {
+        techniquePrinciple: apiResult.acupuncturePlan?.technique || '平补平泻',
+        needleRetentionTime: apiResult.acupuncturePlan?.needleRetentionTime || '',
+        treatmentFrequency: apiResult.acupuncturePlan?.treatmentFrequency || '',
+        treatmentSessions: '',
+        sessionInterval: '',
+      },
+    },
+    lifeCareAdvice: {
+      dietSuggestions: Array.isArray(lifestyleAdvice) 
+        ? lifestyleAdvice.slice(0, 5) 
+        : typeof lifestyleAdvice === 'string' 
+          ? lifestyleAdvice.split(/[、,，]/).slice(0, 5)
+          : [],
+      dailyRoutine: [],
+      precautions: [],
+    },
+    systemInfo: {
+      knowledgeBaseVersion: '3.0-deepseek',
+      skillVersion: '2.0-direct',
+      reasoningRulesCount: 0,
+      updateTime: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * 模拟进度回调
+ * 由于HTTP请求无法流式，使用setTimeout模拟不同阶段的进度
+ */
+function simulateProgress(
+  onProgress: (step: DiagnosisProgressStep) => void,
+  totalDuration: number = 3000
+): { stop: () => void } {
+  const stages: { step: DiagnosisProgressStep; progress: number; delay: number }[] = [
+    { step: 'recognizing', progress: 15, delay: 200 },
+    { step: 'analyzing', progress: 35, delay: 800 },
+    { step: 'reasoning', progress: 65, delay: 1200 },
+    { step: 'matching', progress: 85, delay: totalDuration - 200 },
+  ];
+
+  const timers: NodeJS.Timeout[] = [];
+  let stopped = false;
+
+  for (const stage of stages) {
+    const timer = setTimeout(() => {
+      if (!stopped) {
+        onProgress(stage.step);
+      }
+    }, stage.delay);
+    timers.push(timer);
+  }
+
+  return {
+    stop: () => {
+      stopped = true;
+      timers.forEach(t => clearTimeout(t));
+    }
+  };
+}
+
+/**
+ * 提交辨证请求 - 直连DeepSeek版本
+ * 
+ * @param input 辨证输入数据
+ * @param onProgress 进度回调
+ */
 export async function submitDiagnosis(
   input: DiagnosisInput, 
   onProgress?: (step: DiagnosisProgressStep) => void
 ): Promise<DiagnosisOutput> {
-  // 构建消息内容 - 包含凹凸形态
-  const textContent = JSON.stringify({
-    tongue_color: input.input_features.tongueColor.value,
-    tongue_shape: input.input_features.tongueShape.value,
-    tongue_coating_color: input.input_features.coating.color,
-    tongue_coating_texture: input.input_features.coating.texture,
-    tongue_movement: input.input_features.tongueState.value || '正常',
+  console.log('[submitDiagnosis] 开始辨证请求，直连DeepSeek');
+
+  // 构建舌象特征数据
+  const tongueFeatures = {
+    tongueColor: input.input_features.tongueColor?.value || '',
+    tongueShape: input.input_features.tongueShape?.value || '',
+    tongueState: input.input_features.tongueState?.value || '正常',
+    coatingColor: input.input_features.coating?.color || '',
+    coatingTexture: input.input_features.coating?.texture || '',
+    coatingMoisture: input.input_features.coating?.moisture || '润',
+    teethMark: input.input_features.teethMark?.value === '是',
     crack: input.input_features.crack?.value === '是',
-    teeth_mark: input.input_features.teethMark?.value === '是',
-    spots: input.input_features.ecchymosis?.value === '是',
-    shape_distribution: input.input_features.shapeDistribution || { depression: [], bulge: [] },  // 凹凸形态
-    distribution_features: input.input_features.distributionFeatures || [],  // 舌色分布特征
-    patient_age: input.patientInfo?.age,
-    patient_gender: input.patientInfo?.gender,
-    chief_complaint: input.patientInfo?.chiefComplaint,
-    symptoms: input.symptoms?.map(s => s.symptom).join(', ') || '',
-    mode: input.options?.mode || '详细模式',
-    has_image: !!input.imageData,
-  }, null, 2);
-
-  // 构建多模态消息内容
-  const messageContent = [];
-  
-  // 如果有图片，添加图片内容
-  if (input.imageData) {
-    // 确保图片数据是有效的 base64 URL
-    const imageUrl = input.imageData.startsWith('data:') 
-      ? input.imageData 
-      : `data:image/jpeg;base64,${input.imageData}`;
-    
-    console.log(`[舌照上传] 图片数据长度: ${imageUrl.length} 字符`);
-    
-    messageContent.push({
-      type: 'image_url',
-      image_url: { url: imageUrl }
-    });
-  }
-  
-  // 添加文本内容
-  messageContent.push({
-    type: 'text',
-    text: textContent
-  });
-
-  const requestPayload = {
-    bot_id: BOT_ID,
-    user_id: generateUserId(),
-    stream: true,
-    additional_messages: [{
-      role: 'user',
-      content: messageContent.length > 1 ? JSON.stringify(messageContent) : textContent,
-      content_type: messageContent.length > 1 ? 'object_string' : 'text'
-    }]
+    // 扩展特征
+    shapeDistribution: input.input_features.shapeDistribution || { depression: [], bulge: [] },
+    distributionFeatures: input.input_features.distributionFeatures || [],
   };
 
-  let response: Response;
+  // 获取患者信息
+  const age = input.patientInfo?.age || 0;
+  const gender = input.patientInfo?.gender;
+  const chiefComplaint = input.patientInfo?.chiefComplaint || '';
+
+  // 获取伴随症状
+  const symptoms = input.symptoms?.map(s => s.symptom).join('、') || '';
+
+  // 开始进度模拟
+  let progressController: { stop: () => void } | null = null;
+  if (onProgress) {
+    progressController = simulateProgress(onProgress);
+  }
+
   try {
-    response = await fetch(`${API_BASE_URL}/v3/chat`, {
+    // 调用Vercel Function
+    console.log('[submitDiagnosis] 发送请求到:', VERCE_API_URL);
+    
+    const response = await fetch(VERCE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_TOKEN}`,
       },
-      body: JSON.stringify(requestPayload),
+      body: JSON.stringify({
+        mode: 'diagnose',  // 辨证主模式
+        tongueFeatures,
+        age,
+        gender,
+        chiefComplaint,
+        symptoms,
+        // 保留原始输入以便调试
+        _rawInput: {
+          tongueColor: input.input_features.tongueColor?.value,
+          tongueShape: input.input_features.tongueShape?.value,
+          coatingColor: input.input_features.coating?.color,
+          coatingTexture: input.input_features.coating?.texture,
+        }
+      }),
     });
-  } catch (networkError) {
-    throw getUserFriendlyError(networkError, '网络连接');
-  }
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw getUserFriendlyError({
-      code: response.status,
-      message: `HTTP ${response.status}: ${errorText || response.statusText}`
-    }, 'API请求');
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('无法读取响应流');
-
-  let result = '';
-  const decoder = new TextDecoder();
-  let messageCount = 0;
-  let earlyErrorDetected = false;
-  
-  // 设置超时（90秒，考虑到图片处理可能需要更长时间）
-  const TIMEOUT = 90000;
-  const startTime = Date.now();
-  
-  while (true) {
-    // 检查超时
-    if (Date.now() - startTime > TIMEOUT) {
-      throw new Error('辨证分析超时（90秒），图片可能过大，请尝试压缩后重新上传');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[submitDiagnosis] API错误:', response.status, errorText);
+      throw new Error(`辨证请求失败: ${response.status}`);
     }
+
+    const apiResult = await response.json();
+    console.log('[submitDiagnosis] API响应:', JSON.stringify(apiResult, null, 2));
+
+    // 检查API返回的错误
+    if (!apiResult.success) {
+      throw new Error(apiResult.error || '辨证分析失败');
+    }
+
+    // 检查是否需要问诊确认
+    if (apiResult.needsConfirmation) {
+      console.log('[submitDiagnosis] 需要问诊确认，但主流程直接返回初步结果');
+      // 主流程不需要问诊，直接返回初步结果
+    }
+
+    // 提取辨证数据
+    const diagnosisData = apiResult.data || apiResult.finalResult || apiResult.preliminaryResult || apiResult;
     
-    const { done, value } = await reader.read();
-    if (done) break;
-    result += decoder.decode(value, { stream: true });
+    // 转换为前端期望的格式
+    const output = transformToDiagnosisOutput(diagnosisData);
     
-    // 尝试解析SSE数据流中的错误标记
-    // 因为INVALID_IMAGE在JSON中可能被编码，需要解析后检测
-    const lines = result.split('\n');
-    for (const line of lines) {
-      if (line.includes('"content"') && line.includes('INVALID_IMAGE')) {
-        console.log('[流式错误检测] 检测到INVALID_IMAGE标记');
-        earlyErrorDetected = true;
-        break;
-      }
-    }
+    console.log('[submitDiagnosis] 辨证完成:', output.diagnosisResult.primarySyndrome);
     
-    // 基于SSE事件类型更新真实进度
-    messageCount++;
-    if (onProgress) {
-      const chunkStr = decoder.decode(value, { stream: true });
-      const chunkLines = chunkStr.split('\n');
-      for (const cl of chunkLines) {
-        if (cl.startsWith('event:')) {
-          const evt = cl.slice(6).trim();
-          if (evt === 'conversation.message.delta') {
-            // AI正在输出内容 - 分析阶段
-            onProgress('analyzing');
-          } else if (evt === 'conversation.message.completed') {
-            // 消息完成 - 推理阶段
-            onProgress('reasoning');
-          } else if (evt === 'conversation.chat.completed') {
-            // 对话完成 - 匹配阶段
-            onProgress('matching');
-          }
-        }
-      }
-      // 首次收到数据说明已连接
-      if (messageCount === 1) {
-        onProgress('recognizing');
-      }
-    }
-  }
+    return output;
 
-  // 解析SSE，收集所有事件和数据
-  const lines = result.split('\n');
-  let answerContent = '';
-  let currentEvent = '';
-  let errorEventData: any = null;
-  let chatFailedData: any = null;
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('event:')) {
-      currentEvent = trimmed.slice(6).trim();
-    } else if (trimmed.startsWith('data:')) {
-      try {
-        const jsonStr = trimmed.slice(5).trim();
-        if (jsonStr === '[DONE]') continue;
-        const data = JSON.parse(jsonStr);
-        
-        // 捕获错误事件
-        if (currentEvent === 'error' || currentEvent === 'conversation.chat.failed') {
-          console.error(`[API错误事件] ${currentEvent}:`, JSON.stringify(data));
-          
-          if (currentEvent === 'conversation.chat.failed') {
-            chatFailedData = data;
-          }
-          if (currentEvent === 'error') {
-            errorEventData = data;
-          }
-        }
-        
-        // 只收集type="answer"的消息
-        if (data.type === 'answer' && data.reasoning_content) {
-          answerContent += data.reasoning_content;
-        }
-        
-        // conversation.message.completed事件可能有完整content
-        if (currentEvent === 'conversation.message.completed' && data.type === 'answer' && data.content) {
-          answerContent = data.content;
-          console.log('[API] 获取到完整answer内容，长度:', answerContent.length);
-          console.log('[API] answer内容前200字符:', answerContent.substring(0, 200));
-        }
-      } catch (parseError) {
-        // 忽略解析错误，继续处理其他行
-      }
-    }
-  }
-
-  // 处理conversation.chat.failed错误
-  if (chatFailedData) {
-    const failedReason = chatFailedData?.reason || chatFailedData?.failed_reason || chatFailedData?.err_msg;
-    const failedCode = chatFailedData?.code || chatFailedData?.error_code;
-    
-    if (failedCode) {
-      throw getUserFriendlyError({ code: failedCode, message: failedReason }, '会话失败');
-    }
-    if (failedReason) {
-      throw getUserFriendlyError({ message: failedReason }, '会话失败');
-    }
-  }
-  
-  // 处理error事件
-  if (errorEventData) {
-    throw getUserFriendlyError(errorEventData, 'API错误');
-  }
-
-  // 优先检查流式过程中检测到的错误
-  if (earlyErrorDetected) {
-    console.log('[API] 流式检测到INVALID_IMAGE，抛出错误');
-    throw new Error('当前图片不是舌象照片，无法进行辨证分析。请上传舌象图片或删除图片后手动输入舌象特征。');
-  }
-
-  if (!answerContent) {
-    console.log('[API] 未获取到answer内容');
-    // 如果没有answer内容但有chat失败数据，给出友好提示
-    if (chatFailedData) {
-      throw new Error('服务处理失败，图片可能不符合要求，请尝试更换舌象图片或移除图片后重试');
-    }
-    throw new Error('未获取到辨证结果，请稍后重试');
-  }
-
-  // 检测文本中的错误提示（非舌象图片等）
-  console.log('[API] 开始检测answerContent中的错误...');
-  const contentError = detectErrorInContent(answerContent);
-  if (contentError) {
-    console.log('[API] detectErrorInContent返回错误:', contentError);
-    throw new Error(contentError);
-  }
-
-  // 检测JSON格式的错误响应
-  try {
-    const parsed = typeof answerContent === 'string' ? JSON.parse(answerContent) : answerContent;
-    if (parsed.error) {
-      throw new Error(parsed.message || '输入验证失败，请重新上传舌象图片');
-    }
-    return parsed;
-  } catch (e) {
-    if (e instanceof Error && (e.message.includes('上传') || e.message.includes('舌象'))) {
-      throw e;
-    }
-    return parseMarkdownDiagnosis(answerContent);
+  } catch (error) {
+    console.error('[submitDiagnosis] 异常:', error);
+    throw error instanceof Error ? error : new Error('辨证分析失败');
+  } finally {
+    // 停止进度模拟
+    progressController?.stop();
   }
 }
 
 export async function validateFeatures(input: Partial<DiagnosisInput>): Promise<{ valid: boolean; errors?: string[] }> {
   const errors: string[] = [];
-  if (!input.input_features?.tongueColor.value) errors.push('请选择舌色');
-  if (!input.input_features?.tongueShape.value) errors.push('请选择舌形');
-  if (!input.input_features?.coating.color) errors.push('请选择苔色');
-  if (!input.input_features?.coating.texture) errors.push('请选择苔质');
+  if (!input.input_features?.tongueColor?.value) errors.push('请选择舌色');
+  if (!input.input_features?.tongueShape?.value) errors.push('请选择舌形');
+  if (!input.input_features?.coating?.color) errors.push('请选择苔色');
+  if (!input.input_features?.coating?.texture) errors.push('请选择苔质');
   if (!input.patientInfo?.age) errors.push('请输入患者年龄');
   if (!input.patientInfo?.gender) errors.push('请选择患者性别');
   if (!input.patientInfo?.chiefComplaint) errors.push('请输入主诉');
@@ -592,8 +603,24 @@ export async function getDiagnosisModes() {
   return { modes: [{ value: '快速模式', label: '快速模式', description: '仅输出主要证型和主穴' }, { value: '详细模式', label: '详细模式', description: '完整辨证分析' }] };
 }
 
-export async function healthCheck(): Promise<boolean> { return !!BOT_ID && !!API_TOKEN; }
-export function getApiConfig() { return { baseUrl: API_BASE_URL, botId: BOT_ID.slice(0,8)+'...', hasToken: !!API_TOKEN }; }
+export async function healthCheck(): Promise<boolean> { 
+  try {
+    const response = await fetch(VERCE_API_URL, {
+      method: 'OPTIONS',
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export function getApiConfig() { 
+  return { 
+    baseUrl: VERCE_API_URL, 
+    engine: 'deepseek-direct',
+    hasToken: true 
+  }; 
+}
 
 // 验证图片是否为舌象
 export async function validateTongueImage(imageBase64: string): Promise<{ valid: boolean; message?: string }> {
