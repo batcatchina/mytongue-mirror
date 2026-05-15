@@ -1114,27 +1114,27 @@ const DiagnosisPage: React.FC = () => {
           
           {/* ========== 左侧：输入区域 ========== */}
           <div className="space-y-4">
-            {/* ========== v3.2 性别 + 年龄段选择器 - 分行排列 ==========*/}
+            {/* ========== v3.2 性别 + 年龄段选择器 ==========*/}
             <div className="mb-4 p-4 bg-white rounded-xl shadow-sm border border-stone-100">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-stone-700 font-medium">基本信息</span>
                 <span className="text-xs text-red-500">* 为必填项</span>
               </div>
               
-              {/* 性别 + 年龄段 分行排列 */}
-              <div className="space-y-4">
+              {/* 性别 + 年龄段 一行排列 */}
+              <div className="flex gap-3">
                 {/* 性别选择 - 必填 */}
-                <div>
-                  <span className="text-xs text-stone-500 block mb-2">
+                <div className="flex-shrink-0">
+                  <span className="text-xs text-stone-500 block mb-1.5">
                     性别 <span className="text-red-500">*</span>
                   </span>
-                  <div className="flex gap-3">
+                  <div className="flex gap-2">
                     {(['男', '女'] as const).map((g) => (
                       <button
                         key={g}
                         onClick={() => setPatientInfo({ gender: g })}
                         className={`
-                          flex-1 py-3 px-6 rounded-xl text-base font-medium transition-all min-w-[80px]
+                          px-5 py-2.5 rounded-xl text-sm font-medium transition-all
                           ${patientInfo.gender === g
                             ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
                             : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
@@ -1148,17 +1148,17 @@ const DiagnosisPage: React.FC = () => {
                 </div>
                 
                 {/* 年龄段选择 - 必填 */}
-                <div>
-                  <span className="text-xs text-stone-500 block mb-2">
+                <div className="flex-1">
+                  <span className="text-xs text-stone-500 block mb-1.5">
                     年龄段 <span className="text-red-500">*</span>
                   </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-4 gap-2">
                     {ageGroups.map((group) => (
                       <button
                         key={group.value}
                         onClick={() => setSelectedAgeGroup(group.value)}
                         className={`
-                          py-3 px-2 rounded-xl text-sm font-medium transition-all
+                          py-2 px-2 rounded-xl text-sm font-medium transition-all
                           ${selectedAgeGroup === group.value
                             ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
                             : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
