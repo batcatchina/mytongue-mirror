@@ -118,13 +118,17 @@ function getStructuredTongueDisplay(inputFeatures: any, isAIRecognized: boolean,
   // 凹凸形态
   const shapeItems: Array<{ name: string; confidence: string; category: string }> = [];
   const otherDepression = inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')) || [];
-  otherDepression.forEach((item: string) => {
-    shapeItems.push({ name: item, confidence, category: 'special' });
-    parts.push(item);
+  // 凹陷项加"凹陷"后缀（已有"凹陷"的不重复加）
+  otherDepression.forEach((rawItem: string) => {
+    const displayItem = rawItem.includes('凹陷') ? rawItem : rawItem + '凹陷';
+    shapeItems.push({ name: displayItem, confidence, category: 'special' });
+    parts.push(displayItem);
   });
-  inputFeatures.shapeDistribution?.bulge?.forEach((item: string) => {
-    shapeItems.push({ name: item, confidence, category: 'special' });
-    parts.push(item);
+  // 鼓胀项加"鼓胀"后缀（已有"鼓胀"的不重复加）
+  inputFeatures.shapeDistribution?.bulge?.forEach((rawItem: string) => {
+    const displayItem = rawItem.includes('鼓胀') ? rawItem : rawItem + '鼓胀';
+    shapeItems.push({ name: displayItem, confidence, category: 'special' });
+    parts.push(displayItem);
   });
   if (shapeItems.length > 0) {
     categories.push({ label: '形态', items: shapeItems });
@@ -161,6 +165,7 @@ import {
   DiagnosisInput,
   getRuleStatistics,
 } from '@/services/diagnosisEngine';
+import { getRegionChineseName } from '@/config/tongueDisplay';
 
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
@@ -927,13 +932,15 @@ const DiagnosisPage: React.FC = () => {
       // shape_distribution格式: { depression: Array<{region, degree}>, bulge: Array<{region, degree}> }
       if (result.shape_distribution?.depression) {
         result.shape_distribution.depression.forEach((d: { region: string; degree: string }) => {
-          if (d.region && !depression.includes(d.region)) depression.push(d.region);
+          const cn = getRegionChineseName(d.region);
+          if (cn && !depression.includes(cn)) depression.push(cn);
         });
       }
       // 从shape_distribution中提取鼓胀信息
       if (result.shape_distribution?.bulge) {
         result.shape_distribution.bulge.forEach((b: { region: string; degree: string }) => {
-          if (b.region && !bulge.includes(b.region)) bulge.push(b.region);
+          const cn = getRegionChineseName(b.region);
+          if (cn && !bulge.includes(cn)) bulge.push(cn);
         });
       }
       // 从齿痕和裂纹补充凹陷信息（如果不在shape_distribution中）
