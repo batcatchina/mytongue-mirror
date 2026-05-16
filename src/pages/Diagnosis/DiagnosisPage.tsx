@@ -171,6 +171,7 @@ import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
 import InquiryDialog, { InquiryQuestion } from '@/components/InquiryDialog';
 import { acupointKnowledge } from '@/config/acupointKnowledge';
 import DiagnosisProgress from '@/components/diagnosis/DiagnosisProgress';
+import InferenceChainView from '@/components/inference/InferenceChainView';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import { submitDiagnosis } from '@/services/api';
 import { TongueRecognitionResult } from '@/services/tongueAI';
@@ -209,6 +210,24 @@ const DiagnosisPage: React.FC = () => {
   );
 
 
+
+  // ========== v2.0 UI模式切换 ==========
+  const UIModeToggle = () => (
+    <div className="flex justify-end px-4 py-2">
+      <button
+        onClick={() => setUiMode(prev => prev === 'v1' ? 'v2' : 'v1')}
+        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+          uiMode === 'v2' 
+            ? 'bg-primary-100 text-primary-700 border border-primary-300' 
+            : 'bg-stone-100 text-stone-600 border border-stone-200'
+        }`}
+      >
+        {uiMode === 'v1' ? '🔮 推理链模式' : '📋 简化模式'}
+      </button>
+    </div>
+  );
+
+
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
 
   // ========== v3.2 问而确之：年龄段选择器 ==========
@@ -230,6 +249,8 @@ const DiagnosisPage: React.FC = () => {
   const [useLocalEngine, setUseLocalEngine] = useState(true);
   const [showEngineSwitch, setShowEngineSwitch] = useState(false);
   const [isAIRecognized, setIsAIRecognized] = useState(false);
+  const [uiMode, setUiMode] = useState<'v1' | 'v2'>('v1');
+  const [inferenceChain, setInferenceChain] = useState<any>(null);
 
 
 
@@ -242,6 +263,46 @@ const DiagnosisPage: React.FC = () => {
    */
   const diagnoseWithDeepSeek = async () => {
     console.log('[DeepSeek诊断] 开始AI辨证推理...');
+    
+    // ========== v2.0 模拟推理链数据 ==========
+    const mockInferenceChain = {
+      layers: [
+        {
+          layer: 1,
+          name: '舌质舌苔分析',
+          conclusion: { label: '气血偏虚', confidence: 0.85, evidence: ['舌质淡'] },
+          input: `舌色:${inputFeatures.tongueColor.value}, 苔色:${inputFeatures.coating.color}`,
+          reasoning: '舌质淡主气血不足'
+        },
+        {
+          layer: 2,
+          name: '舌形舌态分析',
+          conclusion: { label: '气虚湿盛', confidence: 0.8, evidence: ['胖大', '齿痕'] },
+          input: `舌形:${inputFeatures.tongueShape.value || '正常'}`,
+          reasoning: '胖大+齿痕→气虚湿盛（气虚为本，湿盛为标）'
+        },
+        {
+          layer: 3,
+          name: '分区凹凸辨证',
+          conclusion: { label: '脾胃区凹陷', confidence: 0.75, evidence: ['舌中凹陷'] },
+          input: `舌中:${shapeDist?.depression?.includes('舌中') ? '凹陷' : '正常'}`,
+          reasoning: '舌中凹陷→脾胃虚弱'
+        },
+        {
+          layer: 4,
+          name: '综合推理',
+          conclusion: { label: '脾虚湿困证', confidence: 0.9, evidence: ['气虚', '湿盛', '脾胃虚'] },
+          reasoning: '脾虚运化失司，湿泛于舌'
+        }
+      ],
+      currentStep: 4,
+      finalOutput: {
+        syndrome: '脾虚湿困证',
+        rootCause: '脾虚运化失司',
+        transmission: ['脾虚→生化不足→气血虚']
+      }
+    };
+
     
     // 构建舌象特征对象
     const shapeDist = inputFeatures.shapeDistribution;
@@ -419,6 +480,7 @@ const DiagnosisPage: React.FC = () => {
           };
           setDiagnosisResult(wrappedResult as any);
           setCurrentStep('result');
+          setInferenceChain(mockInferenceChain);
         }
       }
     } catch (err) {
@@ -1109,6 +1171,8 @@ const DiagnosisPage: React.FC = () => {
       <NavBar currentPath="/" onNavigate={(path) => navigate(path)} />
       
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* ========== v2.0 UI模式切换 ========== */}
+        <UIModeToggle />
         {/* ========== 移动端单列流布局 ========== */}
         <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-4 lg:space-y-0">
           
