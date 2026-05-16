@@ -1114,66 +1114,55 @@ const DiagnosisPage: React.FC = () => {
           
           {/* ========== 左侧：输入区域 ========== */}
           <div className="space-y-4">
-            {/* ========== v3.2 性别 + 年龄段选择器 - 分行排列 ==========*/}
-            <div className="mb-4 p-4 bg-white rounded-xl shadow-sm border border-stone-100">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-stone-700 font-medium">基本信息</span>
-                <span className="text-xs text-red-500">* 为必填项</span>
+            {/* ========== 性别 + 年龄段选择器 - 紧凑一行 ==========*/}
+            <div className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-stone-100">
+              {/* 性别选择 */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-stone-500">性别</span>
+                <div className="flex gap-1">
+                  {(['男', '女'] as const).map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setPatientInfo({ gender: g })}
+                      className={`
+                        px-2.5 py-1 text-xs font-medium rounded-full transition-all
+                        ${patientInfo.gender === g
+                          ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-sm'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                        }
+                      `}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
               </div>
               
-              {/* 性别 + 年龄段 分行排列 */}
-              <div className="space-y-4">
-                {/* 性别选择 - 必填 */}
-                <div>
-                  <span className="text-xs text-stone-500 block mb-2">
-                    性别 <span className="text-red-500">*</span>
-                  </span>
-                  <div className="flex gap-3">
-                    {(['男', '女'] as const).map((g) => (
-                      <button
-                        key={g}
-                        onClick={() => setPatientInfo({ gender: g })}
-                        className={`
-                          flex-1 py-3 px-6 rounded-xl text-base font-medium transition-all min-w-[80px]
-                          ${patientInfo.gender === g
-                            ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
-                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                          }
-                        `}
-                      >
-                        {g}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* 年龄段选择 - 必填 */}
-                <div>
-                  <span className="text-xs text-stone-500 block mb-2">
-                    年龄段 <span className="text-red-500">*</span>
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                    {ageGroups.map((group) => (
-                      <button
-                        key={group.value}
-                        onClick={() => setSelectedAgeGroup(group.value)}
-                        className={`
-                          py-3 px-2 rounded-xl text-sm font-medium transition-all
-                          ${selectedAgeGroup === group.value
-                            ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-md'
-                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                          }
-                        `}
-                      >
-                        {group.label}
-                      </button>
-                    ))}
-                  </div>
+              {/* 分隔线 */}
+              <div className="w-px h-5 bg-stone-200"></div>
+              
+              {/* 年龄段选择 */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-stone-500">年龄</span>
+                <div className="flex gap-1 flex-wrap">
+                  {ageGroups.map((group) => (
+                    <button
+                      key={group.value}
+                      onClick={() => setSelectedAgeGroup(group.value)}
+                      className={`
+                        px-2 py-0.5 text-xs font-medium rounded-full transition-all
+                        ${selectedAgeGroup === group.value
+                          ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-sm'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                        }
+                      `}
+                    >
+                      {group.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
-
-            {/* 核心入口：拍照/上传 - 最醒目 */}
             <div className="tcm-card p-4 bg-gradient-to-br from-primary-50 to-secondary-50 border-2 border-primary-200">
               <ImageUpload 
                 onChange={(imageData) => setImageData(imageData)} 
