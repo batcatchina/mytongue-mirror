@@ -234,37 +234,7 @@ const DiagnosisPage: React.FC = () => {
   // isUnlocked replaced by isUnlocked from usePaymentStatus()
   const [currentReportId, setCurrentReportId] = useState('');
 
-  // ========== 付费通道逻辑 ==========
-  // 面包多商品链接（审核通过后填入实际链接）
-  const MIANBAODUO_PRODUCT_URL = 'https://www.mianbaoduo.com/o/product/PLACEHOLDER';
-  
-  // 检测URL参数（支付回调）
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paid = params.get('paid');
-    const reportId = params.get('report_id');
-    
-    if (paid === '1' && reportId) {
-      // 支付成功回调
-      setIsReportUnlocked(true);
-      setCurrentReportId(reportId);
-      localStorage.setItem('report_unlocked_' + reportId, 'true');
-      // 清除URL参数
-      window.history.replaceState({}, '', window.location.pathname);
-      toast.success('支付成功！正在解锁完整报告...');
-    }
-  }, []);
-  
-  // 解锁报告
-    const reportId = 'R' + Date.now().toString(36).toUpperCase();
-    setCurrentReportId(reportId);
-    // 跳转面包多支付
-    const returnUrl = encodeURIComponent(window.location.origin + window.location.pathname + '?paid=1&report_id=' + reportId);
-    window.open(MIANBAODUO_PRODUCT_URL + '?from=shezhen&return=' + returnUrl, '_blank');
-    // 演示模式：直接解锁（开发时使用）
-    setIsReportUnlocked(true);
-    localStorage.setItem('report_unlocked_' + reportId, 'true');
-  };
+  // 支付逻辑已迁移到 PayButton + usePaymentStatus 组件
   
   // 生成新报告ID
   const generateReportId = () => 'R' + Date.now().toString(36).toUpperCase();
