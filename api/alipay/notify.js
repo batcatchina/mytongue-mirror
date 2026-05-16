@@ -6,7 +6,7 @@
  * 验签通过后，需要更新业务系统中的订单状态
  */
 
-const { getAlipayClient, SANDBOX_CONFIG } = require('./alipay-sdk-config');
+import { getAlipayClient, SANDBOX_CONFIG } from './alipay-sdk-config.js';
 
 export default async function handler(req, res) {
   // CORS

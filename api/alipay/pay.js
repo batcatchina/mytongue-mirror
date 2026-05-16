@@ -4,7 +4,7 @@
  * 通过User-Agent自动判断设备类型选择支付方式
  */
 
-const { getAlipayClient } = require('./alipay-sdk-config');
+import { getAlipayClient } from './alipay-sdk-config.js';
 
 export default async function handler(req, res) {
   // CORS

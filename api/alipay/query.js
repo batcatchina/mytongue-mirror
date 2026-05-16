@@ -3,7 +3,7 @@
  * 根据商户订单号或支付宝交易号查询交易状态
  */
 
-const { getAlipayClient } = require('./alipay-sdk-config');
+import { getAlipayClient } from './alipay-sdk-config.js';
 
 export default async function handler(req, res) {
   // CORS
