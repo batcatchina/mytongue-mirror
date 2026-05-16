@@ -1,8 +1,10 @@
 export default async function handler(req, res) {
   try {
-    const AlipaySdk = (await import("alipay-sdk")).default;
-    return res.json({ success: true, message: "alipay-sdk loaded", hasDefault: !!AlipaySdk });
+    const mod = await import("alipay-sdk");
+    const keys = Object.keys(mod);
+    const defaultType = typeof mod.default;
+    return res.json({ success: true, exportKeys: keys, defaultType });
   } catch (e) {
-    return res.json({ success: false, error: e.message, stack: e.stack?.substring(0, 500) });
+    return res.json({ success: false, error: e.message });
   }
 }
