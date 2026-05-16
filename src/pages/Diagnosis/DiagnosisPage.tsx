@@ -168,6 +168,7 @@ import SymptomInput from '@/components/tongue-input/SymptomInput';
 import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
 import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
+import HealthReport from '@/components/result-display/HealthReport';
 import InquiryDialog, { InquiryQuestion } from '@/components/InquiryDialog';
 import { acupointKnowledge } from '@/config/acupointKnowledge';
 import DiagnosisProgress from '@/components/diagnosis/DiagnosisProgress';
@@ -229,6 +230,48 @@ const DiagnosisPage: React.FC = () => {
 
 
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
+
+  // ========== 付费报告状态 ==========
+  const [isReportUnlocked, setIsReportUnlocked] = useState(false);
+  const [currentReportId, setCurrentReportId] = useState('');
+  const [showFreePreview, setShowFreePreview] = useState(true); // 免费预览模式
+
+  // ========== 付费通道逻辑 ==========
+  // 面包多商品链接（审核通过后填入实际链接）
+  const MIANBAODUO_PRODUCT_URL = 'https://www.mianbaoduo.com/o/product/PLACEHOLDER';
+  const REPORT_PRICE = 9.9;
+  
+  // 检测URL参数（支付回调）
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paid = params.get('paid');
+    const reportId = params.get('report_id');
+    
+    if (paid === '1' && reportId) {
+      // 支付成功回调
+      setIsReportUnlocked(true);
+      setCurrentReportId(reportId);
+      localStorage.setItem('report_unlocked_' + reportId, 'true');
+      // 清除URL参数
+      window.history.replaceState({}, '', window.location.pathname);
+      toast.success('支付成功！正在解锁完整报告...');
+    }
+  }, []);
+  
+  // 解锁报告
+  const unlockReport = () => {
+    const reportId = 'R' + Date.now().toString(36).toUpperCase();
+    setCurrentReportId(reportId);
+    // 跳转面包多支付
+    const returnUrl = encodeURIComponent(window.location.origin + window.location.pathname + '?paid=1&report_id=' + reportId);
+    window.open(MIANBAODUO_PRODUCT_URL + '?from=shezhen&return=' + returnUrl, '_blank');
+    // 演示模式：直接解锁（开发时使用）
+    setIsReportUnlocked(true);
+    localStorage.setItem('report_unlocked_' + reportId, 'true');
+  };
+  
+  // 生成新报告ID
+  const generateReportId = () => 'R' + Date.now().toString(36).toUpperCase();
 
   // ========== v3.2 问而确之：年龄段选择器 ==========
   const ageGroups = [
@@ -1519,6 +1562,30 @@ const DiagnosisPage: React.FC = () => {
                 <DiagnosisResultDisplay result={diagnosisResult?.diagnosisResult || { primarySyndrome: "分析中...", confidence: 0, pathogenesis: "", organLocation: [], priority: "中" }} 
                   className="animate-fade-in"
             />
+
+                {/* 付费解锁：完整健康报告 - 解锁后展示 */}
+                {isReportUnlocked && diagnosisResult && (
+                  <div className="mt-4 animate-fade-in">
+                    {showFreePreview ? (
+                      <div className="tcm-card p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">📋</span>
+                          <span className="font-semibold text-amber-700">完整健康报告已解锁</span>
+                        </div>
+                        <div className="text-sm text-amber-600">
+                          点击上方按钮查看完整报告（含经络推理、选穴方案、生活调理）
+                        </div>
+                      </div>
+                    ) : (
+                      <HealthReport
+                        diagnosisResult={diagnosisResult.diagnosisResult}
+                        acupuncturePlan={diagnosisResult.acupuncturePlan}
+                        lifeCareAdvice={diagnosisResult.lifeCareAdvice}
+                        reportId={currentReportId || generateReportId()}
+                      />
+                    )}
+                  </div>
+                )}
                 
                 {/* 问诊入口 - 证型结论旁边 */}
                 {diagnosisResult && !showRefineButton && (
@@ -1626,16 +1693,38 @@ const DiagnosisPage: React.FC = () => {
                 
                 {/* 付费解锁入口 - 社会证明 */}
                 <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-                  <div className="flex items-center justify-center gap-2 text-xs text-emerald-600 mb-2">
-                    <span>🔓</span>
-                    <span>已有{userCount.toLocaleString()}人解锁深度辨证方案</span>
-                  </div>
-                  <button
-                    onClick={() => toast.success('深度辨证方案开发中，敬请期待！')}
-                    className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium shadow-sm hover:shadow-md transition-all"
-                  >
-                    获取深度辨证方案 ¥9.9
-                  </button>
+                  {isReportUnlocked ? (
+                    // 已解锁：显示完整健康报告
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center gap-2 text-xs text-emerald-600 mb-2">
+                        <span>✅</span>
+                        <span>已解锁完整健康报告</span>
+                      </div>
+                      <button
+                        onClick={() => setShowFreePreview(!showFreePreview)}
+                        className="w-full py-2 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-medium transition-all"
+                      >
+                        {showFreePreview ? '📋 查看完整报告' : '🔓 返回免费摘要'}
+                      </button>
+                    </div>
+                  ) : (
+                    // 未解锁：显示解锁按钮
+                    <>
+                      <div className="flex items-center justify-center gap-2 text-xs text-emerald-600 mb-2">
+                        <span>🔓</span>
+                        <span>已有{userCount.toLocaleString()}人解锁深度辨证方案</span>
+                      </div>
+                      <button
+                        onClick={unlockReport}
+                        className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium shadow-sm hover:shadow-md transition-all"
+                      >
+                        获取完整健康报告 ¥{REPORT_PRICE}
+                      </button>
+                      <div className="text-center text-xs text-emerald-500 mt-1">
+                        含经络推理 · 完整选穴 · 调理方案
+                      </div>
+                    </>
+                  )}
                 </div>
                 
 
