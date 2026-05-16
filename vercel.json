@@ -35,14 +35,6 @@
       ]
     }
   ],
-  "functions": {
-    "api/alipay/*.js": {
-      "runtime": "nodejs20.x"
-    },
-    "api/tongue-ai/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
