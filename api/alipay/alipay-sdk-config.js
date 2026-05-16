@@ -28,7 +28,7 @@ const alipayClient = new AlipaySdk({
   gateway: ALIPAY_CONFIG.gateway,
   signType: ALIPAY_CONFIG.signType,
   charset: ALIPAY_CONFIG.charset,
-  timeout: 15000,
+  timeout: 8000,
 });
 
 // 沙箱环境变量（测试用）- 密钥从环境变量读取，回退到硬编码沙箱值
@@ -52,7 +52,7 @@ function getAlipayClient(useSandbox = false) {
       gateway: SANDBOX_CONFIG.gateway,
       signType: "RSA2",
       charset: "utf-8",
-      timeout: 15000,
+      timeout: 8000,
     });
     return sandboxClient;
   }

@@ -4,6 +4,11 @@
  * 通过User-Agent自动判断设备类型选择支付方式
  */
 
+// Vercel函数超时配置 - Hobby版最大10秒
+export const config = {
+  maxDuration: 10,
+};
+
 import { getAlipayClient } from './alipay-sdk-config.js';
 
 export default async function handler(req, res) {

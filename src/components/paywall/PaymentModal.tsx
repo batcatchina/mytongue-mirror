@@ -37,16 +37,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setIsProcessing(true);
 
     try {
-      const response = await fetch('/api/alipay/pay', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subject: '解锁完整辨证报告',
-          total_amount: price.toString(),
-        }),
-      });
+      // 设置15秒超时，支付宝沙箱网关响应慢
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      try {
+        var response = await fetch('/api/alipay/pay', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            subject: '解锁完整辨证报告',
+            total_amount: price.toString(),
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const data = await response.json();
 
@@ -95,7 +104,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     } catch (error) {
       console.error('支付请求失败:', error);
       setIsProcessing(false);
-      alert('网络错误，请检查网络后重试');
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        alert('支付请求超时，支付宝沙箱响应较慢，请稍后重试');
+      } else {
+        alert('网络错误，请检查网络后重试');
+      }
     }
   };
 
