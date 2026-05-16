@@ -3,7 +3,7 @@
  * 所有敏感配置通过环境变量注入，禁止硬编码
  */
 
-import AlipaySdk from "alipay-sdk";
+import { AlipaySdk } from "alipay-sdk";
 
 // 环境变量配置
 const ALIPAY_CONFIG = {
