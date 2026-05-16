@@ -1565,14 +1565,12 @@ const DiagnosisPage: React.FC = () => {
                 {/* 付费解锁：完整健康报告 - 解锁后展示 */}
                 {isUnlocked && diagnosisResult && (
                   <div className="mt-4 animate-fade-in">
-                    {isUnlocked ? (
-                      <HealthReport
-                        diagnosisResult={diagnosisResult.diagnosisResult}
-                        acupuncturePlan={diagnosisResult.acupuncturePlan}
-                        lifeCareAdvice={diagnosisResult.lifeCareAdvice}
-                        reportId={currentReportId || generateReportId()}
-                      />
-                    )}
+                    <HealthReport
+                      diagnosisResult={diagnosisResult.diagnosisResult}
+                      acupuncturePlan={diagnosisResult.acupuncturePlan}
+                      lifeCareAdvice={diagnosisResult.lifeCareAdvice}
+                      reportId={currentReportId || generateReportId()}
+                    />
                   </div>
                 )}
                 
