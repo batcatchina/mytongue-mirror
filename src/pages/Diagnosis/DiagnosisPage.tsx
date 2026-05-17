@@ -156,6 +156,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import NavBar from '@/components/common/NavBar';
+import { PaidDiagnosisSection } from '@/components/paywall/PaidDiagnosisSection';
 import {
   TongueColorSelector,
   TongueShapeSelector,
@@ -169,6 +170,7 @@ import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultD
 import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
 import HealthReport from '@/components/result-display/HealthReport';
+import PayButton, { usePaymentStatus } from '@/components/payment/PayButton';
 import InquiryDialog, { InquiryQuestion } from '@/components/InquiryDialog';
 import { acupointKnowledge } from '@/config/acupointKnowledge';
 import DiagnosisProgress from '@/components/diagnosis/DiagnosisProgress';
@@ -188,14 +190,12 @@ const DiagnosisPage: React.FC = () => {
   // 版本标记 - v1.3.0 UI优化版
   console.log('[舌镜] 版本: v3.0.0 方案A-DeepSeek推理');
   // 社会证明 - v2.5
-  const [userCount] = useState(12847);
 
   // 社会证明Banner
   const SocialProofBanner = () => (
     <div className="flex flex-wrap items-center justify-center gap-4 py-2 px-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-b border-emerald-100">
       <div className="flex items-center gap-1.5 text-xs text-stone-600">
         <span className="text-lg">👥</span>
-        <span>舌镜已服务 <span className="font-semibold text-emerald-600">{userCount.toLocaleString()}</span> 人</span>
       </div>
       <div className="w-px h-4 bg-stone-300" />
       <div className="flex items-center gap-1.5 text-xs text-stone-600">
@@ -232,43 +232,10 @@ const DiagnosisPage: React.FC = () => {
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
 
   // ========== 付费报告状态 ==========
-  const [isReportUnlocked, setIsReportUnlocked] = useState(false);
+  // isUnlocked replaced by isUnlocked from usePaymentStatus()
   const [currentReportId, setCurrentReportId] = useState('');
-  const [showFreePreview, setShowFreePreview] = useState(true); // 免费预览模式
 
-  // ========== 付费通道逻辑 ==========
-  // 面包多商品链接（审核通过后填入实际链接）
-  const MIANBAODUO_PRODUCT_URL = 'https://www.mianbaoduo.com/o/product/PLACEHOLDER';
-  const REPORT_PRICE = 9.9;
-  
-  // 检测URL参数（支付回调）
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paid = params.get('paid');
-    const reportId = params.get('report_id');
-    
-    if (paid === '1' && reportId) {
-      // 支付成功回调
-      setIsReportUnlocked(true);
-      setCurrentReportId(reportId);
-      localStorage.setItem('report_unlocked_' + reportId, 'true');
-      // 清除URL参数
-      window.history.replaceState({}, '', window.location.pathname);
-      toast.success('支付成功！正在解锁完整报告...');
-    }
-  }, []);
-  
-  // 解锁报告
-  const unlockReport = () => {
-    const reportId = 'R' + Date.now().toString(36).toUpperCase();
-    setCurrentReportId(reportId);
-    // 跳转面包多支付
-    const returnUrl = encodeURIComponent(window.location.origin + window.location.pathname + '?paid=1&report_id=' + reportId);
-    window.open(MIANBAODUO_PRODUCT_URL + '?from=shezhen&return=' + returnUrl, '_blank');
-    // 演示模式：直接解锁（开发时使用）
-    setIsReportUnlocked(true);
-    localStorage.setItem('report_unlocked_' + reportId, 'true');
-  };
+  // 支付逻辑已迁移到 PayButton + usePaymentStatus 组件
   
   // 生成新报告ID
   const generateReportId = () => 'R' + Date.now().toString(36).toUpperCase();
@@ -288,10 +255,14 @@ const DiagnosisPage: React.FC = () => {
   const [inquiryConversationId, setInquiryConversationId] = useState<string | null>(null);
   const [preliminaryResult, setPreliminaryResult] = useState<any>(null);
   const [isRefiningDiagnosis, setIsRefiningDiagnosis] = useState(false);
+  const [isLoadingInquiry, setIsLoadingInquiry] = useState(false);
   const [showRefineButton, setShowRefineButton] = useState(false);
   const [useLocalEngine, setUseLocalEngine] = useState(true);
   const [showEngineSwitch, setShowEngineSwitch] = useState(false);
   const [isAIRecognized, setIsAIRecognized] = useState(false);
+  
+  // 支付解锁状态 - 检测 URL 中的 paid_order 参数
+  const isUnlocked = usePaymentStatus();
   const [uiMode, setUiMode] = useState<'v1' | 'v2'>('v1');
   const [inferenceChain, setInferenceChain] = useState<any>(null);
 
@@ -468,7 +439,10 @@ const DiagnosisPage: React.FC = () => {
   // ========== v3.2 问而确之：Inquiry模式调用 ==========
   const diagnoseWithInquiry = async () => {
     // console.log('[DeepSeek诊断] 启动问诊模式...');
-    setShowRefineButton(true); // 问诊开始时隐藏按钮，防止重复点击
+    setShowRefineButton(true);
+    setShowInquiry(true);
+    setIsLoadingInquiry(true);
+    setInquiryQuestions([]);
     const shapeDist = inputFeatures.shapeDistribution;
     const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
                          shapeDist?.depression?.includes('齿痕') || false;
@@ -499,8 +473,10 @@ const DiagnosisPage: React.FC = () => {
         setInquiryQuestions(result.questions);
         setInquiryConversationId(result.conversationId);
         setPreliminaryResult(result.preliminaryResult);
-        setShowInquiry(true);
+        setIsLoadingInquiry(false);
       } else {
+        setIsLoadingInquiry(false);
+        setShowInquiry(false);
         const aiResult = result.data || result.preliminaryResult;
         if (aiResult) {
           // 包装成嵌套结构，兼容显示组件（修复白屏）
@@ -528,6 +504,8 @@ const DiagnosisPage: React.FC = () => {
       }
     } catch (err) {
       console.error('[问诊] 调用失败:', err);
+      setIsLoadingInquiry(false);
+      setShowInquiry(false);
       setError('问诊调用失败，请重试');
     }
   };
@@ -1559,31 +1537,36 @@ const DiagnosisPage: React.FC = () => {
                 {/* 📋 辨证结果 - 用户关注点2：怎么了+怎么办 */}
                 
                 {/* 证型结论 - 最醒目 */}
-                <DiagnosisResultDisplay result={diagnosisResult?.diagnosisResult || { primarySyndrome: "分析中...", confidence: 0, pathogenesis: "", organLocation: [], priority: "中" }} 
+                
+                {/* 结果内容 - 付费分层展示 */}
+                <PaidDiagnosisSection
+                  diagnosisOutput={diagnosisResult}
+                  inputFeatures={{
+                    tongueColor: inputFeatures.tongueColor.value,
+                    tongueShape: inputFeatures.tongueShape.value,
+                    tongueState: inputFeatures.tongueState.value,
+                    coatingColor: inputFeatures.coating.color,
+                    coatingTexture: inputFeatures.coating.texture,
+                    coatingMoisture: inputFeatures.coating.moisture,
+                  }}
+                  activeTab={activeTab}
+                  price={9.9}
+                  userCount={12847}
+                />
+                
+<DiagnosisResultDisplay result={diagnosisResult?.diagnosisResult || { primarySyndrome: "分析中...", confidence: 0, pathogenesis: "", organLocation: [], priority: "中" }} 
                   className="animate-fade-in"
             />
 
                 {/* 付费解锁：完整健康报告 - 解锁后展示 */}
-                {isReportUnlocked && diagnosisResult && (
+                {isUnlocked && diagnosisResult && (
                   <div className="mt-4 animate-fade-in">
-                    {showFreePreview ? (
-                      <div className="tcm-card p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">📋</span>
-                          <span className="font-semibold text-amber-700">完整健康报告已解锁</span>
-                        </div>
-                        <div className="text-sm text-amber-600">
-                          点击上方按钮查看完整报告（含经络推理、选穴方案、生活调理）
-                        </div>
-                      </div>
-                    ) : (
-                      <HealthReport
-                        diagnosisResult={diagnosisResult.diagnosisResult}
-                        acupuncturePlan={diagnosisResult.acupuncturePlan}
-                        lifeCareAdvice={diagnosisResult.lifeCareAdvice}
-                        reportId={currentReportId || generateReportId()}
-                      />
-                    )}
+                    <HealthReport
+                      diagnosisResult={diagnosisResult.diagnosisResult}
+                      acupuncturePlan={diagnosisResult.acupuncturePlan}
+                      lifeCareAdvice={diagnosisResult.lifeCareAdvice}
+                      reportId={currentReportId || generateReportId()}
+                    />
                   </div>
                 )}
                 
@@ -1678,10 +1661,22 @@ const DiagnosisPage: React.FC = () => {
                   </div>
                 )}
                 {resultTab === 'acupuncture' && (
-                  <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
+                  isUnlocked ? (
+                    <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
+                  ) : (
+                    <div className="tcm-card p-6 text-center text-stone-400 text-sm">
+                      🔒 请先解锁深度辨证方案查看针灸配穴
+                    </div>
+                  )
                 )}
                 {resultTab === 'care' && (
-                  <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
+                  isUnlocked ? (
+                    <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
+                  ) : (
+                    <div className="tcm-card p-6 text-center text-stone-400 text-sm">
+                      🔒 请先解锁深度辨证方案查看生活调理建议
+                    </div>
+                  )
                 )}
                 
                 <button
@@ -1691,41 +1686,27 @@ const DiagnosisPage: React.FC = () => {
                   保存此病例
                 </button>
                 
-                {/* 付费解锁入口 - 社会证明 */}
-                <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-                  {isReportUnlocked ? (
-                    // 已解锁：显示完整健康报告
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-center gap-2 text-xs text-emerald-600 mb-2">
-                        <span>✅</span>
-                        <span>已解锁完整健康报告</span>
-                      </div>
-                      <button
-                        onClick={() => setShowFreePreview(!showFreePreview)}
-                        className="w-full py-2 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-medium transition-all"
-                      >
-                        {showFreePreview ? '📋 查看完整报告' : '🔓 返回免费摘要'}
-                      </button>
+                {/* 深度辨证解锁区域 - 支付宝支付 */}
+                {!isUnlocked ? (
+                  <div className="tcm-card p-4 text-center space-y-3 bg-gradient-to-r from-primary-50 to-secondary-50">
+                    <div className="text-sm text-stone-600">
+                      <span className="text-lg mr-1">🔒</span>
+                      针灸方案和生活调理需解锁查看
                     </div>
-                  ) : (
-                    // 未解锁：显示解锁按钮
-                    <>
-                      <div className="flex items-center justify-center gap-2 text-xs text-emerald-600 mb-2">
-                        <span>🔓</span>
-                        <span>已有{userCount.toLocaleString()}人解锁深度辨证方案</span>
-                      </div>
-                      <button
-                        onClick={unlockReport}
-                        className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium shadow-sm hover:shadow-md transition-all"
-                      >
-                        获取完整健康报告 ¥{REPORT_PRICE}
-                      </button>
-                      <div className="text-center text-xs text-emerald-500 mt-1">
-                        含经络推理 · 完整选穴 · 调理方案
-                      </div>
-                    </>
-                  )}
-                </div>
+                    <div className="flex justify-center">
+                      <PayButton 
+                        amount={9.9} 
+                        title="舌镜深度辨证方案"
+                        size="medium"
+                      />
+                    </div>
+                    <p className="text-xs text-stone-400">包含完整针灸配穴和个性化生活调理建议</p>
+                  </div>
+                ) : (
+                  <div className="tcm-card p-3 text-center bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">
+                    <span className="text-green-600 text-sm">✓ 已解锁深度辨证</span>
+                  </div>
+                )}
                 
 
               </div>
@@ -1746,17 +1727,33 @@ const DiagnosisPage: React.FC = () => {
     
       {/* ========== v3.2 问诊对话框 ========== */}
       {showInquiry && (
-        <InquiryDialog
-          questions={inquiryQuestions}
-          conversationId={inquiryConversationId || ''}
-          preliminaryResult={preliminaryResult}
-          onSubmit={handleInquirySubmit}
-          onCancel={() => {
-            setShowInquiry(false);
-            setShowRefineButton(false); // 取消问诊时恢复按钮显示
-          }}
-          isLoading={isRefiningDiagnosis}
-        />
+        isLoadingInquiry ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+              <svg className="animate-spin w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <p className="text-stone-600 font-medium">正在生成问诊问题...</p>
+              <button
+                onClick={() => { setShowInquiry(false); setIsLoadingInquiry(false); setShowRefineButton(false); }}
+                className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+              >取消</button>
+            </div>
+          </div>
+        ) : (
+          <InquiryDialog
+            questions={inquiryQuestions}
+            conversationId={inquiryConversationId || ''}
+            preliminaryResult={preliminaryResult}
+            onSubmit={handleInquirySubmit}
+            onCancel={() => {
+              setShowInquiry(false);
+              setShowRefineButton(false);
+            }}
+            isLoading={isRefiningDiagnosis}
+          />
+        )
       )}
 </div>
   );

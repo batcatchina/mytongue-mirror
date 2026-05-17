@@ -1,3 +1,4 @@
+const ipRateMap = new Map();
 /**
  * 舌镜辨证推理引擎 API v3.3
  * 
@@ -21,7 +22,7 @@ const __dirname = dirname(__filename);
 
 const DEEPSEEK_CONFIG = {
   apiUrl: 'https://api.deepseek.com/chat/completions',
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-8a16d38a51a14dcb946692f13c7f9d54',
+  apiKey: process.env.DEEPSEEK_API_KEY,
   model: 'deepseek-chat',
 };
 
@@ -775,6 +776,25 @@ export default async function handler(req, res) {
   
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
+  }
+
+  // 统一校验：没有tongueFeatures或为空对象，直接拒绝不调DeepSeek
+  const preCheck = req.body.tongueFeatures;
+  if (!preCheck || typeof preCheck !== "object" || Object.keys(preCheck).length === 0) {
+    return res.status(400).json({ success: false, error: "缺少舌象特征数据" });
+  }
+  if (!preCheck.tongueColor || !preCheck.coatingColor) {
+    return res.status(400).json({ success: false, error: "缺少必需字段: tongueColor或coatingColor" });
+  }
+  // IP频率限制
+  const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  const now = Date.now();
+  const record = ipRateMap.get(clientIp) || { count: 0, windowStart: now };
+  if (now - record.windowStart > 60000) { record.count = 0; record.windowStart = now; }
+  record.count++;
+  ipRateMap.set(clientIp, record);
+  if (record.count > 10) {
+    return res.status(429).json({ success: false, error: "请求过于频繁" });
   }
 
   try {
