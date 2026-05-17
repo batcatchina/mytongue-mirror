@@ -50,38 +50,22 @@ export default function TongueInputSection({
     resetInput,
   } = useDiagnosisStore();
 
-  // 年龄段选项
-  const ageGroups = [
-    { label: '儿童', value: '儿童' },
-    { label: '青年', value: '青年' },
-    { label: '中年', value: '中年' },
-    { label: '老年', value: '老年' },
-  ];
-
-  const [selectedAgeGroup, setSelectedAgeGroup] = React.useState<string>('青年');
+  // 年龄输入状态（直接使用 patientInfo.age，默认30）
+  const [ageInput, setAgeInput] = React.useState<string>(
+    patientInfo.age !== null ? String(patientInfo.age) : '30'
+  );
   const [showEngineSwitch, setShowEngineSwitch] = React.useState(false);
-
-  // 处理年龄选择
-  React.useEffect(() => {
-    const ageMap: Record<string, number | null> = {
-      '儿童': null, // 儿童不填具体年龄
-      '青年': 30,
-      '中年': 50,
-      '老年': 70,
-    };
-    setPatientInfo({ age: ageMap[selectedAgeGroup] ?? 30 });
-  }, [selectedAgeGroup]);
 
   // 清空输入
   const handleReset = () => {
     resetInput();
-    setSelectedAgeGroup('青年');
+    setAgeInput('30');
     toast.success('已清空所有输入');
   };
 
   return (
     <div className="space-y-4">
-      {/* ========== 性别 + 年龄段选择器 - 紧凑一行 ==========*/}
+      {/* ========== 性别 + 年龄输入 - 紧凑一行 ==========*/}
       <div className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-stone-100">
         {/* 性别选择 */}
         <div className="flex items-center gap-1.5">
@@ -108,26 +92,29 @@ export default function TongueInputSection({
         {/* 分隔线 */}
         <div className="w-px h-5 bg-stone-200"></div>
         
-        {/* 年龄段选择 */}
+        {/* 年龄数字输入 */}
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-stone-500">年龄</span>
-          <div className="flex gap-1 flex-wrap">
-            {ageGroups.map((group) => (
-              <button
-                key={group.value}
-                onClick={() => setSelectedAgeGroup(group.value)}
-                className={`
-                  px-2 py-0.5 text-xs font-medium rounded-full transition-all
-                  ${selectedAgeGroup === group.value
-                    ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-sm'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                  }
-                `}
-              >
-                {group.label}
-              </button>
-            ))}
-          </div>
+          <input
+            type="number"
+            min="1"
+            max="120"
+            value={ageInput}
+            onChange={(e) => {
+              const val = e.target.value;
+              setAgeInput(val);
+              const numVal = parseInt(val, 10);
+              setPatientInfo({ age: isNaN(numVal) ? 30 : numVal });
+            }}
+            onBlur={(e) => {
+              const numVal = parseInt(e.target.value, 10);
+              if (isNaN(numVal) || numVal < 1) setAgeInput('30');
+              else if (numVal > 120) setAgeInput('120');
+            }}
+            className="w-14 px-2 py-1 text-xs text-center border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+            placeholder="30"
+          />
+          <span className="text-xs text-stone-400">岁</span>
         </div>
       </div>
 
