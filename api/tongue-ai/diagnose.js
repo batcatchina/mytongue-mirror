@@ -127,7 +127,8 @@ function loadInquiryPrompt() {
       \id\: \q1\,
       	ext\: \问题文字\,
       \options\: [\选项1\, \选项2\, \选项3\],
-      eason\: \为什么问这个问题\n    }
+      
+eason\: \为什么问这个问题\n    }
   ]
 }
 
@@ -542,6 +543,14 @@ export default async function handler(req, res) {
     }
   }
   try {
+    // 统一校验：没有tongueFeatures或tongueFeatures为空对象，直接拒绝
+    const { tongueFeatures: preCheck } = req.body;
+    if (!preCheck || typeof preCheck !== "object" || Object.keys(preCheck).length === 0) {
+      return res.status(400).json({ success: false, error: "缺少舌象特征数据" });
+    }
+    if (!preCheck.tongueColor || !preCheck.coatingColor) {
+      return res.status(400).json({ success: false, error: "缺少必需字段: tongueColor或coatingColor" });
+    }
     const { mode } = req.body;
     console.log("[舌镜AI诊断] 请求模式:", mode || "default", "| IP:", clientIp);
     let result;
