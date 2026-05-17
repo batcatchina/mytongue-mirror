@@ -424,7 +424,9 @@ export async function submitInquiryAnswers(
         }
       }
       
-      console.warn('[InquiryService] 确认API调用失败，使用本地整合');
+      // 打印详细错误信息
+      const errBody = await response.text();
+      console.error('[InquiryService] 确认API失败:', response.status, errBody);
     } catch (error) {
       console.error('[InquiryService] 确认API调用异常:', error);
     }

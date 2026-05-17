@@ -278,9 +278,9 @@ export default function DiagnosisPage() {
       const hasTeethMark = inputFeatures.teethMark?.value === '是' || shapeDist?.depression?.includes('齿痕') || false;
       const hasCrack = inputFeatures.crack?.value === '是' || shapeDist?.depression?.includes('裂纹') || false;
       const tongueFeatures = {
-        tongueColor: inputFeatures.tongueColor.value,
+        tongueColor: inputFeatures.tongueColor.value || '淡红',
         tongueShape: inputFeatures.tongueShape.value || '正常',
-        coatingColor: inputFeatures.coating.color,
+        coatingColor: inputFeatures.coating.color || '薄白',
         coatingTexture: inputFeatures.coating.texture || '薄',
         coatingMoisture: inputFeatures.coating.moisture || '润',
         teethMark: hasTeethMark,
@@ -296,7 +296,7 @@ export default function DiagnosisPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tongueFeatures,
-          age: patientInfo.age > 0 ? patientInfo.age : undefined,
+          age: (patientInfo.age && patientInfo.age > 0) ? patientInfo.age : 30,
           mode: 'inquiry',
         }),
       });
@@ -351,9 +351,9 @@ export default function DiagnosisPage() {
       const hasTeethMark = inputFeatures.teethMark?.value === '是' || shapeDist?.depression?.includes('齿痕') || false;
       const hasCrack = inputFeatures.crack?.value === '是' || shapeDist?.depression?.includes('裂纹') || false;
       const tongueFeatures = {
-        tongueColor: inputFeatures.tongueColor.value,
+        tongueColor: inputFeatures.tongueColor.value || '淡红',
         tongueShape: inputFeatures.tongueShape.value || '正常',
-        coatingColor: inputFeatures.coating.color,
+        coatingColor: inputFeatures.coating.color || '薄白',
         coatingTexture: inputFeatures.coating.texture || '薄',
         coatingMoisture: inputFeatures.coating.moisture || '润',
         teethMark: hasTeethMark,
@@ -375,7 +375,7 @@ export default function DiagnosisPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tongueFeatures,
-          age: patientInfo.age > 0 ? patientInfo.age : undefined,
+          age: (patientInfo.age && patientInfo.age > 0) ? patientInfo.age : 30,
           answers: formattedAnswers,
           conversationId: inquiryConversationId,
           preliminaryResult,
@@ -383,7 +383,11 @@ export default function DiagnosisPage() {
         }),
       });
 
-      if (!response.ok) throw new Error('问诊提交失败');
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.error('问诊提交失败:', response.status, errBody);
+        throw new Error(`问诊提交失败: ${response.status} ${errBody}`);
+      }
 
       const data = await response.json();
       const finalResult: DiagnosisOutput = {
@@ -468,10 +472,10 @@ export default function DiagnosisPage() {
               showRefineButton={showRefineButton}
               isRefiningDiagnosis={isRefiningDiagnosis}
               inputFeatures={{
-                tongueColor: inputFeatures.tongueColor.value,
+                tongueColor: inputFeatures.tongueColor.value || '淡红',
                 tongueShape: inputFeatures.tongueShape.value,
                 tongueState: inputFeatures.tongueState.value,
-                coatingColor: inputFeatures.coating.color,
+                coatingColor: inputFeatures.coating.color || '薄白',
                 coatingTexture: inputFeatures.coating.texture,
                 coatingMoisture: inputFeatures.coating.moisture,
               }}
