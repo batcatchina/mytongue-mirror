@@ -2,9 +2,7 @@
  * 问诊区域组件
  * 包含问诊对话框入口和对话框本身
  */
-import React from 'react';
-import InquiryDialog, { InquiryQuestion } from '@/components/InquiryDialog';
-import { DiagnosisOutput } from '@/types';
+import { InquiryQuestion, DiagnosisOutput } from '@/components/InquiryDialog';
 import InquiryDialog from '@/components/InquiryDialog';
 
 interface InquirySectionProps {
@@ -28,7 +26,6 @@ export default function InquirySection({
   isRefiningDiagnosis,
   onSubmit,
   onCancel,
-  onClose,
 }: InquirySectionProps) {
   if (!showInquiry) return null;
 
@@ -59,7 +56,7 @@ export default function InquirySection({
       questions={inquiryQuestions}
       conversationId={inquiryConversationId || ''}
       preliminaryResult={preliminaryResult}
-      onSubmit={onSubmit}
+      onSubmit={onSubmit as any}
       onCancel={onCancel}
       isLoading={isRefiningDiagnosis}
     />

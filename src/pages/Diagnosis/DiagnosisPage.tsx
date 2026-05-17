@@ -3,7 +3,7 @@
  * 架构：按领域拆分后的主入口
  * 目标：< 300行
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import NavBar from '@/components/common/NavBar';
@@ -14,9 +14,8 @@ import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import { submitDiagnosis } from '@/services/api';
 import { handleFallbackToLocal } from '@/services/DiagnosisService';
 import { checkGlobalUnlocked, generateReportId } from '@/services/PaymentService';
-import InquiryDialog, { InquiryQuestion } from '@/components/InquiryDialog';
-import { DiagnosisOutput } from '@/types';
-
+import { InquiryQuestion, DiagnosisOutput } from '@/components/InquiryDialog';
+import { InputFeatures } from '@/types';
 
 // ========== 导出结构化展示相关常量（供子组件使用） ==========
 export const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -38,7 +37,7 @@ export function getRegionChineseName(part: string): string {
 }
 
 // 生成结构化展示数据
-export function getStructuredTongueDisplay(inputFeatures: any, isAIRecognized: boolean, aiConfidence: number = 0.8): {
+export function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized: boolean, aiConfidence: number = 0.8): {
   categories: Array<{ label: string; items: Array<{ name: string; confidence: string; category: string }> }>;
   rawText: string;
 } {
@@ -161,7 +160,7 @@ export default function DiagnosisPage() {
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
 
   // Tab状态
-  const [activeTab, setActiveTab] = useState<'input' | 'report' | 'history'>('input');
+  const [activeTab] = useState<'input' | 'report' | 'history'>('input');
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
 
   // 问诊相关状态
@@ -183,7 +182,7 @@ export default function DiagnosisPage() {
   }, []);
 
   // 处理舌象识别
-  const handleRecognize = useCallback((imageData: string) => {
+  const handleRecognize = useCallback(() => {
     setIsAIRecognized(true);
   }, []);
 
@@ -245,7 +244,7 @@ export default function DiagnosisPage() {
   }, [inputFeatures, patientInfo, getDiagnosisInput]);
 
   // Fallback 到本地引擎
-  const handleFallbackToLocal = useCallback(() => {
+  const handleFallbackToLocalCallback = useCallback(() => {
     if (isAnalyzing) return;
     const input = getDiagnosisInput();
     setLocalIsAnalyzing(true);
@@ -363,7 +362,7 @@ export default function DiagnosisPage() {
               isAIRecognized={isAIRecognized}
               useLocalEngine={useLocalEngine}
               onRecognize={handleRecognize}
-              onFallbackToLocal={handleFallbackToLocal}
+              onFallbackToLocal={handleFallbackToLocalCallback}
             />
             {/* 提交按钮单独放在这里 */}
             <button

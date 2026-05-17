@@ -4,8 +4,7 @@
  */
 import toast from 'react-hot-toast';
 import { DiagnosisInput, DiagnosisOutput } from '@/types';
-import { transmissionEngine } from '@/engine/core/TransmissionEngine';
-import { getLifeCareAdvice } from '@/engine/lifeCareEngine';
+import { DiagnosisEngine, diagnose as localDiagnose, getRuleStatistics } from './diagnosisEngine';
 import { diagCacheKey, diagCacheGet, diagCacheSet } from './CacheService';
 
 /**
@@ -33,6 +32,9 @@ export interface DiagnosisResult {
   step: DiagnosisStep;
 }
 
+// 本地规则引擎实例
+const localEngine = new DiagnosisEngine();
+
 /**
  * 使用 DeepSeek 进行舌象诊断
  */
@@ -50,7 +52,7 @@ export async function diagnoseWithDeepSeek(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        input_features: input.input_features,
+        input_features: input,
         deepseek_enabled: true,
       }),
     });
@@ -60,41 +62,9 @@ export async function diagnoseWithDeepSeek(
     }
 
     const result = await response.json();
-    
-    // 步骤2: 推理
-    onStepChange?.('reasoning');
-    
-    // 使用四层推理引擎
-    const engine = transmissionEngine;
-    const reasoningResult = await engine.inference({
-      tongueBody: input.input_features.tongueColor.value || '淡红',
-      tongueColor: input.input_features.tongueColor.value || '淡红',
-      tongueShape: input.input_features.tongueShape.value || '正常',
-      tongueState: input.input_features.tongueState.value || '正常',
-      coatingColor: input.input_features.coating?.color || '薄白',
-      coatingTexture: input.input_features.coating?.texture || '薄',
-      coatingMoisture: input.input_features.coating?.moisture || '润',
-      teethMark: input.input_features.teethMark?.value === '是',
-      crack: input.input_features.crack?.value === '是',
-      distributionFeatures: input.input_features.distributionFeatures,
-      shapeDistribution: input.input_features.shapeDistribution,
-    });
-
-    // 步骤3: 匹配规则
-    onStepChange?.('matching');
-    
-    // 合并 DeepSeek 结果和规则引擎结果
-    const mergedResult: DiagnosisOutput = {
-      ...result,
-      diagnosisResult: reasoningResult.diagnosisResult || result.diagnosisResult,
-      acupuncturePlan: reasoningResult.acupuncturePlan || result.acupuncturePlan,
-      lifeCareAdvice: result.lifeCareAdvice || getLifeCareAdvice(reasoningResult.diagnosisResult),
-    };
-
-    // 步骤4: 完成
     onStepChange?.('result');
     
-    return mergedResult;
+    return result;
   } catch (error) {
     console.error('DeepSeek诊断失败:', error);
     throw error;
@@ -113,30 +83,9 @@ export function diagnoseWithLocalEngine(
   try {
     onStepChange?.('analyzing');
     
-    // 使用四层推理引擎
-    const engine = transmissionEngine;
-    const reasoningResult = engine.inference({
-      tongueBody: input.input_features.tongueColor.value || '淡红',
-      tongueColor: input.input_features.tongueColor.value || '淡红',
-      tongueShape: input.input_features.tongueShape.value || '正常',
-      tongueState: input.input_features.tongueState.value || '正常',
-      coatingColor: input.input_features.coating?.color || '薄白',
-      coatingTexture: input.input_features.coating?.texture || '薄',
-      coatingMoisture: input.input_features.coating?.moisture || '润',
-      teethMark: input.input_features.teethMark?.value === '是',
-      crack: input.input_features.crack?.value === '是',
-      distributionFeatures: input.input_features.distributionFeatures,
-      shapeDistribution: input.input_features.shapeDistribution,
-    });
-
-    onStepChange?.('matching');
+    // 调用本地规则引擎
+    const result = localDiagnose(input);
     
-    const result: DiagnosisOutput = {
-      diagnosisResult: reasoningResult.diagnosisResult!,
-      acupuncturePlan: reasoningResult.acupuncturePlan!,
-      lifeCareAdvice: getLifeCareAdvice(reasoningResult.diagnosisResult),
-    };
-
     onStepChange?.('result');
     
     return result;
@@ -157,7 +106,7 @@ export async function performDiagnosis(
   
   // 1. 检查缓存
   if (enableCache) {
-    const cacheKey = diagCacheKey(input.input_features, input);
+    const cacheKey = diagCacheKey({ input_features: input } as any, {} as any);
     const cachedResult = diagCacheGet(cacheKey);
     if (cachedResult) {
       onStepChange?.('result');
@@ -173,7 +122,7 @@ export async function performDiagnosis(
       
       // 缓存结果
       if (enableCache) {
-        const cacheKey = diagCacheKey(input.input_features, input);
+        const cacheKey = diagCacheKey({ input_features: input } as any, {} as any);
         diagCacheSet(cacheKey, result);
       }
       
@@ -190,7 +139,7 @@ export async function performDiagnosis(
   
   // 缓存结果
   if (enableCache) {
-    const cacheKey = diagCacheKey(input.input_features, input);
+    const cacheKey = diagCacheKey({ input_features: input } as any, {} as any);
     diagCacheSet(cacheKey, result);
   }
   
@@ -209,7 +158,7 @@ export function handleFallbackToLocal(
   const result = diagnoseWithLocalEngine(input, { onStepChange });
   
   // 缓存结果
-  const cacheKey = diagCacheKey(input.input_features, input);
+  const cacheKey = diagCacheKey({ input_features: input } as any, {} as any);
   diagCacheSet(cacheKey, result);
   
   return result;
