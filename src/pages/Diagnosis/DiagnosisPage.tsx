@@ -156,6 +156,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import NavBar from '@/components/common/NavBar';
+import { PaidDiagnosisSection } from '@/components/paywall/PaidDiagnosisSection';
 import {
   TongueColorSelector,
   TongueShapeSelector,
@@ -1536,7 +1537,24 @@ const DiagnosisPage: React.FC = () => {
                 {/* 📋 辨证结果 - 用户关注点2：怎么了+怎么办 */}
                 
                 {/* 证型结论 - 最醒目 */}
-                <DiagnosisResultDisplay result={diagnosisResult?.diagnosisResult || { primarySyndrome: "分析中...", confidence: 0, pathogenesis: "", organLocation: [], priority: "中" }} 
+                
+                {/* 结果内容 - 付费分层展示 */}
+                <PaidDiagnosisSection
+                  diagnosisOutput={diagnosisResult}
+                  inputFeatures={{
+                    tongueColor: inputFeatures.tongueColor.value,
+                    tongueShape: inputFeatures.tongueShape.value,
+                    tongueState: inputFeatures.tongueState.value,
+                    coatingColor: inputFeatures.coating.color,
+                    coatingTexture: inputFeatures.coating.texture,
+                    coatingMoisture: inputFeatures.coating.moisture,
+                  }}
+                  activeTab={activeTab}
+                  price={9.9}
+                  userCount={12847}
+                />
+                
+<DiagnosisResultDisplay result={diagnosisResult?.diagnosisResult || { primarySyndrome: "分析中...", confidence: 0, pathogenesis: "", organLocation: [], priority: "中" }} 
                   className="animate-fade-in"
             />
 

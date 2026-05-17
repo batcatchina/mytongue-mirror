@@ -1,85 +1,208 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import clsx from 'clsx';
-import { recognizeTongue, TongueRecognitionResult, ProgressInfo, TongueNotDetectedError } from '@/services/tongueAI';
+
+// AI识别结果类型
+export interface AIRecognitionResult {
+  tongue_color: { value: string; confidence: number };
+  tongue_shape: { 
+    value: string; 
+    teeth_mark?: { has: boolean; degree?: string; position?: string };
+    crack?: { has: boolean; degree?: string; position?: string };
+  };
+  tongue_coating: { 
+    color: string; 
+    texture: string; 
+    moisture: string;
+    confidence: number 
+  };
+  tongue_state: { value: string };
+  region_features?: {
+    tip?: { color?: string; features?: string[]; depression?: boolean; bulge?: boolean };
+    sides?: { color?: string; features?: string[]; depression?: boolean; bulge?: boolean };
+    middle?: { color?: string; features?: string[]; depression?: boolean; bulge?: boolean };
+    root?: { color?: string; features?: string[]; depression?: boolean; bulge?: boolean };
+  };
+  shape_distribution?: { depression: string[]; bulge: string[] };
+  overall_confidence: number;
+  notes?: string;
+}
 
 interface ImageUploadProps {
   value?: string;
   onChange: (imageData: string | null) => void;
-  onRecognize?: (result: TongueRecognitionResult) => void;
-  useLocalEngine?: boolean; // 本地引擎模式：不调用Coze API
+  onCompressionProgress?: (status: string) => void;
+  onAIRecognition?: (result: AIRecognitionResult) => void; // 新增：AI识别回调
+  aiApiUrl?: string; // 新增：AI识别API地址，支持热切换
 }
 
-// 压缩图片：最大宽度800px，质量0.7
-function compressImage(dataUrl: string, maxWidth = 800, quality = 0.7): Promise<string> {
+// 图片压缩配置
+const COMPRESSION_CONFIG = {
+  maxWidth: 1024,      // 最大宽度
+  maxHeight: 1024,     // 最大高度
+  maxSizeKB: 200,      // 目标最大大小（KB）
+  minQuality: 0.5,    // 最低质量
+  initialQuality: 0.85 // 初始压缩质量
+};
+
+// 使用canvas压缩图片
+async function compressImage(file: File, onProgress?: (status: string) => void): Promise<string> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let w = img.width;
-      let h = img.height;
-      if (w > maxWidth) {
-        h = Math.round(h * maxWidth / w);
-        w = maxWidth;
-      }
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        onProgress?.('正在压缩图片...');
+        
+        // 计算压缩后的尺寸
+        let { width, height } = img;
+        const { maxWidth, maxHeight } = COMPRESSION_CONFIG;
+        
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        
+        // 创建canvas并压缩
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('无法创建画布上下文'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 逐步降低质量直到文件大小符合要求
+        let quality = COMPRESSION_CONFIG.initialQuality;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let currentSize = (dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75; // 估算实际字节数
+        
+        onProgress?.('优化图片大小...');
+        
+        // 最多尝试10次压缩
+        let attempts = 0;
+        while (currentSize > COMPRESSION_CONFIG.maxSizeKB * 1024 && quality > COMPRESSION_CONFIG.minQuality && attempts < 10) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          currentSize = (dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75;
+          attempts++;
+          onProgress?.(`压缩中 (${Math.round(100 - (quality - COMPRESSION_CONFIG.minQuality) / (COMPRESSION_CONFIG.initialQuality - COMPRESSION_CONFIG.minQuality) * 100)}%)...`);
+        }
+        
+        // 如果仍然太大，进行更激进的尺寸压缩
+        if (currentSize > COMPRESSION_CONFIG.maxSizeKB * 1024) {
+          let scale = 0.8;
+          while (currentSize > COMPRESSION_CONFIG.maxSizeKB * 1024 && scale >= 0.3) {
+            const scaledWidth = Math.round(width * scale);
+            const scaledHeight = Math.round(height * scale);
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+            dataUrl = canvas.toDataURL('image/jpeg', COMPRESSION_CONFIG.minQuality);
+            currentSize = (dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75;
+            scale -= 0.1;
+            onProgress?.(`调整尺寸中...`);
+          }
+        }
+        
+        const finalSize = Math.round(currentSize / 1024);
+        onProgress?.(`压缩完成 (${finalSize}KB)`);
+        
+        resolve(dataUrl);
+      };
+      
+      img.onerror = () => reject(new Error('图片加载失败'));
+      img.src = e.target?.result as string;
     };
-    img.onerror = () => reject(new Error('图片加载失败'));
-    img.src = dataUrl;
+    
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(file);
   });
-}
-
-// 生成识别结果摘要
-function buildSummary(result: TongueRecognitionResult): string {
-  const parts: string[] = [];
-  if (result.tongue_color?.value) parts.push(`舌色:${result.tongue_color.value}`);
-  if (result.tongue_shape?.value && result.tongue_shape.value !== '正常') parts.push(`舌形:${result.tongue_shape.value}`);
-  if (result.tongue_coating?.color) parts.push(`苔色:${result.tongue_coating.color}`);
-  if (result.tongue_coating?.texture && result.tongue_coating.texture !== '正常') parts.push(`苔质:${result.tongue_coating.texture}`);
-  if (result.tongue_coating?.moisture && result.tongue_coating.moisture !== '正常') parts.push(`${result.tongue_coating.moisture}`);
-  if (result.tongue_shape?.teeth_mark?.has) parts.push('齿痕');
-  if (result.tongue_shape?.crack?.has) parts.push('裂纹');
-  if (result.tongue_state?.value && result.tongue_state.value !== '正常') parts.push(`舌态:${result.tongue_state.value}`);
-  if (result.overall_confidence) {
-    const conf = result.overall_confidence > 1 ? result.overall_confidence : result.overall_confidence * 100;
-    parts.push(`置信度:${Math.round(conf)}%`);
-  }
-  return parts.join(' · ');
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({ 
   value, 
   onChange, 
-  onRecognize,
-  useLocalEngine = false 
+  onAIRecognition,
+  aiApiUrl = 'https://she-zhen-app.vercel.app/api/tongue'
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
   const [isRecognizing, setIsRecognizing] = useState(false);
-  const [recognizeStatus, setRecognizeStatus] = useState<string>('');
-  const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
-  const [recognizeResult, setRecognizeResult] = useState<TongueRecognitionResult | null>(null);
-  const [autoRecognize, setAutoRecognize] = useState(true); // 默认自动识别
+  const [recognitionStatus, setRecognitionStatus] = useState<string | null>(null);
+  const [progressInfo, setProgressInfo] = useState<{ status: string; percent: number } | null>(null);
+  const [aiResult, setAiResult] = useState<AIRecognitionResult | null>(null);
+  
+  // 进度反馈定时器
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionStartTimeRef = useRef<number>(0);
+  
+  // 清理进度定时器
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
+    };
+  }, []);
+  
+  // 获取进度文案 - 前置舌象检测步骤
+  const getProgressMessage = (elapsedSeconds: number): string => {
+    if (elapsedSeconds < 6) {
+      return '正在上传图片...';
+    } else if (elapsedSeconds < 12) {
+      return '正在检测舌象...';
+    } else if (elapsedSeconds < 18) {
+      return '正在识别舌色...';
+    } else if (elapsedSeconds < 24) {
+      return '正在分析舌形...';
+    } else if (elapsedSeconds < 30) {
+      return '正在判断苔色...';
+    } else {
+      return '正在综合辨证...';
+    }
+  };
 
-  // 本地引擎模式下不自动识别AI
-  const shouldAutoRecognize = useMemo(() => {
-    return autoRecognize && !useLocalEngine;
-  }, [autoRecognize, useLocalEngine]);
+  // 获取进度百分比 (非线性)
+  // 0-8秒: 0%->30%, 8-16秒: 30%->60%, 16-24秒: 60%->80%, 24秒+: 80%->90%
+  const getProgressPercent = (elapsedSeconds: number): number => {
+    if (elapsedSeconds < 0) return 0;
+    if (elapsedSeconds < 8) {
+      // 快速阶段: 0 -> 30
+      return Math.round((elapsedSeconds / 8) * 30);
+    } else if (elapsedSeconds < 16) {
+      // 中速阶段: 30 -> 60
+      return 30 + Math.round(((elapsedSeconds - 8) / 8) * 30);
+    } else if (elapsedSeconds < 24) {
+      // 减速阶段: 60 -> 80
+      return 60 + Math.round(((elapsedSeconds - 16) / 8) * 20);
+    } else {
+      // 缓慢阶段: 80 -> 90
+      const extraSeconds = elapsedSeconds - 24;
+      const progress = Math.min(extraSeconds * 2, 10); // 每秒2%，最高到90
+      return 80 + Math.round(progress);
+    }
+  };
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('请选择图片文件');
       return;
     }
+    
     if (file.size > 10 * 1024 * 1024) {
       alert('图片大小不能超过10MB');
       return;
     }
 
     try {
+      // 直接读取原图，不压缩
       const imageData = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target?.result as string);
@@ -89,64 +212,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       
       setPreview(imageData);
       onChange(imageData);
-      setRecognizeResult(null);
-      setRecognizeStatus('');
-      console.log(`[图片上传] 成功，大小: ${Math.round(file.size / 1024)}KB${useLocalEngine ? '（本地引擎模式，不调用AI识别）' : ''}`);
-      
-      // 本地引擎模式下不上传识别，只显示引导提示
-      if (useLocalEngine) {
-        setRecognizeStatus('请手动选择舌象特征');
-      }
-      // 自动触发AI识别（如果开启且不是本地引擎模式）
-      else if (shouldAutoRecognize) {
-        setTimeout(() => handleRecognize(imageData), 300);
-      }
+      setAiResult(null); // 清除之前的识别结果
     } catch (error) {
       console.error('图片处理失败:', error);
+      alert('图片处理失败，请尝试其他图片');
     }
-  }, [onChange, useLocalEngine, shouldAutoRecognize]);
-
-  const handleRecognize = useCallback(async (imageData?: string) => {
-    // 本地引擎模式下禁止调用API
-    if (useLocalEngine) {
-      console.log('[ImageUpload] 本地引擎模式，禁止调用AI识别API');
-      setRecognizeStatus('本地引擎模式，请手动选择舌象特征');
-      return;
-    }
-
-    const dataToRecognize = imageData || preview;
-    if (!dataToRecognize) {
-      alert('请先上传舌象图片');
-      return;
-    }
-
-    setIsRecognizing(true);
-    setRecognizeResult(null);
-    setRecognizeStatus('正在上传识别...');
-    setProgressInfo({ status: '正在上传图片...', percent: 0 });
-
-    try {
-      const result = await recognizeTongue(dataToRecognize, (info: ProgressInfo) => {
-        setRecognizeStatus(info.status);
-        setProgressInfo(info);
-      });
-
-      onRecognize?.(result);
-      setRecognizeResult(result);
-      setRecognizeStatus('识别完成 ✓');
-    } catch (error) {
-      if (error instanceof TongueNotDetectedError) {
-        // 安全验证：未检测到舌头，显示醒目警告
-        setRecognizeStatus(`⚠️ ${error.message}`);
-      } else {
-        const msg = error instanceof Error ? error.message : '识别失败';
-        setRecognizeStatus(`识别失败: ${msg}`);
-      }
-    } finally {
-      setIsRecognizing(false);
-      setProgressInfo(null);
-    }
-  }, [preview, onRecognize, useLocalEngine]);
+  }, [onChange]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -172,157 +243,120 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const handleRemove = useCallback(() => {
     setPreview(null);
     onChange(null);
-    setRecognizeStatus('');
+    setAiResult(null);
+    setRecognitionStatus(null);
     setProgressInfo(null);
-    setRecognizeResult(null);
   }, [onChange]);
+
+  // AI识别功能
+  const handleAIRecognition = useCallback(async () => {
+    if (!preview) return;
+    
+    setIsRecognizing(true);
+    setRecognitionStatus('正在识别...');
+    setProgressInfo({ status: '正在识别...', percent: 0 });
+    recognitionStartTimeRef.current = Date.now();
+    
+    // 启动进度文案定时器（每2秒更新一次）
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recognitionStartTimeRef.current) / 1000);
+      const message = getProgressMessage(elapsed);
+      const percent = getProgressPercent(elapsed);
+      setRecognitionStatus(message);
+      setProgressInfo({ status: message, percent });
+    }, 2000);
+    
+    try {
+      const response = await fetch(aiApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: preview })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setAiResult(result.data);
+        const statusMsg = `识别完成 (置信度: ${Math.round(result.data.overall_confidence * 100)}%)`;
+        setRecognitionStatus(statusMsg);
+        setProgressInfo({ status: '识别完成', percent: 100 });
+        onAIRecognition?.(result.data);
+      } else if (result.tongueNotDetected) {
+        // 安全验证：未检测到舌头
+        setRecognitionStatus('⚠️ ' + (result.error || '未检测到舌象，请上传清晰的舌头照片'));
+        setAiResult(null);
+        setProgressInfo(null);
+      } else {
+        setRecognitionStatus('识别失败: ' + (result.error || '未知错误'));
+        setProgressInfo(null);
+      }
+    } catch (e: any) {
+      setRecognitionStatus('网络错误: ' + e.message);
+      setProgressInfo(null);
+    } finally {
+      // 清理进度定时器
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+      setIsRecognizing(false);
+    }
+  }, [preview, aiApiUrl, onAIRecognition]);
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-stone-700">
-          📷 舌象图片
-          {useLocalEngine && (
-            <span className="ml-2 px-1.5 py-0.5 text-xs bg-primary-100 text-primary-700 rounded">本地引擎</span>
-          )}
-        </label>
-        {/* 自动识别开关 - 本地引擎模式下隐藏 */}
-        {!useLocalEngine && (
-          <label className="flex items-center gap-1.5 text-xs text-stone-500 cursor-pointer">
-            <input 
-              type="checkbox" 
-              checked={autoRecognize}
-              onChange={(e) => setAutoRecognize(e.target.checked)}
-              className="rounded border-stone-300 text-primary-500 focus:ring-primary-400"
-            />
-            <span>拍照后自动识别</span>
-          </label>
-        )}
-      </div>
+      <label className="block text-sm font-medium text-stone-700">
+        📷 舌象图片上传
+      </label>
       
       {preview ? (
-        <div className="space-y-3">
-          <div className="relative rounded-xl overflow-hidden border-2 border-primary-200 bg-gradient-to-br from-primary-50 to-secondary-50">
-            <img 
-              src={preview} 
-              alt="舌象预览" 
-              className="w-full h-40 object-cover"
-            />
-            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-              <label className="cursor-pointer px-4 py-2 bg-white rounded-lg text-sm font-medium text-stone-700 hover:bg-stone-100 transition-colors">
-                重新上传
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleInputChange}
-                  className="hidden"
-                />
-              </label>
-              <button
-                onClick={handleRemove}
-                className="px-4 py-2 bg-red-500 rounded-lg text-sm font-medium text-white hover:bg-red-600 transition-colors"
-              >
-                删除
-              </button>
-            </div>
-          </div>
-
-          {/* 本地引擎模式引导提示 */}
-          {useLocalEngine ? (
-            <div className="px-3 py-3 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-sm text-amber-800">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">💡</span>
-                <span className="font-medium">本地引擎模式</span>
-              </div>
-              <p className="text-xs text-amber-700 leading-relaxed">
-                拍照完成，请点击下方按钮手动选择舌象特征进行辨证分析。
-                {recognizeStatus && recognizeStatus.includes('手动选择') && (
-                  <span className="block mt-1 text-amber-900 font-medium">
-                    → 请向下滑动，手动选择您的舌象特征
-                  </span>
-                )}
-              </p>
-            </div>
-          ) : (
-            /* AI识别按钮 - 非本地引擎模式 */
+        <div className="relative rounded-xl overflow-hidden border-2 border-primary-200 bg-gradient-to-br from-primary-50 to-secondary-50">
+          <img 
+            src={preview} 
+            alt="舌象预览" 
+            className="w-full h-48 object-cover"
+          />
+          <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+            <label className="cursor-pointer px-4 py-2 bg-white rounded-lg text-sm font-medium text-stone-700 hover:bg-stone-100 transition-colors">
+              重新上传
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleInputChange}
+                className="hidden"
+              />
+            </label>
             <button
-              onClick={() => handleRecognize()}
+              onClick={handleRemove}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+            >
+              删除
+            </button>
+          </div>
+          <div className="absolute top-2 right-2 px-2 py-1 bg-green-500 text-white text-xs rounded-full">
+            ✓ 已上传
+          </div>
+          {/* AI识别按钮 */}
+          <div className="absolute bottom-14 left-1/2 transform -translate-x-1/2">
+            <button
+              onClick={handleAIRecognition}
               disabled={isRecognizing}
               className={clsx(
-                'w-full py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2',
-                isRecognizing
-                  ? 'bg-stone-100 text-stone-400 cursor-wait'
-                  : recognizeResult
-                    ? 'bg-green-50 text-green-600 border border-green-200 hover:bg-green-100'
-                    : 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white hover:from-primary-600 hover:to-secondary-600 shadow-md hover:shadow-lg'
+                'px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-all',
+                isRecognizing 
+                  ? 'bg-stone-400 text-white cursor-wait'
+                  : aiResult 
+                    ? 'bg-green-500 text-white hover:bg-green-600'
+                    : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
               )}
             >
-              {isRecognizing ? (
-                <>
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  {recognizeStatus || '识别中...'}
-                </>
-              ) : recognizeResult ? (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  重新识别
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                  </svg>
-                  AI智能识别
-                </>
-              )}
+              {isRecognizing ? '🔄 识别中...' : aiResult ? '✓ 已识别' : '✨ AI识别'}
             </button>
-          )}
-
-          {/* 识别进度条 */}
-          {isRecognizing && progressInfo && (
-            <div className="space-y-2 animate-fadeIn">
-              <div className="flex items-center justify-between text-xs text-stone-500">
-                <span>{progressInfo.status}</span>
-                <span className="font-medium text-primary-600">{progressInfo.percent}%</span>
-              </div>
-              <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden">
-                <div 
-                  className={clsx(
-                    'h-full rounded-full transition-all duration-500 ease-out',
-                    progressInfo.isComplete 
-                      ? 'bg-green-500' 
-                      : 'bg-gradient-to-r from-teal-400 to-cyan-500'
-                  )}
-                  style={{ width: `${progressInfo.percent}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* 识别结果摘要条 */}
-          {recognizeResult && (
-            <div className="px-3 py-2.5 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-xs text-stone-600 leading-relaxed">
-              <div className="flex items-center gap-1.5 mb-1">
-                <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="font-medium text-green-700">AI识别结果</span>
-              </div>
-              <p>{buildSummary(recognizeResult)}</p>
-            </div>
-          )}
-
-          {/* 识别状态（失败时显示） */}
-          {recognizeStatus && !isRecognizing && !recognizeStatus.includes('✓') && !recognizeStatus.includes('手动选择') && (
-            <div className="px-3 py-2 rounded-lg text-sm text-center bg-red-50 text-red-700">
-              {recognizeStatus}
-            </div>
-          )}
+          </div>
+          {/* 提示用户确认 */}
+          <div className="p-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-700 text-center">
+            ⚠️ 请确保上传的是清晰的舌象照片，AI识别后请确认舌象特征
+          </div>
         </div>
       ) : (
         <div
@@ -330,10 +364,10 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           className={clsx(
-            'border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer',
+            'border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer',
             isDragging
-              ? 'border-primary-500 bg-primary-50'
-              : 'border-stone-300 hover:border-primary-400 hover:bg-stone-50'
+              ? 'border-primary-400 bg-primary-50'
+              : 'border-stone-300 bg-stone-50 hover:border-primary-300 hover:bg-primary-50'
           )}
         >
           <input
@@ -341,22 +375,73 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             accept="image/*"
             onChange={handleInputChange}
             className="hidden"
-            id="image-upload"
+            id="tongue-image-upload"
           />
-          <label htmlFor="image-upload" className="cursor-pointer">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-stone-700 font-medium text-sm">点击拍照或上传舌象</p>
-                <p className="text-stone-500 text-xs mt-0.5">支持 JPG、PNG，最大 10MB</p>
-              </div>
-            </div>
+          <label htmlFor="tongue-image-upload" className="cursor-pointer">
+            <div className="text-4xl mb-3">📷</div>
+            <p className="text-stone-600 font-medium">点击或拖拽上传舌象图片（可选）</p>
+            <p className="text-stone-400 text-sm mt-1">支持 JPG、PNG 格式，最大 10MB</p>
+            <p className="text-primary-600 text-xs mt-2 bg-primary-50 px-2 py-1 rounded inline-block">
+              💡 有图可自动识别舌象特征，无图也能手动输入辨证
+            </p>
           </label>
+        </div>
+      )}
+
+      {/* AI识别状态显示 */}
+      {recognitionStatus && (
+        <div className={clsx(
+          'flex items-center gap-2 px-3 py-2 rounded-lg text-sm',
+          aiResult ? 'bg-green-50 text-green-700' : 'bg-purple-50 text-purple-700'
+        )}>
+          {isRecognizing && <div className="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>}
+          <span>{recognitionStatus}</span>
+        </div>
+      )}
+
+      {/* 识别进度条 */}
+      {isRecognizing && progressInfo && (
+        <div className="space-y-2 px-1">
+          <div className="flex items-center justify-between text-xs text-stone-500">
+            <span>{progressInfo.status}</span>
+            <span className="font-medium text-purple-600">{progressInfo.percent}%</span>
+          </div>
+          <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden">
+            <div 
+              className={clsx(
+                'h-full rounded-full transition-all duration-500 ease-out',
+                progressInfo.percent >= 100 
+                  ? 'bg-green-500' 
+                  : 'bg-gradient-to-r from-purple-400 to-pink-500'
+              )}
+              style={{ width: `${progressInfo.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* AI识别结果预览 */}
+      {aiResult && (
+        <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+          <div className="text-xs text-purple-700 font-medium mb-2">🤖 AI识别结果（可微调）</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-1">
+              <span className="text-stone-500">舌色:</span>
+              <span className="font-medium text-purple-700">{aiResult.tongue_color?.value || '-'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-stone-500">舌形:</span>
+              <span className="font-medium text-purple-700">{aiResult.tongue_shape?.value || '-'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-stone-500">舌苔:</span>
+              <span className="font-medium text-purple-700">{aiResult.tongue_coating?.color || '-'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-stone-500">舌态:</span>
+              <span className="font-medium text-purple-700">{aiResult.tongue_state?.value || '-'}</span>
+            </div>
+          </div>
         </div>
       )}
     </div>
