@@ -22,7 +22,7 @@ const __dirname = dirname(__filename);
 
 const DEEPSEEK_CONFIG = {
   apiUrl: 'https://api.deepseek.com/chat/completions',
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-8a16d38a51a14dcb946692f13c7f9d54',
+  apiKey: process.env.DEEPSEEK_API_KEY,
   model: 'deepseek-chat',
 };
 
