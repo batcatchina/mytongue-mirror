@@ -254,6 +254,7 @@ const DiagnosisPage: React.FC = () => {
   const [inquiryConversationId, setInquiryConversationId] = useState<string | null>(null);
   const [preliminaryResult, setPreliminaryResult] = useState<any>(null);
   const [isRefiningDiagnosis, setIsRefiningDiagnosis] = useState(false);
+  const [isLoadingInquiry, setIsLoadingInquiry] = useState(false);
   const [showRefineButton, setShowRefineButton] = useState(false);
   const [useLocalEngine, setUseLocalEngine] = useState(true);
   const [showEngineSwitch, setShowEngineSwitch] = useState(false);
@@ -437,7 +438,10 @@ const DiagnosisPage: React.FC = () => {
   // ========== v3.2 问而确之：Inquiry模式调用 ==========
   const diagnoseWithInquiry = async () => {
     // console.log('[DeepSeek诊断] 启动问诊模式...');
-    setShowRefineButton(true); // 问诊开始时隐藏按钮，防止重复点击
+    setShowRefineButton(true);
+    setShowInquiry(true);
+    setIsLoadingInquiry(true);
+    setInquiryQuestions([]);
     const shapeDist = inputFeatures.shapeDistribution;
     const hasTeethMark = inputFeatures.teethMark?.value === '是' ||
                          shapeDist?.depression?.includes('齿痕') || false;
@@ -468,8 +472,10 @@ const DiagnosisPage: React.FC = () => {
         setInquiryQuestions(result.questions);
         setInquiryConversationId(result.conversationId);
         setPreliminaryResult(result.preliminaryResult);
-        setShowInquiry(true);
+        setIsLoadingInquiry(false);
       } else {
+        setIsLoadingInquiry(false);
+        setShowInquiry(false);
         const aiResult = result.data || result.preliminaryResult;
         if (aiResult) {
           // 包装成嵌套结构，兼容显示组件（修复白屏）
@@ -497,6 +503,8 @@ const DiagnosisPage: React.FC = () => {
       }
     } catch (err) {
       console.error('[问诊] 调用失败:', err);
+      setIsLoadingInquiry(false);
+      setShowInquiry(false);
       setError('问诊调用失败，请重试');
     }
   };
@@ -1701,17 +1709,33 @@ const DiagnosisPage: React.FC = () => {
     
       {/* ========== v3.2 问诊对话框 ========== */}
       {showInquiry && (
-        <InquiryDialog
-          questions={inquiryQuestions}
-          conversationId={inquiryConversationId || ''}
-          preliminaryResult={preliminaryResult}
-          onSubmit={handleInquirySubmit}
-          onCancel={() => {
-            setShowInquiry(false);
-            setShowRefineButton(false); // 取消问诊时恢复按钮显示
-          }}
-          isLoading={isRefiningDiagnosis}
-        />
+        isLoadingInquiry ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+              <svg className="animate-spin w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <p className="text-stone-600 font-medium">正在生成问诊问题...</p>
+              <button
+                onClick={() => { setShowInquiry(false); setIsLoadingInquiry(false); setShowRefineButton(false); }}
+                className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+              >取消</button>
+            </div>
+          </div>
+        ) : (
+          <InquiryDialog
+            questions={inquiryQuestions}
+            conversationId={inquiryConversationId || ''}
+            preliminaryResult={preliminaryResult}
+            onSubmit={handleInquirySubmit}
+            onCancel={() => {
+              setShowInquiry(false);
+              setShowRefineButton(false);
+            }}
+            isLoading={isRefiningDiagnosis}
+          />
+        )
       )}
 </div>
   );
