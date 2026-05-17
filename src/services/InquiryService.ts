@@ -4,6 +4,7 @@
  */
 import toast from 'react-hot-toast';
 import { DiagnosisOutput, InputFeatures } from '@/types';
+import type { TongueAnalysisResult } from '@/types/tongue';
 import { getLifeCareAdvice } from '@/engine/lifeCareEngine';
 import { QuestionTree } from '@/services/interrogation/QuestionTree';
 import { InquiryQuestion } from '@/components/InquiryDialog';
@@ -55,6 +56,43 @@ export function buildTongueFeatures(inputFeatures: InputFeatures): TongueFeature
     shapeDistribution: inputFeatures.shapeDistribution,
     distributionFeatures: inputFeatures.distributionFeatures,
   };
+}
+
+/**
+ * 将InputFeatures转换为TongueAnalysisResult
+ * 用于QuestionTree动态生成定向问诊问题
+ */
+function convertInputFeaturesToTongueResult(inputFeatures?: InputFeatures): TongueAnalysisResult | undefined {
+  if (!inputFeatures) return undefined;
+  
+  return {
+    bodyColor: (inputFeatures.tongueColor.value as any) || '淡红',
+    shape: (inputFeatures.tongueShape.value as any) || '正常',
+    coatingColor: (inputFeatures.coating.color as any) || '薄白',
+    coatingTexture: (inputFeatures.coating.texture as any) || '薄',
+    state: (inputFeatures.tongueState.value as any) || '正常',
+    hasTeethMark: inputFeatures.teethMark?.value === '是' || 
+                  inputFeatures.shapeDistribution?.depression?.includes('齿痕') || false,
+    hasCrack: inputFeatures.crack?.value === '是' || 
+              inputFeatures.shapeDistribution?.depression?.includes('裂纹') || false,
+    zoneFeatures: inputFeatures.distributionFeatures?.map(f => ({
+      position: f.part as any,
+      color: '',
+      undulation: f.feature.includes('凹陷') ? 'depression' : f.feature.includes('凸起') ? 'bulge' : undefined,
+    })),
+  };
+}
+
+/**
+ * 根据置信度计算需要问诊的问题数量
+ * - 置信度 ≥ 0.8：不问
+ * - 置信度 0.6-0.8：问1-2题
+ * - 置信度 < 0.6：问2-3题
+ */
+function getQuestionCountByConfidence(confidence: number): number {
+  if (confidence >= 0.8) return 0;
+  if (confidence >= 0.6) return Math.random() > 0.5 ? 1 : 2;
+  return Math.floor(Math.random() * 2) + 2; // 2-3题
 }
 
 /**
@@ -201,8 +239,21 @@ async function diagnoseWithInquiryLocal(
 function refineSyndrome(current: any, addSyndrome: string, boost: number): any {
   if (!current) return addSyndrome;
   
-  let currentStr = typeof current === 'string' ? current : 
-    (current.primarySyndrome || JSON.stringify(current));
+  let currentStr: string;
+  if (typeof current === 'string') {
+    currentStr = current;
+  } else if (current && typeof current === 'object' && current.primarySyndrome) {
+    currentStr = current.primarySyndrome;
+  } else if (current && typeof current === 'object') {
+    // 尝试提取证型数组
+    try {
+      currentStr = current.syndromeTypes?.join('、') || current.mainSyndrome || JSON.stringify(current);
+    } catch {
+      currentStr = addSyndrome;
+    }
+  } else {
+    currentStr = String(current);
+  }
   
   if (!currentStr.includes(addSyndrome)) {
     currentStr = currentStr + '、' + addSyndrome;
@@ -277,16 +328,34 @@ export async function generateInquiryQuestions(
   console.log('[InquiryService] 使用本地QuestionTree引擎生成问诊问题');
   try {
     const inferenceNodes = extractInferenceNodes(preliminaryResult);
+    const tongueResult = convertInputFeaturesToTongueResult(inputFeatures);
+    
+    // 根据推理节点置信度计算需要问诊的问题数量
+    const avgConfidence = inferenceNodes.length > 0 
+      ? inferenceNodes.reduce((sum, n) => sum + (n.conclusion?.confidence || 0.5), 0) / inferenceNodes.length
+      : 0.5;
+    const maxQuestions = getQuestionCountByConfidence(avgConfidence);
+    
+    // 如果置信度足够高，不需要问诊
+    if (maxQuestions === 0) {
+      console.log('[InquiryService] 置信度足够高，跳过问诊');
+      return {
+        questions: [],
+        conversationId: `inq_${Date.now()}`,
+        preliminaryResult,
+      };
+    }
     
     const questionTree = new QuestionTree();
     const questions = questionTree.buildTree(
-      undefined,
+      tongueResult,  // 传入舌象分析结果，实现定向问诊
       inferenceNodes,
       patientAge || preliminaryResult.patientAge || 30
     );
     
+    // 按置信度和舌象特征筛选问题，确保定向性
     const inquiryQuestions = questions
-      .slice(0, 5)
+      .slice(0, maxQuestions)
       .map(convertToInquiryQuestion);
     
     const conversationId = `inq_${Date.now()}`;

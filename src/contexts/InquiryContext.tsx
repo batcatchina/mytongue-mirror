@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo } from
 import InquiryDialog, { InquiryQuestion } from '@/components/InquiryDialog';
 import { DiagnosisOutput } from '@/types';
 import { generateInquiryQuestions, submitInquiryAnswers } from '@/services/InquiryService';
+import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import toast from 'react-hot-toast';
 
 interface InquiryContextValue {
@@ -35,6 +36,10 @@ export function InquiryProvider({ children }: { children: React.ReactNode }) {
   const [preliminaryResult, setPreliminaryResult] = useState<DiagnosisOutput | null>(null);
   const [showRefineButton, setShowRefineButton] = useState(true);
   
+  // 从 store 获取 inputFeatures 和 patientAge
+  const inputFeatures = useDiagnosisStore(state => state.inputFeatures);
+  const patientAge = useDiagnosisStore(state => state.patientInfo.age) ?? undefined;
+  
   // 开始问诊流程
   const startInquiry = useCallback(async (result: DiagnosisOutput) => {
     if (isRefiningDiagnosis) return;
@@ -45,7 +50,11 @@ export function InquiryProvider({ children }: { children: React.ReactNode }) {
     setPreliminaryResult(result);
     
     try {
-      const { questions, conversationId } = await generateInquiryQuestions(result);
+      const { questions, conversationId } = await generateInquiryQuestions(
+        result,
+        inputFeatures,
+        patientAge
+      );
       
       setInquiryQuestions(questions);
       setInquiryConversationId(conversationId);
@@ -59,7 +68,7 @@ export function InquiryProvider({ children }: { children: React.ReactNode }) {
       setIsRefiningDiagnosis(false);
       setIsLoadingInquiry(false);
     }
-  }, [isRefiningDiagnosis]);
+  }, [isRefiningDiagnosis, inputFeatures, patientAge]);
   
   // 提交问诊答案
   const submitInquiry = useCallback(async (answers: Record<string, string>): Promise<DiagnosisOutput> => {
@@ -73,7 +82,9 @@ export function InquiryProvider({ children }: { children: React.ReactNode }) {
       const finalResult = await submitInquiryAnswers(
         inquiryConversationId,
         answers,
-        preliminaryResult
+        preliminaryResult,
+        inputFeatures,  // 补传 inputFeatures
+        patientAge       // 补传 patientAge
       );
       
       setShowInquiry(false);
@@ -85,7 +96,7 @@ export function InquiryProvider({ children }: { children: React.ReactNode }) {
       toast.error('提交问诊失败，请重试');
       throw error;
     }
-  }, [preliminaryResult, inquiryConversationId]);
+  }, [preliminaryResult, inquiryConversationId, inputFeatures, patientAge]);
   
   // 取消问诊
   const cancelInquiry = useCallback(() => {
