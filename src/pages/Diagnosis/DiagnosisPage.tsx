@@ -264,7 +264,7 @@ export default function DiagnosisPage() {
     }
   }, [isAnalyzing, getDiagnosisInput]);
 
-  // 开始问诊
+  // 开始问诊 - 调用后端DeepSeek API生成问诊问题
   const handleRefineDiagnosis = useCallback(async () => {
     if (isRefiningDiagnosis || !diagnosisResult) return;
     setIsRefiningDiagnosis(true);
@@ -273,18 +273,61 @@ export default function DiagnosisPage() {
     setPreliminaryResult(diagnosisResult);
 
     try {
-      const response = await fetch('/api/inquiry/generate', {
+      // 构造舌象特征对象
+      const shapeDist = inputFeatures.shapeDistribution;
+      const hasTeethMark = inputFeatures.teethMark?.value === '是' || shapeDist?.depression?.includes('齿痕') || false;
+      const hasCrack = inputFeatures.crack?.value === '是' || shapeDist?.depression?.includes('裂纹') || false;
+      const tongueFeatures = {
+        tongueColor: inputFeatures.tongueColor.value,
+        tongueShape: inputFeatures.tongueShape.value || '正常',
+        coatingColor: inputFeatures.coating.color,
+        coatingTexture: inputFeatures.coating.texture || '薄',
+        coatingMoisture: inputFeatures.coating.moisture || '润',
+        teethMark: hasTeethMark,
+        crack: hasCrack,
+        tongueState: inputFeatures.tongueState.value || '正常',
+        shapeDistribution: inputFeatures.shapeDistribution,
+        distributionFeatures: inputFeatures.distributionFeatures,
+      };
+
+      // 调用后端API
+      const response = await fetch('/api/tongue-ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preliminary_result: diagnosisResult }),
+        body: JSON.stringify({
+          tongueFeatures,
+          age: patientInfo.age > 0 ? patientInfo.age : undefined,
+          mode: 'inquiry',
+        }),
       });
 
       if (!response.ok) throw new Error('问诊问题生成失败');
 
       const data = await response.json();
-      setInquiryQuestions(data.questions || []);
-      setInquiryConversationId(data.conversation_id || `inq_${Date.now()}`);
-      setShowInquiry(true);
+      
+      if (data.success && data.questions && data.questions.length > 0) {
+        // DeepSeek生成了问诊问题
+        const questions: InquiryQuestion[] = data.questions.map((q: any) => ({
+          id: q.id,
+          text: q.text,
+          options: q.options,
+          reason: q.reason || '',
+        }));
+        setInquiryQuestions(questions);
+        setInquiryConversationId(data.conversationId || `sz_${Date.now()}`);
+        
+        // 如果后端返回了初步辨证结果，更新preliminaryResult
+        if (data.preliminaryResult) {
+          setPreliminaryResult(data.preliminaryResult);
+        }
+        
+        setShowInquiry(true);
+      } else if (data.success && (!data.questions || data.questions.length === 0)) {
+        // 高置信度，不需要问诊
+        toast.success('辨证置信度较高，无需进一步问诊');
+        setShowRefineButton(true);
+        setIsRefiningDiagnosis(false);
+      }
     } catch (error) {
       console.error('生成问诊问题失败:', error);
       toast.error('生成问诊问题失败，请重试');
@@ -293,9 +336,9 @@ export default function DiagnosisPage() {
       setIsRefiningDiagnosis(false);
       setIsLoadingInquiry(false);
     }
-  }, [isRefiningDiagnosis, diagnosisResult]);
+  }, [isRefiningDiagnosis, diagnosisResult, inputFeatures, patientInfo.age]);
 
-  // 提交问诊答案
+  // 提交问诊答案 - 调用后端DeepSeek API整合答案
   const handleInquirySubmit = useCallback(async (answers: Record<string, string>) => {
     if (!preliminaryResult || !inquiryConversationId) {
       throw new Error('问诊数据不完整');
@@ -303,23 +346,50 @@ export default function DiagnosisPage() {
 
     setIsRefiningDiagnosis(true);
     try {
-      const response = await fetch('/api/inquiry/refine', {
+      // 构造舌象特征对象
+      const shapeDist = inputFeatures.shapeDistribution;
+      const hasTeethMark = inputFeatures.teethMark?.value === '是' || shapeDist?.depression?.includes('齿痕') || false;
+      const hasCrack = inputFeatures.crack?.value === '是' || shapeDist?.depression?.includes('裂纹') || false;
+      const tongueFeatures = {
+        tongueColor: inputFeatures.tongueColor.value,
+        tongueShape: inputFeatures.tongueShape.value || '正常',
+        coatingColor: inputFeatures.coating.color,
+        coatingTexture: inputFeatures.coating.texture || '薄',
+        coatingMoisture: inputFeatures.coating.moisture || '润',
+        teethMark: hasTeethMark,
+        crack: hasCrack,
+        tongueState: inputFeatures.tongueState.value || '正常',
+        shapeDistribution: inputFeatures.shapeDistribution,
+        distributionFeatures: inputFeatures.distributionFeatures,
+      };
+
+      // 转换answers格式
+      const formattedAnswers = Object.entries(answers).map(([questionId, selectedOption]) => ({
+        questionId,
+        selectedOption,
+      }));
+
+      // 调用后端confirm API
+      const response = await fetch('/api/tongue-ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conversation_id: inquiryConversationId,
-          answers,
-          preliminary_result: preliminaryResult,
+          tongueFeatures,
+          age: patientInfo.age > 0 ? patientInfo.age : undefined,
+          answers: formattedAnswers,
+          conversationId: inquiryConversationId,
+          preliminaryResult,
+          mode: 'confirm',
         }),
       });
 
       if (!response.ok) throw new Error('问诊提交失败');
 
-      const refinedResult = await response.json();
+      const data = await response.json();
       const finalResult: DiagnosisOutput = {
-        diagnosisResult: refinedResult.diagnosisResult || preliminaryResult.diagnosisResult,
-        acupuncturePlan: refinedResult.acupuncturePlan || preliminaryResult.acupuncturePlan,
-        lifeCareAdvice: refinedResult.lifeCareAdvice || preliminaryResult.lifeCareAdvice,
+        diagnosisResult: data.data?.mainSyndrome || data.data?.syndrome || preliminaryResult.diagnosisResult,
+        acupuncturePlan: data.data?.acupuncturePlan || preliminaryResult.acupuncturePlan,
+        lifeCareAdvice: data.data?.lifeCareAdvice || preliminaryResult.lifeCareAdvice,
       };
 
       setLocalDiagnosisResult(finalResult);
@@ -332,7 +402,7 @@ export default function DiagnosisPage() {
       toast.error('提交问诊失败，请重试');
       throw error;
     }
-  }, [preliminaryResult, inquiryConversationId]);
+  }, [preliminaryResult, inquiryConversationId, inputFeatures, patientInfo.age]);
 
   // 解锁付费内容
   const handleUnlock = useCallback(async () => {

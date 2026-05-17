@@ -1,9 +1,9 @@
 /**
  * 问诊服务 - 智能问诊相关逻辑
- * 使用本地问诊引擎替代远程API
+ * 优先调用后端DeepSeek API，本地QuestionTree作为降级方案
  */
 import toast from 'react-hot-toast';
-import { DiagnosisOutput } from '@/types';
+import { DiagnosisOutput, InputFeatures } from '@/types';
 import { getLifeCareAdvice } from '@/engine/lifeCareEngine';
 import { QuestionTree } from '@/services/interrogation/QuestionTree';
 import { InquiryQuestion } from '@/components/InquiryDialog';
@@ -14,6 +14,47 @@ import { InquiryQuestion } from '@/components/InquiryDialog';
 export interface InquiryServiceConfig {
   onQuestionsGenerated?: (questions: InquiryQuestion[], conversationId: string) => void;
   onInquiryComplete?: (finalResult: DiagnosisOutput) => void;
+}
+
+/**
+ * 舌象特征对象（与后端API一致）
+ */
+export interface TongueFeatures {
+  tongueColor: string;
+  tongueShape?: string;
+  coatingColor: string;
+  coatingTexture?: string;
+  coatingMoisture?: string;
+  teethMark?: boolean;
+  crack?: boolean;
+  tongueState?: string;
+  shapeDistribution?: {
+    depression?: string[];
+    bulge?: string[];
+  };
+  distributionFeatures?: Array<{ part: string; feature: string }>;
+}
+
+/**
+ * 从InputFeatures构造TongueFeatures对象
+ */
+export function buildTongueFeatures(inputFeatures: InputFeatures): TongueFeatures {
+  const shapeDist = inputFeatures.shapeDistribution;
+  const hasTeethMark = inputFeatures.teethMark?.value === '是' || shapeDist?.depression?.includes('齿痕') || false;
+  const hasCrack = inputFeatures.crack?.value === '是' || shapeDist?.depression?.includes('裂纹') || false;
+  
+  return {
+    tongueColor: inputFeatures.tongueColor.value || '淡红',
+    tongueShape: inputFeatures.tongueShape.value || '正常',
+    coatingColor: inputFeatures.coating.color || '薄白',
+    coatingTexture: inputFeatures.coating.texture || '薄',
+    coatingMoisture: inputFeatures.coating.moisture || '润',
+    teethMark: hasTeethMark,
+    crack: hasCrack,
+    tongueState: inputFeatures.tongueState.value || '正常',
+    shapeDistribution: inputFeatures.shapeDistribution,
+    distributionFeatures: inputFeatures.distributionFeatures,
+  };
 }
 
 /**
@@ -46,7 +87,7 @@ function extractInferenceNodes(result: DiagnosisOutput): any[] {
           id: `syndrome-${idx}`,
           conclusion: {
             label: syndrome.trim(),
-            confidence: 0.6, // 假设初始置信度
+            confidence: 0.6,
           },
         });
       });
@@ -92,75 +133,66 @@ function extractInferenceNodes(result: DiagnosisOutput): any[] {
 }
 
 /**
- * 使用问诊引擎诊断（整合用户回答）
+ * 使用问诊引擎诊断（整合用户回答）- 本地降级版本
  */
-export async function diagnoseWithInquiry(
+async function diagnoseWithInquiryLocal(
   conversationId: string,
   answers: Record<string, string>,
   preliminaryResult: DiagnosisOutput,
   config?: InquiryServiceConfig
 ): Promise<DiagnosisOutput> {
-  try {
-    // 使用本地引擎整合用户回答
-    // 根据回答调整辨证结果
-    let refinedResult = { ...preliminaryResult };
-    
-    // 分析回答并调整辨证
-    for (const [questionId, answer] of Object.entries(answers)) {
-      // 根据问题ID和回答调整证型
-      if (questionId.includes('fatigue') || questionId.includes('疲劳')) {
-        if (answer.includes('是') || answer.includes('经常')) {
-          // 增加气虚权重
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '气虚', 0.2);
-        }
-      }
-      if (questionId.includes('thirsty') || questionId.includes('口干') || questionId.includes('渴')) {
-        if (answer.includes('是') || answer.includes('明显')) {
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阴虚', 0.2);
-        }
-      }
-      if (questionId.includes('cold') || questionId.includes('寒热')) {
-        if (answer.includes('怕冷')) {
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阳虚', 0.15);
-        } else if (answer.includes('怕热')) {
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阴虚', 0.15);
-        }
-      }
-      if (questionId.includes('stool') || questionId.includes('二便')) {
-        if (answer.includes('溏') || answer.includes('稀')) {
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '脾虚', 0.2);
-        } else if (answer.includes('便秘') || answer.includes('干')) {
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '热证', 0.15);
-        }
-      }
-      if (questionId.includes('sleep') || questionId.includes('睡眠')) {
-        if (answer.includes('失眠') || answer.includes('难入睡')) {
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '心火', 0.15);
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阴虚', 0.1);
-        }
-      }
-      if (questionId.includes('diet') || questionId.includes('饮食')) {
-        if (answer.includes('不振') || answer.includes('差')) {
-          refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '脾虚', 0.2);
-        }
+  // 分析回答并调整辨证
+  let refinedResult = { ...preliminaryResult };
+  
+  for (const [questionId, answer] of Object.entries(answers)) {
+    if (questionId.includes('fatigue') || questionId.includes('疲劳')) {
+      if (answer.includes('是') || answer.includes('经常')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '气虚', 0.2);
       }
     }
-    
-    // 整合结果：问诊后优先级 - 针灸方案优先使用原辨证的
-    const finalResult: DiagnosisOutput = {
-      diagnosisResult: refinedResult.diagnosisResult || preliminaryResult.diagnosisResult,
-      acupuncturePlan: preliminaryResult.acupuncturePlan || refinedResult.acupuncturePlan,
-      lifeCareAdvice: refinedResult.lifeCareAdvice || getLifeCareAdvice(refinedResult.diagnosisResult || preliminaryResult.diagnosisResult),
-    };
-
-    config?.onInquiryComplete?.(finalResult);
-    toast.success('✅ 问诊完成，辨证更精准');
-    
-    return finalResult;
-  } catch (error) {
-    console.error('问诊诊断失败:', error);
-    throw error;
+    if (questionId.includes('thirsty') || questionId.includes('口干') || questionId.includes('渴')) {
+      if (answer.includes('是') || answer.includes('明显')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阴虚', 0.2);
+      }
+    }
+    if (questionId.includes('cold') || questionId.includes('寒热')) {
+      if (answer.includes('怕冷')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阳虚', 0.15);
+      } else if (answer.includes('怕热')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阴虚', 0.15);
+      }
+    }
+    if (questionId.includes('stool') || questionId.includes('二便')) {
+      if (answer.includes('溏') || answer.includes('稀')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '脾虚', 0.2);
+      } else if (answer.includes('便秘') || answer.includes('干')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '热证', 0.15);
+      }
+    }
+    if (questionId.includes('sleep') || questionId.includes('睡眠')) {
+      if (answer.includes('失眠') || answer.includes('难入睡')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '心火', 0.15);
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '阴虚', 0.1);
+      }
+    }
+    if (questionId.includes('diet') || questionId.includes('饮食')) {
+      if (answer.includes('不振') || answer.includes('差')) {
+        refinedResult.diagnosisResult = refineSyndrome(refinedResult.diagnosisResult, '脾虚', 0.2);
+      }
+    }
   }
+  
+  // 整合结果
+  const finalResult: DiagnosisOutput = {
+    diagnosisResult: refinedResult.diagnosisResult || preliminaryResult.diagnosisResult,
+    acupuncturePlan: preliminaryResult.acupuncturePlan || refinedResult.acupuncturePlan,
+    lifeCareAdvice: refinedResult.lifeCareAdvice || getLifeCareAdvice(refinedResult.diagnosisResult || preliminaryResult.diagnosisResult),
+  };
+
+  config?.onInquiryComplete?.(finalResult);
+  toast.success('✅ 问诊完成，辨证更精准');
+  
+  return finalResult;
 }
 
 /**
@@ -172,9 +204,7 @@ function refineSyndrome(current: any, addSyndrome: string, boost: number): any {
   let currentStr = typeof current === 'string' ? current : 
     (current.primarySyndrome || JSON.stringify(current));
   
-  // 如果证型已存在，增加其权重标记
   if (!currentStr.includes(addSyndrome)) {
-    // 保持原有证型，添加新证型
     currentStr = currentStr + '、' + addSyndrome;
   }
   
@@ -182,27 +212,81 @@ function refineSyndrome(current: any, addSyndrome: string, boost: number): any {
 }
 
 /**
- * 生成问诊问题 - 使用本地问诊引擎
+ * 生成问诊问题 - 优先调用后端DeepSeek API，本地QuestionTree作为降级
  */
 export async function generateInquiryQuestions(
   preliminaryResult: DiagnosisOutput,
+  inputFeatures?: InputFeatures,
+  patientAge?: number,
   config?: InquiryServiceConfig
-): Promise<{ questions: InquiryQuestion[]; conversationId: string }> {
+): Promise<{ questions: InquiryQuestion[]; conversationId: string; preliminaryResult?: DiagnosisOutput }> {
+  // 如果有inputFeatures，调用后端API
+  if (inputFeatures) {
+    try {
+      const tongueFeatures = buildTongueFeatures(inputFeatures);
+      
+      const response = await fetch('/api/tongue-ai/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tongueFeatures,
+          age: patientAge,
+          mode: 'inquiry',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success && data.questions && data.questions.length > 0) {
+          const inquiryQuestions: InquiryQuestion[] = data.questions.map((q: any) => ({
+            id: q.id,
+            text: q.text,
+            options: q.options,
+            reason: q.reason || '',
+          }));
+          
+          config?.onQuestionsGenerated?.(inquiryQuestions, data.conversationId || `sz_${Date.now()}`);
+          
+          return {
+            questions: inquiryQuestions,
+            conversationId: data.conversationId || `sz_${Date.now()}`,
+            preliminaryResult: data.preliminaryResult,
+          };
+        }
+        
+        // 如果API返回不需要问诊（高置信度），返回空问题
+        if (data.success && (!data.questions || data.questions.length === 0)) {
+          console.log('[InquiryService] 后端返回不需要问诊');
+          return {
+            questions: [],
+            conversationId: data.conversationId || `sz_${Date.now()}`,
+            preliminaryResult: data.preliminaryResult || preliminaryResult,
+          };
+        }
+      }
+      
+      console.warn('[InquiryService] 后端API调用失败，尝试降级到本地引擎');
+    } catch (error) {
+      console.error('[InquiryService] 后端API调用异常:', error);
+      toast.error('智能问诊服务暂不可用，使用本地引擎');
+    }
+  }
+  
+  // 降级到本地QuestionTree引擎
+  console.log('[InquiryService] 使用本地QuestionTree引擎生成问诊问题');
   try {
-    // 提取推理节点
     const inferenceNodes = extractInferenceNodes(preliminaryResult);
     
-    // 使用本地QuestionTree生成问题
     const questionTree = new QuestionTree();
     const questions = questionTree.buildTree(
-      undefined, // tongueResult
+      undefined,
       inferenceNodes,
-      preliminaryResult.patientAge || 30
+      patientAge || preliminaryResult.patientAge || 30
     );
     
-    // 转换格式并限制数量
     const inquiryQuestions = questions
-      .slice(0, 5) // 最多5个问题
+      .slice(0, 5)
       .map(convertToInquiryQuestion);
     
     const conversationId = `inq_${Date.now()}`;
@@ -214,7 +298,7 @@ export async function generateInquiryQuestions(
       conversationId,
     };
   } catch (error) {
-    console.error('生成问诊问题失败:', error);
+    console.error('[InquiryService] 本地引擎也失败:', error);
     throw error;
   }
 }
@@ -226,9 +310,59 @@ export async function submitInquiryAnswers(
   conversationId: string,
   answers: Record<string, string>,
   preliminaryResult: DiagnosisOutput,
+  inputFeatures?: InputFeatures,
+  patientAge?: number,
   config?: InquiryServiceConfig
 ): Promise<DiagnosisOutput> {
-  return diagnoseWithInquiry(conversationId, answers, preliminaryResult, config);
+  // 如果有inputFeatures，调用后端confirm API
+  if (inputFeatures) {
+    try {
+      const tongueFeatures = buildTongueFeatures(inputFeatures);
+      
+      // 转换answers格式
+      const formattedAnswers = Object.entries(answers).map(([questionId, selectedOption]) => ({
+        questionId,
+        selectedOption,
+      }));
+      
+      const response = await fetch('/api/tongue-ai/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tongueFeatures,
+          age: patientAge,
+          answers: formattedAnswers,
+          conversationId,
+          preliminaryResult,
+          mode: 'confirm',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          const refinedResult: DiagnosisOutput = {
+            diagnosisResult: data.data.mainSyndrome || data.data.syndrome || preliminaryResult.diagnosisResult,
+            acupuncturePlan: data.data.acupuncturePlan || preliminaryResult.acupuncturePlan,
+            lifeCareAdvice: data.data.lifeCareAdvice || preliminaryResult.lifeCareAdvice || getLifeCareAdvice(data.data.mainSyndrome || preliminaryResult.diagnosisResult),
+          };
+
+          config?.onInquiryComplete?.(refinedResult);
+          toast.success('✅ 问诊完成，辨证更精准');
+          
+          return refinedResult;
+        }
+      }
+      
+      console.warn('[InquiryService] 确认API调用失败，使用本地整合');
+    } catch (error) {
+      console.error('[InquiryService] 确认API调用异常:', error);
+    }
+  }
+  
+  // 降级到本地整合逻辑
+  return diagnoseWithInquiryLocal(conversationId, answers, preliminaryResult, config);
 }
 
 /**
