@@ -32,19 +32,19 @@ function generateConversationId() {
 
 const KNOWLEDGE_PATHS = {
   default: [
+    join(process.cwd(), '舌镜', 'diagnose_knowledge.md'),
     join(__dirname, '..', '..', '舌镜', 'diagnose_knowledge.md'),
     join(__dirname, '..', '舌镜', 'diagnose_knowledge.md'),
-    '/root/mytongue-mirror/舌镜/diagnose_knowledge.md',
   ],
   core: [
+    join(process.cwd(), '舌镜', 'diagnose_knowledge_core.md'),
     join(__dirname, '..', '..', '舌镜', 'diagnose_knowledge_core.md'),
     join(__dirname, '..', '舌镜', 'diagnose_knowledge_core.md'),
-    '/root/mytongue-mirror/舌镜/diagnose_knowledge_core.md',
   ],
   full: [
+    join(process.cwd(), '舌镜', 'diagnose_knowledge_full.md'),
     join(__dirname, '..', '..', '舌镜', 'diagnose_knowledge_full.md'),
     join(__dirname, '..', '舌镜', 'diagnose_knowledge_full.md'),
-    '/root/mytongue-mirror/舌镜/diagnose_knowledge_full.md',
   ],
 };
 
