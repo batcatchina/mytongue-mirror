@@ -1,7 +1,7 @@
 /**
  * useInquiryFlow - 问诊流程管理
  * 职责：处理问诊生成、提交、结果合并
- * 解决状态不一致问题：确保isRefiningDiagnosis和isLoadingInquiry互斥
+ * 解决状态不一致问题：确保refining/loading/submitting状态语义清晰
  */
 
 import { useState, useCallback } from 'react';
@@ -171,14 +171,15 @@ export function useInquiryFlow({
   const [preliminaryResult, setPreliminaryResult] = useState<DiagnosisOutput | null>(null);
 
   const isRefiningDiagnosis = currentStep === 'refining';
-  const isLoadingInquiry = currentStep === 'inquiring';
+  const isLoadingInquiry = currentStep === 'refining';
+  const isSubmittingInquiry = currentStep === 'submitting_inquiry';
   const setStep = useCallback((step: DiagnosisStep) => {
     setCurrentStep(step);
     onStepChange?.(step);
   }, [onStepChange]);
 
   const startRefine = useCallback(async (diagnosisResult: DiagnosisOutput) => {
-    if (currentStep === 'refining' || currentStep === 'inquiring') {
+    if (currentStep === 'refining' || currentStep === 'inquiry_ready' || currentStep === 'submitting_inquiry') {
       console.warn('[InquiryFlow] 已有操作进行中，忽略重复请求');
       return;
     }
@@ -218,12 +219,12 @@ export function useInquiryFlow({
         const defaultQuestions = getDefaultInquiryQuestions(diagnosisResult);
         setInquiryQuestions(defaultQuestions);
         setInquiryConversationId(conversationId || 'local-' + Date.now());
-        setStep('inquiring');
+        setStep('inquiry_ready');
         toast('使用补充问诊问题', { icon: '💬' });
       } else {
         setInquiryQuestions(questions);
         setInquiryConversationId(conversationId);
-        setStep('inquiring');
+        setStep('inquiry_ready');
       }
     } catch (error) {
       console.error('生成问诊失败:', error);
@@ -231,7 +232,7 @@ export function useInquiryFlow({
       const defaultQuestions = getDefaultInquiryQuestions(diagnosisResult);
       setInquiryQuestions(defaultQuestions);
       setInquiryConversationId('local-' + Date.now());
-      setStep('inquiring');
+      setStep('inquiry_ready');
       toast('使用默认问诊问题（AI服务暂时不可用）', { icon: '⚠️' });
     }
   }, [currentStep, inputFeatures, patientAge, setStep]);
@@ -242,12 +243,7 @@ export function useInquiryFlow({
       return;
     }
 
-    if (currentStep === 'inquiring') {
-      console.warn('[InquiryFlow] 已有操作进行中');
-      return;
-    }
-
-    setStep('inquiring');
+    setStep('submitting_inquiry');
 
     try {
       const requestPayload = {
@@ -290,7 +286,7 @@ export function useInquiryFlow({
         setStep('idle');
       }
     }
-  }, [preliminaryResult, inquiryConversationId, inputFeatures, patientAge, onResultUpdate, currentStep, setStep, showInquiry]);
+  }, [preliminaryResult, inquiryConversationId, inputFeatures, patientAge, onResultUpdate, setStep, showInquiry]);
 
   const cancelRefine = useCallback(() => {
     setStep('idle');
@@ -305,7 +301,7 @@ export function useInquiryFlow({
   }, [setStep]);
 
   // 检查是否有操作进行中
-  const isOperationInProgress = isRefiningDiagnosis || isLoadingInquiry;
+  const isOperationInProgress = isRefiningDiagnosis || isLoadingInquiry || isSubmittingInquiry;
 
   return {
     // 状态
@@ -313,6 +309,7 @@ export function useInquiryFlow({
     currentStep,
     isRefiningDiagnosis,
     isLoadingInquiry,
+    isSubmittingInquiry,
     inquiryQuestions,
     inquiryConversationId,
     preliminaryResult,

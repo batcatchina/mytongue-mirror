@@ -63,6 +63,7 @@ const DiagnosisPage: React.FC = () => {
     isRefiningDiagnosis,
     showInquiry,
     isLoadingInquiry,
+    isSubmittingInquiry,
     inquiryQuestions,
     inquiryConversationId,
     preliminaryResult,
@@ -178,7 +179,7 @@ const DiagnosisPage: React.FC = () => {
                     onClick={() => setRecognitionExpanded(false)}
                     className="w-full flex items-center justify-between text-sm text-stone-600 px-3 py-2 rounded-lg bg-stone-50 border border-stone-200"
                   >
-                    <span>智能识别区</span>
+                    <span>舌象特征选择区</span>
                     <span>▲</span>
                   </button>
                   <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
@@ -297,6 +298,12 @@ const DiagnosisPage: React.FC = () => {
 
 
 
+              {((structuredDisplay.categories || []).length) > 0 && (
+                <div className="px-3 py-2 rounded-lg bg-stone-50 border border-stone-200">
+                  <span className="text-xs text-stone-500">舌象智能识别：</span>
+                  <span className="text-sm text-stone-700">{structuredDisplay.rawText}</span>
+                </div>
+              )}
               <button
                 onClick={handleSubmit}
                 disabled={isAnalyzing}
@@ -306,28 +313,7 @@ const DiagnosisPage: React.FC = () => {
               </button>
             </div>
 
-            {((structuredDisplay.categories || []).length) > 0 && (
-              <div className="tcm-card p-4">
-                <h3 className="text-sm font-medium text-stone-600 mb-3">结构化舌象</h3>
-                <div className="space-y-2">
-                  {structuredDisplay.categories.map((cat) => (
-                    <div key={cat.label}>
-                      <div className="text-xs text-stone-500 mb-1">{cat.label}</div>
-                      <div className="flex flex-wrap gap-2">
-                        {cat.items.map((item, i) => {
-                          const c = TONGUE_CATEGORY_COLORS[item.category] || TONGUE_CATEGORY_COLORS.special;
-                          return (
-                            <span key={`${item.name}-${i}`} className={`px-2 py-1 rounded-full text-xs border ${c.bg} ${c.text} ${c.border}`}>
-                              {item.name}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
           </div>
 
           <div className="space-y-4">
@@ -402,7 +388,7 @@ const DiagnosisPage: React.FC = () => {
             preliminaryResult={preliminaryResult}
             onSubmit={handleInquirySubmit as any}
             onCancel={cancelInquiry}
-            isLoading={isLoadingInquiry}
+            isLoading={isSubmittingInquiry}
           />
         )
       )}
