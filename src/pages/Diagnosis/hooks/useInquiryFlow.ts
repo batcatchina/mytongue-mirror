@@ -12,6 +12,21 @@ import type { InquiryQuestion } from '@/components/InquiryDialog';
 import type { InputFeatures } from '@/types';
 import type { DiagnosisStep } from './useDiagnosisSubmit';
 
+function getErrorMessage(error: unknown): string {
+  if (!error) return '未知错误';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error && error.message) return error.message;
+
+  if (typeof error === 'object') {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+      return maybeMessage;
+    }
+  }
+
+  return '未知错误';
+}
+
 export function useInquiryFlow({
   inputFeatures,
   patientAge,
@@ -46,15 +61,18 @@ export function useInquiryFlow({
     setPreliminaryResult(diagnosisResult);
 
     try {
+      const requestPayload = {
+        diagnosisResult: diagnosisResult.diagnosisResult,
+        inputFeatures,
+        patientInfo: { age: patientAge || 30 },
+        mode: 'inquiry',
+      };
+      console.log('[InquiryFlow] generate request payload:', requestPayload);
+
       const response = await fetch('/api/ai/inquiry/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          diagnosisResult: diagnosisResult.diagnosisResult,
-          inputFeatures,
-          patientInfo: { age: patientAge || 30 },
-          mode: 'inquiry',
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       if (!response.ok) {
@@ -64,6 +82,7 @@ export function useInquiryFlow({
       }
 
       const data = await response.json();
+      console.log('[InquiryFlow] generate response body:', data);
       const questions = data?.data?.questions || [];
       const conversationId = data?.data?.conversationId || null;
 
@@ -73,7 +92,7 @@ export function useInquiryFlow({
       setStep('inquiring');
     } catch (error) {
       console.error('生成问诊失败:', error);
-      toast.error('生成问诊失败，请重试');
+      toast.error(`生成问诊失败: ${getErrorMessage(error)}`);
       cancelRefine();
     }
   }, [currentStep, inputFeatures, patientAge, setStep]);
@@ -92,16 +111,19 @@ export function useInquiryFlow({
     setStep('inquiring');
 
     try {
+      const requestPayload = {
+        conversationId: inquiryConversationId,
+        answers,
+        preliminaryDiagnosis: preliminaryResult.diagnosisResult,
+        inputFeatures,
+        patientInfo: { age: patientAge || 30 },
+      };
+      console.log('[InquiryFlow] submit request payload:', requestPayload);
+
       const response = await fetch('/api/ai/inquiry/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: inquiryConversationId,
-          answers,
-          preliminaryDiagnosis: preliminaryResult.diagnosisResult,
-          inputFeatures,
-          patientInfo: { age: patientAge || 30 },
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       if (!response.ok) {
@@ -111,6 +133,7 @@ export function useInquiryFlow({
       }
 
       const data = await response.json();
+      console.log('[InquiryFlow] submit response body:', data);
       const normalizedResult = transformToDiagnosisOutput(data.data || {});
       const finalResult: DiagnosisOutput = normalizeDiagnosisOutput(normalizedResult, preliminaryResult);
 
@@ -121,7 +144,7 @@ export function useInquiryFlow({
       return finalResult;
     } catch (error) {
       console.error('提交问诊失败:', error);
-      toast.error('提交问诊失败，请重试');
+      toast.error(`提交问诊失败: ${getErrorMessage(error)}`);
       throw error;
     } finally {
       if (showInquiry) {
