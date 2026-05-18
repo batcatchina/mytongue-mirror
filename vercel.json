@@ -37,6 +37,18 @@
   ],
   "rewrites": [
     {
+      "source": "/api/diagnose",
+      "destination": "/api/tongue-ai/diagnose"
+    },
+    {
+      "source": "/api/tongue",
+      "destination": "/api/tongue-ai/tongue"
+    },
+    {
+      "source": "/api/result",
+      "destination": "/api/tongue-ai/result"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     }
