@@ -1,4 +1,13 @@
-import type { DiagnosisInput, DiagnosisOutput, DiagnosisEvidence, AcupuncturePoint } from '@/types';
+import type {
+  DiagnosisInput,
+  DiagnosisOutput,
+  DiagnosisEvidence,
+  AcupuncturePoint,
+  SecondarySyndrome,
+  TreatmentAdvice,
+  LifeCareAdvice,
+  SystemInfo,
+} from '@/types';
 import { getMeridian, getEffect } from './acupoint_data';
 
 const API_BASE_URL = 'https://api.coze.cn';
@@ -31,11 +40,6 @@ export const API_ERROR_CODES: Record<number, { message: string; suggestion: stri
   5001: { message: '服务暂时不可用', suggestion: '服务维护中，请稍后重试' },
 };
 
-// Coze API错误事件类型
-export const ERROR_EVENTS = [
-  'conversation.chat.failed',
-  'error',
-];
 
 function parseMarkdownDiagnosis(markdown: string): DiagnosisOutput {
   // 主要证型 - 同时支持 **主要证型** 和 主要证型 两种格式
@@ -264,7 +268,7 @@ function detectErrorInContent(content: string): string | null {
   return null;
 }
 
-function parseAPIErrorCode(errorData: any): { message: string; code: number } | null {
+function parseAPIErrorCode(errorData: unknown): { message: string; code: number } | null {
   // 从各种可能的错误格式中提取错误码
   const code = errorData?.code || errorData?.error_code || errorData?.err_code;
   if (code && API_ERROR_CODES[code]) {
@@ -273,7 +277,7 @@ function parseAPIErrorCode(errorData: any): { message: string; code: number } | 
   return null;
 }
 
-function getUserFriendlyError(error: any, context: string = ''): Error {
+function getUserFriendlyError(error: unknown, context: string = ''): Error {
   // 1. 检查是否是API错误码
   const apiError = parseAPIErrorCode(error);
   if (apiError) {
@@ -361,7 +365,172 @@ function cleanAcupointName(name: string): string {
 /**
  * 将API返回的数据转换为前端期望的DiagnosisOutput格式
  */
-function transformToDiagnosisOutput(apiResult: any): DiagnosisOutput {
+function normalizeSecondarySyndromes(input: unknown): SecondarySyndrome[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item) => ({
+      syndrome: typeof item.syndrome === 'string' ? item.syndrome : '',
+      score: typeof item.score === 'number' ? item.score : 0,
+      confidence: typeof item.confidence === 'number' ? item.confidence : 0,
+      matchedFeatures: Array.isArray(item.matchedFeatures)
+        ? item.matchedFeatures.filter((feature): feature is string => typeof feature === 'string')
+        : undefined,
+    }))
+    .filter((item) => item.syndrome);
+}
+
+function normalizeEvidence(input: unknown): DiagnosisEvidence[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item, index) => ({
+      feature: typeof item.feature === 'string' ? item.feature : '',
+      weight: typeof item.weight === 'number' ? item.weight : 0,
+      contribution: typeof item.contribution === 'string' ? item.contribution : '',
+      matchDegree: typeof item.matchDegree === 'number' ? item.matchDegree : 0,
+      ruleId: typeof item.ruleId === 'string' ? item.ruleId : `rule_${index + 1}`,
+    }))
+    .filter((item) => item.feature && item.contribution);
+}
+
+function normalizeStringArray(input: unknown): string[] {
+  return Array.isArray(input) ? input.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+}
+
+function normalizeTreatmentAdvice(input: unknown, fallback?: Partial<TreatmentAdvice>): TreatmentAdvice {
+  const source = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+
+  return {
+    techniquePrinciple: typeof source.techniquePrinciple === 'string'
+      ? source.techniquePrinciple
+      : fallback?.techniquePrinciple || '平补平泻',
+    needleRetentionTime: typeof source.needleRetentionTime === 'string'
+      ? source.needleRetentionTime
+      : fallback?.needleRetentionTime || '',
+    treatmentFrequency: typeof source.treatmentFrequency === 'string'
+      ? source.treatmentFrequency
+      : fallback?.treatmentFrequency || '',
+    treatmentSessions: typeof source.treatmentSessions === 'string'
+      ? source.treatmentSessions
+      : fallback?.treatmentSessions || '',
+    sessionInterval: typeof source.sessionInterval === 'string'
+      ? source.sessionInterval
+      : fallback?.sessionInterval || '',
+    stimulationSuggestion: typeof source.stimulationSuggestion === 'string'
+      ? source.stimulationSuggestion
+      : fallback?.stimulationSuggestion,
+    moxibustionSuggestion: typeof source.moxibustionSuggestion === 'string'
+      ? source.moxibustionSuggestion
+      : fallback?.moxibustionSuggestion,
+  };
+}
+
+function normalizeAcupuncturePoint(input: unknown, fallback?: Partial<AcupuncturePoint>): AcupuncturePoint {
+  const source = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  const point = typeof source.point === 'string'
+    ? source.point.trim()
+    : (fallback?.point || '');
+
+  return {
+    point,
+    meridian: typeof source.meridian === 'string'
+      ? source.meridian
+      : (fallback?.meridian || (point ? getMeridian(point) || '' : '')),
+    effect: typeof source.effect === 'string'
+      ? source.effect
+      : (fallback?.effect || (point ? getEffect(point) || '' : '')),
+    technique: typeof source.technique === 'string'
+      ? source.technique
+      : (fallback?.technique || '平补平泻'),
+  };
+}
+
+function normalizeAcupuncturePoints(input: unknown, fallback?: AcupuncturePoint[]): AcupuncturePoint[] {
+  const source = Array.isArray(input) ? input : [];
+
+  if (source.length > 0) {
+    return source
+      .map((item, index) => normalizeAcupuncturePoint(item, fallback?.[index]))
+      .filter((item) => item.point);
+  }
+
+  return Array.isArray(fallback)
+    ? fallback
+      .map((item) => normalizeAcupuncturePoint(item))
+      .filter((item) => item.point)
+    : [];
+}
+
+function normalizeDiagnosisPayload(result: Partial<DiagnosisOutput> | null | undefined, fallback?: Partial<DiagnosisOutput> | null): DiagnosisOutput {
+  const diagnosis = result?.diagnosisResult;
+  const fallbackDiagnosis = fallback?.diagnosisResult;
+
+  const lifeCare: LifeCareAdvice = {
+    dietSuggestions: normalizeStringArray(result?.lifeCareAdvice?.dietSuggestions).length > 0
+      ? normalizeStringArray(result?.lifeCareAdvice?.dietSuggestions)
+      : normalizeStringArray(fallback?.lifeCareAdvice?.dietSuggestions),
+    dailyRoutine: normalizeStringArray(result?.lifeCareAdvice?.dailyRoutine).length > 0
+      ? normalizeStringArray(result?.lifeCareAdvice?.dailyRoutine)
+      : normalizeStringArray(fallback?.lifeCareAdvice?.dailyRoutine),
+    precautions: normalizeStringArray(result?.lifeCareAdvice?.precautions).length > 0
+      ? normalizeStringArray(result?.lifeCareAdvice?.precautions)
+      : normalizeStringArray(fallback?.lifeCareAdvice?.precautions),
+  };
+
+  const systemInfo: SystemInfo = {
+    knowledgeBaseVersion: result?.systemInfo?.knowledgeBaseVersion || fallback?.systemInfo?.knowledgeBaseVersion || '3.0-deepseek',
+    skillVersion: result?.systemInfo?.skillVersion || fallback?.systemInfo?.skillVersion || '2.0-direct',
+    reasoningRulesCount: typeof result?.systemInfo?.reasoningRulesCount === 'number'
+      ? result.systemInfo.reasoningRulesCount
+      : (fallback?.systemInfo?.reasoningRulesCount || 0),
+    updateTime: result?.systemInfo?.updateTime || fallback?.systemInfo?.updateTime || new Date().toISOString(),
+  };
+
+  return {
+    diagnosisResult: {
+      primarySyndrome: diagnosis?.primarySyndrome || fallbackDiagnosis?.primarySyndrome || '未知',
+      syndromeScore: typeof diagnosis?.syndromeScore === 'number'
+        ? diagnosis.syndromeScore
+        : (fallbackDiagnosis?.syndromeScore || 0),
+      confidence: typeof diagnosis?.confidence === 'number'
+        ? diagnosis.confidence
+        : (fallbackDiagnosis?.confidence || 0),
+      secondarySyndromes: normalizeSecondarySyndromes(diagnosis?.secondarySyndromes).length > 0
+        ? normalizeSecondarySyndromes(diagnosis?.secondarySyndromes)
+        : normalizeSecondarySyndromes(fallbackDiagnosis?.secondarySyndromes),
+      pathogenesis: diagnosis?.pathogenesis || fallbackDiagnosis?.pathogenesis || '',
+      organLocation: normalizeStringArray(diagnosis?.organLocation).length > 0
+        ? normalizeStringArray(diagnosis?.organLocation)
+        : normalizeStringArray(fallbackDiagnosis?.organLocation),
+      diagnosisEvidence: normalizeEvidence(diagnosis?.diagnosisEvidence).length > 0
+        ? normalizeEvidence(diagnosis?.diagnosisEvidence)
+        : normalizeEvidence(fallbackDiagnosis?.diagnosisEvidence),
+      priority: diagnosis?.priority || fallbackDiagnosis?.priority || '中',
+      diagnosisTime: diagnosis?.diagnosisTime || fallbackDiagnosis?.diagnosisTime || new Date().toISOString(),
+    },
+    acupuncturePlan: {
+      treatmentPrinciple: result?.acupuncturePlan?.treatmentPrinciple || fallback?.acupuncturePlan?.treatmentPrinciple || '',
+      mainPoints: normalizeAcupuncturePoints(result?.acupuncturePlan?.mainPoints, fallback?.acupuncturePlan?.mainPoints),
+      secondaryPoints: normalizeAcupuncturePoints(result?.acupuncturePlan?.secondaryPoints, fallback?.acupuncturePlan?.secondaryPoints),
+      contraindications: normalizeStringArray(result?.acupuncturePlan?.contraindications).length > 0
+        ? normalizeStringArray(result?.acupuncturePlan?.contraindications)
+        : normalizeStringArray(fallback?.acupuncturePlan?.contraindications),
+      treatmentAdvice: normalizeTreatmentAdvice(result?.acupuncturePlan?.treatmentAdvice, fallback?.acupuncturePlan?.treatmentAdvice),
+    },
+    lifeCareAdvice: lifeCare,
+    systemInfo,
+    constitutionAssessment: result?.constitutionAssessment || fallback?.constitutionAssessment,
+  };
+}
+
+export function normalizeDiagnosisOutput(result: Partial<DiagnosisOutput> | null | undefined, fallback?: Partial<DiagnosisOutput> | null): DiagnosisOutput {
+  return normalizeDiagnosisPayload(result, fallback);
+}
+
+export function transformToDiagnosisOutput(apiResult: unknown): DiagnosisOutput {
   // 提取证型信息
   const syndrome = apiResult.syndrome || apiResult.mainSyndrome || '辨证分析完成';
   const syndromeType = apiResult.syndromeType || apiResult.mainSyndromeType || '其他';
@@ -404,7 +573,7 @@ function transformToDiagnosisOutput(apiResult: any): DiagnosisOutput {
   if (confidence >= 0.85) priority = '高';
   else if (confidence < 0.6) priority = '低';
 
-  return {
+  return normalizeDiagnosisPayload({
     diagnosisResult: {
       primarySyndrome: syndrome,
       syndromeScore: Math.round(confidence * 10),
@@ -444,7 +613,7 @@ function transformToDiagnosisOutput(apiResult: any): DiagnosisOutput {
       reasoningRulesCount: 0,
       updateTime: new Date().toISOString(),
     },
-  };
+  });
 }
 
 /**

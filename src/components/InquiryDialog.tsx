@@ -7,11 +7,13 @@ export interface InquiryQuestion {
   reason?: string;
 }
 
+type InquiryAnswer = { questionId: string; selectedOption: string; reason?: string };
+
 interface InquiryDialogProps {
   questions: InquiryQuestion[];
   conversationId: string;
   preliminaryResult?: any;
-  onSubmit: (answers: { questionId: string; selectedOption: string; reason?: string }[]) => void;
+  onSubmit: (answers: InquiryAnswer[]) => void;
   onCancel: () => void;
   isLoading?: boolean;
 }
@@ -29,12 +31,12 @@ const InquiryDialog: React.FC<InquiryDialogProps> = ({
   isLoading = false,
 }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<{ questionId: string; selectedOption: string }[]>([]);
+  const [answers, setAnswers] = useState<InquiryAnswer[]>([]);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   const currentQuestion = questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === questions.length - 1;
-  const progress = `第 ${currentQuestionIndex + 1} 题 / 共 ${questions.length} 题`;
+  const isLastQuestion = currentQuestionIndex === ((questions || []).length) - 1;
+  const progress = `第 ${currentQuestionIndex + 1} 题 / 共 ${((questions || []).length)} 题`;
 
   const handleOptionSelect = (option: string) => {
     setSelectedOption(option);
@@ -46,6 +48,7 @@ const InquiryDialog: React.FC<InquiryDialogProps> = ({
     const newAnswer = {
       questionId: currentQuestion.id,
       selectedOption,
+      reason: currentQuestion.reason,
     };
     
     const newAnswers = [...answers, newAnswer];
@@ -66,7 +69,7 @@ const InquiryDialog: React.FC<InquiryDialogProps> = ({
       const prevAnswers = answers.slice(0, -1);
       setAnswers(prevAnswers);
       setCurrentQuestionIndex(currentQuestionIndex - 1);
-      setSelectedOption(prevAnswers[prevAnswers.length - 1]?.selectedOption || null);
+      setSelectedOption(prevAnswers[((prevAnswers || []).length) - 1]?.selectedOption || null);
     }
   };
 
@@ -97,7 +100,7 @@ const InquiryDialog: React.FC<InquiryDialogProps> = ({
         <div className="h-1 bg-stone-100">
           <div 
             className="h-full bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-300"
-            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+            style={{ width: `${((currentQuestionIndex + 1) / ((questions || []).length)) * 100}%` }}
           />
         </div>
 

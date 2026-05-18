@@ -281,7 +281,7 @@ export async function generateInquiryQuestions(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tongueFeatures,
-          age: patientAge || 30,
+          age: patientAge,
           mode: 'inquiry',
         }),
       });
@@ -377,28 +377,22 @@ export async function generateInquiryQuestions(
  */
 export async function submitInquiryAnswers(
   conversationId: string,
-  answers: Record<string, string> | { questionId: string; selectedOption: string }[],
+  answers: Record<string, string>,
   preliminaryResult: DiagnosisOutput,
   inputFeatures?: InputFeatures,
   patientAge?: number,
   config?: InquiryServiceConfig
 ): Promise<DiagnosisOutput> {
-  const formattedAnswers = Array.isArray(answers)
-    ? answers
-    : Object.entries(answers).map(([questionId, selectedOption]) => ({
-        questionId,
-        selectedOption,
-      }));
-
-  const normalizedAnswers = formattedAnswers.reduce<Record<string, string>>((acc, item) => {
-    acc[item.questionId] = item.selectedOption;
-    return acc;
-  }, {});
-
   // 如果有inputFeatures，调用后端confirm API
   if (inputFeatures) {
     try {
       const tongueFeatures = buildTongueFeatures(inputFeatures);
+      
+      // 转换answers格式
+      const formattedAnswers = Object.entries(answers).map(([questionId, selectedOption]) => ({
+        questionId,
+        selectedOption,
+      }));
       
       const response = await fetch('/api/tongue-ai/diagnose', {
         method: 'POST',
@@ -439,7 +433,7 @@ export async function submitInquiryAnswers(
   }
   
   // 降级到本地整合逻辑
-  return diagnoseWithInquiryLocal(conversationId, normalizedAnswers, preliminaryResult, config);
+  return diagnoseWithInquiryLocal(conversationId, answers, preliminaryResult, config);
 }
 
 /**

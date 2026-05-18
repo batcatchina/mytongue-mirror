@@ -1,24 +1,28 @@
-/**
- * 舌诊主页 - 简化后的主页面
- * 架构：按领域拆分后的主入口
- * 目标：< 300行
- */
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import NavBar from '@/components/common/NavBar';
-import TongueInputSection from './components/TongueInputSection';
-import ResultSection from './components/ResultSection';
-import InquirySection from './components/InquirySection';
+import { PaidDiagnosisSection } from '@/components/paywall/PaidDiagnosisSection';
+import {
+  TongueColorSelector,
+  TongueShapeSelector,
+  TongueCoatingSelector,
+  TongueStateSelector,
+  TongueColorDistribution,
+} from '@/components/tongue-input/TongueFeatureSelectors';
+import ImageUpload from '@/components/tongue-input/ImageUpload';
+import SymptomInput from '@/components/tongue-input/SymptomInput';
+import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
+import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
+import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
+import PayButton, { usePaymentStatus } from '@/components/payment/PayButton';
+import InquiryDialog from '@/components/InquiryDialog';
+import DiagnosisProgress from '@/components/diagnosis/DiagnosisProgress';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
-import { submitDiagnosis } from '@/services/api';
-import { handleFallbackToLocal } from '@/services/DiagnosisService';
-import { checkGlobalUnlocked, generateReportId } from '@/services/PaymentService';
-import { InquiryQuestion, DiagnosisOutput } from '@/components/InquiryDialog';
-import { InputFeatures } from '@/types';
+import { getRegionChineseName } from '@/config/tongueDisplay';
+import { useDiagnosisFlow } from './hooks/useDiagnosisFlow';
 
-// ========== 导出结构化展示相关常量（供子组件使用） ==========
-export const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   tongueColor: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
   tongueShape: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
   tongueState: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
@@ -27,522 +31,269 @@ export const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; 
   special: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
 };
 
-// 区域中文名映射
-const REGION_NAME_MAP: Record<string, string> = {
-  tip: '舌尖', sides: '舌边', middle: '舌中', root: '舌根',
-  left: '左侧', right: '右侧', center: '中央', centerTip: '舌尖',
-};
-export function getRegionChineseName(part: string): string {
-  return REGION_NAME_MAP[part] || part;
-}
-
-// 生成结构化展示数据
-export function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized: boolean, aiConfidence: number = 0.8): {
-  categories: Array<{ label: string; items: Array<{ name: string; confidence: string; category: string }> }>;
-  rawText: string;
-} {
-  const categories: Array<{ label: string; items: Array<{ name: string; confidence: string; category: string }> }> = [];
-  const parts: string[] = [];
-  const confidence = isAIRecognized ? `AI ${Math.round(aiConfidence * 100)}%` : '手动选择';
-
-  if (inputFeatures.tongueColor.value) {
-    categories.push({ label: '舌色', items: [{ name: inputFeatures.tongueColor.value, confidence, category: 'tongueColor' }] });
-    parts.push(`舌色:${inputFeatures.tongueColor.value}`);
-  }
-
-  const coatItems: Array<{ name: string; confidence: string; category: string }> = [];
-  if (inputFeatures.coating.color) {
-    coatItems.push({ name: inputFeatures.coating.color, confidence, category: 'coating' });
-    parts.push(`苔色:${inputFeatures.coating.color}`);
-  }
-  if (inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常') {
-    coatItems.push({ name: inputFeatures.coating.texture, confidence, category: 'coating' });
-    parts.push(`苔质:${inputFeatures.coating.texture}`);
-  }
-  if (inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常') {
-    coatItems.push({ name: inputFeatures.coating.moisture, confidence, category: 'moisture' });
-    parts.push(`润燥:${inputFeatures.coating.moisture}`);
-  }
-  if (coatItems.length > 0) categories.push({ label: '舌苔', items: coatItems });
-
-  if (inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常') {
-    categories.push({ label: '舌形', items: [{ name: inputFeatures.tongueShape.value, confidence, category: 'tongueShape' }] });
-    parts.push(`舌形:${inputFeatures.tongueShape.value}`);
-  }
-
-  if (inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常') {
-    categories.push({ label: '舌态', items: [{ name: inputFeatures.tongueState.value, confidence, category: 'tongueState' }] });
-    parts.push(`舌态:${inputFeatures.tongueState.value}`);
-  }
-
-  const specialItems: Array<{ name: string; confidence: string; category: string }> = [];
-  if (inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) {
-    specialItems.push({ name: '齿痕', confidence, category: 'special' });
-    parts.push('齿痕');
-  }
-  if (inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) {
-    specialItems.push({ name: '裂纹', confidence, category: 'special' });
-    parts.push('裂纹');
-  }
-  if (specialItems.length > 0) categories.push({ label: '特殊', items: specialItems });
-
-  if (inputFeatures.distributionFeatures?.length > 0) {
-    const regionFeatureItems = inputFeatures.distributionFeatures.map((item: any) => {
-      const regionName = getRegionChineseName(item.part);
-      const displayName = `${regionName}${item.feature}`;
-      return { name: displayName, confidence, category: 'distribution' };
-    });
-    categories.push({ label: '舌色分布', items: regionFeatureItems });
-    regionFeatureItems.forEach((item) => parts.push(item.name));
-  }
-
-  const shapeItems: Array<{ name: string; confidence: string; category: string }> = [];
-  const otherDepression = inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')) || [];
-  otherDepression.forEach((rawItem: string) => {
-    const regionName = getRegionChineseName(rawItem.replace('凹陷', ''));
-    const displayItem = regionName.includes('凹陷') ? regionName : regionName + '凹陷';
-    shapeItems.push({ name: displayItem, confidence, category: 'special' });
-    parts.push(displayItem);
-  });
-  inputFeatures.shapeDistribution?.bulge?.forEach((rawItem: string) => {
-    const regionName = getRegionChineseName(rawItem.replace('鼓胀', ''));
-    const displayItem = regionName.includes('鼓胀') ? regionName : regionName + '鼓胀';
-    shapeItems.push({ name: displayItem, confidence, category: 'special' });
-    parts.push(displayItem);
-  });
-  if (shapeItems.length > 0) categories.push({ label: '形态', items: shapeItems });
-
-  return { categories, rawText: parts.join('·') };
-}
-// ========== 结构化展示结束 ==========
-
-// UI模式切换组件
-const UIModeToggle = ({ uiMode, onToggle }: { uiMode: 'v1' | 'v2'; onToggle: () => void }) => (
-  <div className="flex justify-end px-4 py-2">
-    <button
-      onClick={onToggle}
-      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-        uiMode === 'v2' 
-          ? 'bg-primary-100 text-primary-700 border border-primary-300' 
-          : 'bg-stone-100 text-stone-600 border border-stone-200'
-      }`}
-    >
-      {uiMode === 'v1' ? '🔮 推理链模式' : '📋 简化模式'}
-    </button>
-  </div>
-);
-
-export default function DiagnosisPage() {
+const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
+  const isUnlocked = usePaymentStatus();
+  const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
+  const [uiMode, setUiMode] = useState<'v1' | 'v2'>('v1');
+
   const {
     inputFeatures,
     patientInfo,
-    getDiagnosisInput,
-    setTongueShape,
-    setTongueState,
-    setCoating,
+    currentSymptoms,
+    setInputFeatures,
+    setPatientInfo,
+    setCurrentSymptoms,
+    setTongueImage,
   } = useDiagnosisStore();
 
-  // UI模式
-  const [uiMode, setUiMode] = useState<'v1' | 'v2'>('v2');
+  const {
+    diagnosisResult,
+    currentStep,
+    isAnalyzing,
+    showRefineButton,
+    isRefiningDiagnosis,
+    showInquiry,
+    isLoadingInquiry,
+    inquiryQuestions,
+    inquiryConversationId,
+    preliminaryResult,
+    handleSubmit,
+    handleRefineDiagnosis,
+    handleInquirySubmit,
+    cancelInquiry,
+  } = useDiagnosisFlow({ inputFeatures, patientInfo });
 
-  // 诊断相关状态
-  const [diagnosisResult, setLocalDiagnosisResult] = useState<DiagnosisOutput | null>(null);
-  const [isAnalyzing, setLocalIsAnalyzing] = useState(false);
-  const [currentStep, setLocalCurrentStep] = useState<string>('idle');
-  const [useLocalEngine, setUseLocalEngine] = useState(false);
-
-  // 识别相关状态
-  const [isAIRecognized, setIsAIRecognized] = useState(false);
-
-  // 支付相关状态
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [currentReportId, setCurrentReportId] = useState<string | null>(null);
-
-  // Tab状态
-  const [activeTab] = useState<'input' | 'report' | 'history'>('input');
-  const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
-
-  // 问诊相关状态
-  const [showInquiry, setShowInquiry] = useState(false);
-  const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
-  const [inquiryConversationId, setInquiryConversationId] = useState<string | null>(null);
-  const [isRefiningDiagnosis, setIsRefiningDiagnosis] = useState(false);
-  const [isLoadingInquiry, setIsLoadingInquiry] = useState(false);
-  const [preliminaryResult, setPreliminaryResult] = useState<DiagnosisOutput | null>(null);
-  const [showRefineButton, setShowRefineButton] = useState(true);
-
-  // 初始化检查解锁状态
-  useEffect(() => {
-    const unlocked = checkGlobalUnlocked();
-    setIsUnlocked(unlocked);
-    if (unlocked) {
-      setCurrentReportId(generateReportId());
-    }
-  }, []);
-
-  // 处理舌象识别
-  const handleRecognize = useCallback(() => {
-    setIsAIRecognized(true);
-  }, []);
-
-  // 处理提交诊断 - 确保每次都从 store 获取最新状态
-  const handleSubmit = useCallback(async () => {
-    // 验证并获取最新状态（每次调用都重新获取）
-    const currentInput = getDiagnosisInput();
-    const currentFeatures = currentInput.input_features;
-    const currentPatientInfo = currentInput.patientInfo;
-
-    // 验证必填项
-    if (!currentFeatures.tongueColor.value) {
-      toast.error('请选择舌色');
+  const handleSaveCase = () => {
+    if (!diagnosisResult) {
+      toast.error('暂无可保存的辨证结果');
       return;
     }
-    if (!currentFeatures.coating.color) {
-      toast.error('请选择苔色');
-      return;
+    localStorage.setItem('tcm_saved_case', JSON.stringify(diagnosisResult));
+    toast.success('病例已保存');
+  };
+
+  const structuredDisplay = (() => {
+    const categories: Array<{ label: string; items: Array<{ name: string; confidence: string; category: string }> }> = [];
+    const parts: string[] = [];
+    const confidence = '手动选择';
+
+    if (inputFeatures.tongueColor.value) {
+      categories.push({ label: '舌色', items: [{ name: inputFeatures.tongueColor.value, confidence, category: 'tongueColor' }] });
+      parts.push(`舌色:${inputFeatures.tongueColor.value}`);
     }
-    if (!currentPatientInfo.gender) {
-      toast.error('请选择性别');
-      return;
+    const coatItems: Array<{ name: string; confidence: string; category: string }> = [];
+    if (inputFeatures.coating.color) {
+      coatItems.push({ name: inputFeatures.coating.color, confidence, category: 'coating' });
+      parts.push(`苔色:${inputFeatures.coating.color}`);
+    }
+    if (inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常') {
+      coatItems.push({ name: inputFeatures.coating.texture, confidence, category: 'coating' });
+      parts.push(`苔质:${inputFeatures.coating.texture}`);
+    }
+    if (inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常') {
+      coatItems.push({ name: inputFeatures.coating.moisture, confidence, category: 'moisture' });
+      parts.push(`润燥:${inputFeatures.coating.moisture}`);
+    }
+    if (coatItems.length > 0) categories.push({ label: '舌苔', items: coatItems });
+
+    if (inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常') {
+      categories.push({ label: '舌形', items: [{ name: inputFeatures.tongueShape.value, confidence, category: 'tongueShape' }] });
+      parts.push(`舌形:${inputFeatures.tongueShape.value}`);
+    }
+    if (inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常') {
+      categories.push({ label: '舌态', items: [{ name: inputFeatures.tongueState.value, confidence, category: 'tongueState' }] });
+      parts.push(`舌态:${inputFeatures.tongueState.value}`);
     }
 
-    // 填充默认值（如果为空）
-    if (!currentFeatures.tongueShape.value) setTongueShape('正常');
-    if (!currentFeatures.tongueState.value) setTongueState('正常');
-    if (!currentFeatures.coating.texture) setCoating(currentFeatures.coating.color, '薄', '润');
-    if (!currentFeatures.coating.moisture) setCoating(currentFeatures.coating.color, currentFeatures.coating.texture || '薄', '润');
+    const specialItems: Array<{ name: string; confidence: string; category: string }> = [];
+    if (inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) {
+      specialItems.push({ name: '齿痕', confidence, category: 'special' });
+      parts.push('齿痕');
+    }
+    if (inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) {
+      specialItems.push({ name: '裂纹', confidence, category: 'special' });
+      parts.push('裂纹');
+    }
+    if (specialItems.length > 0) categories.push({ label: '特殊', items: specialItems });
 
-    // 再次获取最新状态（填充默认值后）
-    const input = getDiagnosisInput();
-    
-    console.log('[辨证提交] 最新输入特征:', JSON.stringify(input.input_features, null, 2));
-
-    setLocalIsAnalyzing(true);
-    setLocalDiagnosisResult(null);
-    setShowRefineButton(false);
-
-    try {
-      setLocalCurrentStep('analyzing');
-      const result = await submitDiagnosis(input, (step) => {
-        setLocalCurrentStep(step);
+    if (((inputFeatures.distributionFeatures || []).length > 0)) {
+      const regionFeatureItems = inputFeatures.distributionFeatures.map((item: any) => {
+        const regionName = getRegionChineseName(item.part);
+        const displayName = `${regionName}${item.feature}`;
+        return { name: displayName, confidence, category: 'distribution' };
       });
-
-      setLocalDiagnosisResult(result);
-      setLocalCurrentStep('result');
-      toast.success('辨证分析完成！');
-    } catch (err) {
-      console.error('[辨证提交] 异常:', err);
-      const message = err instanceof Error ? err.message : '辨证分析失败';
-      toast.error(message);
-
-      // 降级到本地引擎
-      toast('远程辨证失败，切换到本地快速分析...', { icon: '⚡' });
-      try {
-        // 再次获取最新输入（确保使用最新状态）
-        const latestInput = getDiagnosisInput();
-        console.log('[降级] 本地引擎输入:', JSON.stringify(latestInput.input_features, null, 2));
-        const localResult = handleFallbackToLocal(latestInput);
-        setLocalDiagnosisResult(localResult);
-        setLocalCurrentStep('result');
-        toast.success(`本地辨证完成！${localResult.diagnosisResult?.primarySyndrome || ''}`);
-      } catch (localErr) {
-        console.error('[降级] 本地引擎也失败:', localErr);
-        toast.error('本地引擎也失败了，请检查输入');
-      }
-    } finally {
-      setLocalIsAnalyzing(false);
-    }
-  }, [getDiagnosisInput]);
-
-  // Fallback 到本地引擎
-  const handleFallbackToLocalCallback = useCallback(() => {
-    if (isAnalyzing) return;
-    const input = getDiagnosisInput();
-    setLocalIsAnalyzing(true);
-    setUseLocalEngine(true);
-    setLocalCurrentStep('reasoning');
-
-    try {
-      const result = handleFallbackToLocal(input);
-      setLocalDiagnosisResult(result);
-      setLocalCurrentStep('result');
-      toast.success('🔧 本地诊断完成');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '本地诊断失败';
-      toast.error(`本地诊断失败: ${errorMessage}`);
-    } finally {
-      setLocalIsAnalyzing(false);
-    }
-  }, [isAnalyzing, getDiagnosisInput]);
-
-  // 开始问诊 - 调用后端DeepSeek API生成问诊问题
-  const handleRefineDiagnosis = useCallback(async () => {
-    if (isRefiningDiagnosis || !diagnosisResult) return;
-    setIsRefiningDiagnosis(true);
-    setIsLoadingInquiry(true);
-    setShowRefineButton(false);
-    setPreliminaryResult(diagnosisResult);
-
-    try {
-      // 构造舌象特征对象
-      const shapeDist = inputFeatures.shapeDistribution;
-      const hasTeethMark = inputFeatures.teethMark?.value === '是' || shapeDist?.depression?.includes('齿痕') || false;
-      const hasCrack = inputFeatures.crack?.value === '是' || shapeDist?.depression?.includes('裂纹') || false;
-      const tongueFeatures = {
-        tongueColor: inputFeatures.tongueColor.value || '淡红',
-        tongueShape: inputFeatures.tongueShape.value || '正常',
-        coatingColor: inputFeatures.coating.color || '薄白',
-        coatingTexture: inputFeatures.coating.texture || '薄',
-        coatingMoisture: inputFeatures.coating.moisture || '润',
-        teethMark: hasTeethMark,
-        crack: hasCrack,
-        tongueState: inputFeatures.tongueState.value || '正常',
-        shapeDistribution: inputFeatures.shapeDistribution,
-        distributionFeatures: inputFeatures.distributionFeatures,
-      };
-
-      // 调用后端API
-      const response = await fetch('/api/tongue-ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tongueFeatures,
-          age: (patientInfo.age && patientInfo.age > 0) ? patientInfo.age : 30,
-          mode: 'inquiry',
-        }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.text();
-        console.error('问诊问题生成失败:', response.status, errBody);
-        throw new Error(`问诊问题生成失败: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      // 处理 API 返回错误的情况
-      if (!data.success) {
-        const errorMsg = data.error || '生成问诊问题失败';
-        console.error('[问诊] API返回错误:', errorMsg);
-        toast.error(errorMsg);
-        setShowRefineButton(true);
-        return;
-      }
-      
-      // 根据 needsConfirmation 和 questions 组合判断
-      if (data.needsConfirmation && data.questions && data.questions.length > 0) {
-        // 需要确认且有问诊问题，显示问诊对话框
-        const questions: InquiryQuestion[] = data.questions.map((q: any) => ({
-          id: q.id,
-          text: q.text,
-          options: q.options,
-          reason: q.reason || '',
-        }));
-        setInquiryQuestions(questions);
-        setInquiryConversationId(data.conversationId);
-
-        // 如果后端返回了初步辨证结果，更新preliminaryResult
-        if (data.preliminaryResult) {
-          setPreliminaryResult(data.preliminaryResult);
-        }
-
-        setShowInquiry(true);
-      } else if (!data.needsConfirmation && data.questions && data.questions.length > 0) {
-        // 不需要确认但有问诊问题（深度辨证），也显示问诊
-        const questions: InquiryQuestion[] = data.questions.map((q: any) => ({
-          id: q.id,
-          text: q.text,
-          options: q.options,
-          reason: q.reason || '',
-        }));
-        setInquiryQuestions(questions);
-        setInquiryConversationId(data.conversationId);
-
-        // 如果后端返回了初步辨证结果，更新preliminaryResult
-        if (data.preliminaryResult) {
-          setPreliminaryResult(data.preliminaryResult);
-        }
-
-        setShowInquiry(true);
-      } else {
-        // 不需要确认且没有问题（高置信度），跳过问诊
-        toast.success('辨证置信度较高，无需进一步问诊');
-        setShowRefineButton(true);
-      }
-    } catch (error) {
-      console.error('生成问诊问题失败:', error);
-      toast.error('生成问诊问题失败，请重试');
-      setShowRefineButton(true);
-    } finally {
-      setIsRefiningDiagnosis(false);
-      setIsLoadingInquiry(false);
-    }
-  }, [isRefiningDiagnosis, diagnosisResult, inputFeatures, patientInfo.age]);
-
-  // 提交问诊答案 - 调用后端DeepSeek API整合答案
-  const handleInquirySubmit = useCallback(async (answers: { questionId: string; selectedOption: string }[]) => {
-    if (!preliminaryResult || !inquiryConversationId) {
-      throw new Error('问诊数据不完整');
+      categories.push({ label: '舌色分布', items: regionFeatureItems });
+      regionFeatureItems.forEach((item) => parts.push(item.name));
     }
 
-    setIsRefiningDiagnosis(true);
-    try {
-      // 构造舌象特征对象
-      const shapeDist = inputFeatures.shapeDistribution;
-      const hasTeethMark = inputFeatures.teethMark?.value === '是' || shapeDist?.depression?.includes('齿痕') || false;
-      const hasCrack = inputFeatures.crack?.value === '是' || shapeDist?.depression?.includes('裂纹') || false;
-      const tongueFeatures = {
-        tongueColor: inputFeatures.tongueColor.value || '淡红',
-        tongueShape: inputFeatures.tongueShape.value || '正常',
-        coatingColor: inputFeatures.coating.color || '薄白',
-        coatingTexture: inputFeatures.coating.texture || '薄',
-        coatingMoisture: inputFeatures.coating.moisture || '润',
-        teethMark: hasTeethMark,
-        crack: hasCrack,
-        tongueState: inputFeatures.tongueState.value || '正常',
-        shapeDistribution: inputFeatures.shapeDistribution,
-        distributionFeatures: inputFeatures.distributionFeatures,
-      };
-
-      // 调用后端confirm API
-      const response = await fetch('/api/tongue-ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tongueFeatures,
-          age: (patientInfo.age && patientInfo.age > 0) ? patientInfo.age : 30,
-          answers,
-          conversationId: inquiryConversationId,
-          preliminaryResult,
-          mode: 'confirm',
-        }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.text();
-        console.error('问诊提交失败:', response.status, errBody);
-        throw new Error(`问诊提交失败: ${response.status} ${errBody}`);
-      }
-
-      const data = await response.json();
-      const finalResult: DiagnosisOutput = {
-        diagnosisResult: data.data?.mainSyndrome || data.data?.syndrome || preliminaryResult.diagnosisResult,
-        acupuncturePlan: data.data?.acupuncturePlan || preliminaryResult.acupuncturePlan,
-        lifeCareAdvice: data.data?.lifeCareAdvice || preliminaryResult.lifeCareAdvice,
-      };
-
-      setLocalDiagnosisResult(finalResult);
-      setShowInquiry(false);
-      setIsRefiningDiagnosis(false);
-      toast.success('✅ 问诊完成，辨证更精准');
-      return finalResult;
-    } catch (error) {
-      console.error('提交问诊失败:', error);
-      toast.error('提交问诊失败，请重试');
-      throw error;
-    }
-  }, [preliminaryResult, inquiryConversationId, inputFeatures, patientInfo.age]);
-
-  // 解锁付费内容
-  const handleUnlock = useCallback(async () => {
-    if (isUnlocked) {
-      toast.success('已解锁');
-      return;
-    }
-    setIsUnlocked(true);
-    setCurrentReportId(generateReportId());
-    toast.success('✅ 深度辨证已解锁！');
-  }, [isUnlocked]);
+    return { categories, rawText: parts.join('·') };
+  })();
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-stone-50 to-orange-50">
       <Toaster position="top-center" />
-      <NavBar currentPath="/" onNavigate={(path) => navigate(path)} />
+      <NavBar title="舌镜辨证" onBack={() => navigate('/')} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <UIModeToggle uiMode={uiMode} onToggle={() => setUiMode(prev => prev === 'v1' ? 'v2' : 'v1')} />
-
-        <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-4 lg:space-y-0">
-          {/* 左侧：输入区域 */}
+      <main className="max-w-6xl mx-auto px-4 py-4 md:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           <div className="space-y-4">
-            <TongueInputSection
-              isAnalyzing={isAnalyzing}
-              currentStep={currentStep as any}
-              isAIRecognized={isAIRecognized}
-              useLocalEngine={useLocalEngine}
-              onRecognize={handleRecognize}
-              onFallbackToLocal={handleFallbackToLocalCallback}
-            />
-            {/* 提交按钮单独放在这里 */}
-            <button
-              onClick={handleSubmit}
-              disabled={isAnalyzing}
-              className="w-full py-4 rounded-xl text-base font-medium transition-all disabled:opacity-50 bg-gradient-to-r from-primary-500 to-secondary-500 text-white hover:from-primary-600 hover:to-secondary-600 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-            >
-              {isAnalyzing ? (
-                <>
-                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  分析中...
-                </>
-              ) : (
-                <>
-                  <span className="text-xl">🔍</span>
-                  开始辨证分析
-                </>
-              )}
-            </button>
+            <div className="tcm-card p-4 md:p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold text-stone-700">舌象输入</h2>
+                <button
+                  onClick={() => setUiMode((prev) => (prev === 'v1' ? 'v2' : 'v1'))}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-100 text-stone-600 border border-stone-200"
+                >
+                  {uiMode === 'v1' ? '🔮 推理链模式' : '📋 简化模式'}
+                </button>
+              </div>
+
+              <ImageUpload
+                onFeaturesExtracted={(features, imageData) => {
+                  setInputFeatures(features);
+                  setTongueImage(imageData || null);
+                }}
+              />
+
+              <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
+              <TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })} />
+              <TongueStateSelector value={inputFeatures.tongueState.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })} />
+              <TongueCoatingSelector value={inputFeatures.coating} onChange={(coating) => setInputFeatures({ ...inputFeatures, coating })} />
+              <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
+
+              <SymptomInput value={currentSymptoms || ''} onChange={setCurrentSymptoms} />
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-stone-600">性别:</span>
+                <select
+                  className="px-2 py-1 border rounded"
+                  value={patientInfo.gender || '男'}
+                  onChange={(e) => setPatientInfo({ gender: e.target.value as '男' | '女' })}
+                >
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                </select>
+
+                <span className="text-sm text-stone-600">年龄:</span>
+                <input
+                  type="number"
+                  className="w-24 px-2 py-1 border rounded"
+                  value={patientInfo.age ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setPatientInfo({ age: raw === '' ? null : Number(raw) || 0 });
+                  }}
+                />
+              </div>
+
+              <button
+                onClick={handleSubmit}
+                disabled={isAnalyzing}
+                className="w-full py-2.5 rounded-xl bg-primary-600 text-white text-sm font-medium disabled:opacity-60"
+              >
+                {isAnalyzing ? '辨证分析中...' : '开始辨证'}
+              </button>
+            </div>
+
+            {((structuredDisplay.categories || []).length) > 0 && (
+              <div className="tcm-card p-4">
+                <h3 className="text-sm font-medium text-stone-600 mb-3">结构化舌象</h3>
+                <div className="space-y-2">
+                  {structuredDisplay.categories.map((cat) => (
+                    <div key={cat.label}>
+                      <div className="text-xs text-stone-500 mb-1">{cat.label}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {cat.items.map((item, i) => {
+                          const c = TONGUE_CATEGORY_COLORS[item.category] || TONGUE_CATEGORY_COLORS.special;
+                          return (
+                            <span key={`${item.name}-${i}`} className={`px-2 py-1 rounded-full text-xs border ${c.bg} ${c.text} ${c.border}`}>
+                              {item.name}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 右侧：结果展示 */}
-          <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <ResultSection
-              diagnosisResult={diagnosisResult}
-              isUnlocked={isUnlocked}
-              currentReportId={currentReportId}
-              resultTab={resultTab}
-              activeTab={activeTab}
-              showRefineButton={showRefineButton}
-              isRefiningDiagnosis={isRefiningDiagnosis}
-              inputFeatures={{
-                tongueColor: inputFeatures.tongueColor.value || '淡红',
-                tongueShape: inputFeatures.tongueShape.value,
-                tongueState: inputFeatures.tongueState.value,
-                coatingColor: inputFeatures.coating.color || '薄白',
-                coatingTexture: inputFeatures.coating.texture,
-                coatingMoisture: inputFeatures.coating.moisture,
-              }}
-              onResultTabChange={setResultTab}
-              onRefineDiagnosis={handleRefineDiagnosis}
-              onUnlock={handleUnlock}
-            />
+          <div className="space-y-4">
+            {isAnalyzing && (
+              <DiagnosisProgress currentStep={currentStep as any} />
+            )}
+
+            {diagnosisResult ? (
+              <div className="space-y-4">
+                <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
+
+                <div className="flex gap-2">
+                  <button onClick={() => setResultTab('pathogenesis')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">病机</button>
+                  <button onClick={() => setResultTab('acupuncture')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">针灸</button>
+                  <button onClick={() => setResultTab('care')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">调理</button>
+                </div>
+
+                {resultTab === 'pathogenesis' && (
+                  <div className="tcm-card p-4 text-sm text-stone-700">
+                    {diagnosisResult.diagnosisResult.pathogenesis || '-'}
+                  </div>
+                )}
+                {resultTab === 'acupuncture' && (
+                  isUnlocked ? <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} /> : <PaidDiagnosisSection />
+                )}
+                {resultTab === 'care' && (
+                  isUnlocked ? <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} /> : <PaidDiagnosisSection />
+                )}
+
+                {!showRefineButton && (
+                  <button
+                    onClick={handleRefineDiagnosis}
+                    disabled={isRefiningDiagnosis}
+                    className="w-full py-2 rounded-xl bg-amber-500 text-white text-sm font-medium disabled:opacity-60"
+                  >
+                    {isRefiningDiagnosis ? '生成问诊中...' : '问而确之（提升准确率）'}
+                  </button>
+                )}
+
+                <button onClick={handleSaveCase} className="w-full py-2 rounded-xl bg-stone-100 text-stone-600 text-sm">保存此病例</button>
+
+                {!isUnlocked && (
+                  <div className="tcm-card p-4 text-center space-y-2">
+                    <div className="text-sm text-stone-600">🔒 针灸方案和生活调理需解锁查看</div>
+                    <div className="flex justify-center"><PayButton amount={9.9} title="舌镜深度辨证方案" size="medium" /></div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="tcm-card p-8 text-center text-stone-500">等待辨证分析</div>
+            )}
           </div>
         </div>
       </main>
 
-      {/* 问诊对话框 */}
-      <InquirySection
-        showInquiry={showInquiry}
-        inquiryQuestions={inquiryQuestions}
-        inquiryConversationId={inquiryConversationId}
-        preliminaryResult={preliminaryResult}
-        isLoadingInquiry={isLoadingInquiry}
-        isRefiningDiagnosis={isRefiningDiagnosis}
-        onSubmit={handleInquirySubmit}
-        onCancel={() => {
-          setShowInquiry(false);
-          setShowRefineButton(true);
-          setIsRefiningDiagnosis(false);
-          setIsLoadingInquiry(false);
-        }}
-        onClose={() => {
-          setShowInquiry(false);
-          setShowRefineButton(true);
-        }}
-      />
+      {showInquiry && (
+        isLoadingInquiry ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+              <p className="text-stone-600 font-medium">正在生成问诊问题...</p>
+              <button onClick={cancelInquiry} className="text-sm text-stone-400 hover:text-stone-600">取消</button>
+            </div>
+          </div>
+        ) : (
+          <InquiryDialog
+            questions={inquiryQuestions}
+            conversationId={inquiryConversationId || ''}
+            preliminaryResult={preliminaryResult}
+            onSubmit={handleInquirySubmit as any}
+            onCancel={cancelInquiry}
+            isLoading={isLoadingInquiry}
+          />
+        )
+      )}
     </div>
   );
-}
+};
+
+export default DiagnosisPage;
