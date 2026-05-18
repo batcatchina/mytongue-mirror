@@ -12,7 +12,7 @@ interface InquirySectionProps {
   preliminaryResult: DiagnosisOutput | null;
   isLoadingInquiry: boolean;
   isRefiningDiagnosis: boolean;
-  onSubmit: (answers: Record<string, string>) => Promise<DiagnosisOutput>;
+  onSubmit: (answers: { questionId: string; selectedOption: string }[]) => Promise<DiagnosisOutput>;
   onCancel: () => void;
   onClose: () => void;
 }
@@ -56,7 +56,7 @@ export default function InquirySection({
       questions={inquiryQuestions}
       conversationId={inquiryConversationId || ''}
       preliminaryResult={preliminaryResult}
-      onSubmit={onSubmit as any}
+      onSubmit={onSubmit}
       onCancel={onCancel}
       isLoading={isRefiningDiagnosis}
     />

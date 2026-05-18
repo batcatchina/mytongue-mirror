@@ -330,8 +330,9 @@ export default function DiagnosisPage() {
         return;
       }
       
-      if (data.questions && data.questions.length > 0) {
-        // DeepSeek生成了问诊问题
+      // 根据 needsConfirmation 和 questions 组合判断
+      if (data.needsConfirmation && data.questions && data.questions.length > 0) {
+        // 需要确认且有问诊问题，显示问诊对话框
         const questions: InquiryQuestion[] = data.questions.map((q: any) => ({
           id: q.id,
           text: q.text,
@@ -339,16 +340,33 @@ export default function DiagnosisPage() {
           reason: q.reason || '',
         }));
         setInquiryQuestions(questions);
-        setInquiryConversationId(data.conversationId || `sz_${Date.now()}`);
-        
+        setInquiryConversationId(data.conversationId);
+
         // 如果后端返回了初步辨证结果，更新preliminaryResult
         if (data.preliminaryResult) {
           setPreliminaryResult(data.preliminaryResult);
         }
-        
+
+        setShowInquiry(true);
+      } else if (!data.needsConfirmation && data.questions && data.questions.length > 0) {
+        // 不需要确认但有问诊问题（深度辨证），也显示问诊
+        const questions: InquiryQuestion[] = data.questions.map((q: any) => ({
+          id: q.id,
+          text: q.text,
+          options: q.options,
+          reason: q.reason || '',
+        }));
+        setInquiryQuestions(questions);
+        setInquiryConversationId(data.conversationId);
+
+        // 如果后端返回了初步辨证结果，更新preliminaryResult
+        if (data.preliminaryResult) {
+          setPreliminaryResult(data.preliminaryResult);
+        }
+
         setShowInquiry(true);
       } else {
-        // 高置信度，不需要问诊
+        // 不需要确认且没有问题（高置信度），跳过问诊
         toast.success('辨证置信度较高，无需进一步问诊');
         setShowRefineButton(true);
       }
