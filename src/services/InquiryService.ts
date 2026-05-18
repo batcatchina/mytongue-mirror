@@ -281,7 +281,7 @@ export async function generateInquiryQuestions(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tongueFeatures,
-          age: patientAge,
+          age: patientAge || 30,
           mode: 'inquiry',
         }),
       });
