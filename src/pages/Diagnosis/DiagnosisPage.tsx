@@ -21,21 +21,25 @@ import DiagnosisProgress from '@/components/diagnosis/DiagnosisProgress';
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import { getRegionChineseName } from '@/config/tongueDisplay';
 import { useDiagnosisFlow } from './hooks/useDiagnosisFlow';
-
-const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  tongueColor: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-  tongueShape: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
-  tongueState: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
-  coating: { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
-  moisture: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
-  special: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
-};
-
+import InferenceChainView from '@/components/inference/InferenceChainView';
+import { DiagnosisInput, DiagnosisOutput, InputFeatures, DistributionFeature } from '@/services/diagnosisEngine';
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   const isUnlocked = usePaymentStatus();
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
   const [uiMode, setUiMode] = useState<'v1' | 'v2'>('v1');
+  const [useLocalEngine, setUseLocalEngine] = useState(true);
+  const [showEngineSwitch, setShowEngineSwitch] = useState(false);
+  const [isAIRecognized, setIsAIRecognized] = useState(false);
+  const [inferenceChain, setInferenceChain] = useState<any>(null);
+  
+  // 年龄组选项
+  const ageGroups = [
+    { label: '30以下', value: 25 },
+    { label: '30-50', value: 40 },
+    { label: '50-65', value: 57 },
+    { label: '65以上', value: 72 },
+  ] as const;
 
   const {
     inputFeatures,
@@ -64,71 +68,10 @@ const DiagnosisPage: React.FC = () => {
     cancelInquiry,
   } = useDiagnosisFlow({ inputFeatures, patientInfo });
 
-  const handleSaveCase = () => {
-    if (!diagnosisResult) {
-      toast.error('暂无可保存的辨证结果');
-      return;
-    }
-    localStorage.setItem('tcm_saved_case', JSON.stringify(diagnosisResult));
-    toast.success('病例已保存');
-  };
+  
+  const structuredDisplay = getStructuredTongueDisplay(inputFeatures, isAIRecognized);
 
-  const structuredDisplay = (() => {
-    const categories: Array<{ label: string; items: Array<{ name: string; confidence: string; category: string }> }> = [];
-    const parts: string[] = [];
-    const confidence = '手动选择';
-
-    if (inputFeatures.tongueColor.value) {
-      categories.push({ label: '舌色', items: [{ name: inputFeatures.tongueColor.value, confidence, category: 'tongueColor' }] });
-      parts.push(`舌色:${inputFeatures.tongueColor.value}`);
-    }
-    const coatItems: Array<{ name: string; confidence: string; category: string }> = [];
-    if (inputFeatures.coating.color) {
-      coatItems.push({ name: inputFeatures.coating.color, confidence, category: 'coating' });
-      parts.push(`苔色:${inputFeatures.coating.color}`);
-    }
-    if (inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常') {
-      coatItems.push({ name: inputFeatures.coating.texture, confidence, category: 'coating' });
-      parts.push(`苔质:${inputFeatures.coating.texture}`);
-    }
-    if (inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常') {
-      coatItems.push({ name: inputFeatures.coating.moisture, confidence, category: 'moisture' });
-      parts.push(`润燥:${inputFeatures.coating.moisture}`);
-    }
-    if (coatItems.length > 0) categories.push({ label: '舌苔', items: coatItems });
-
-    if (inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常') {
-      categories.push({ label: '舌形', items: [{ name: inputFeatures.tongueShape.value, confidence, category: 'tongueShape' }] });
-      parts.push(`舌形:${inputFeatures.tongueShape.value}`);
-    }
-    if (inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常') {
-      categories.push({ label: '舌态', items: [{ name: inputFeatures.tongueState.value, confidence, category: 'tongueState' }] });
-      parts.push(`舌态:${inputFeatures.tongueState.value}`);
-    }
-
-    const specialItems: Array<{ name: string; confidence: string; category: string }> = [];
-    if (inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) {
-      specialItems.push({ name: '齿痕', confidence, category: 'special' });
-      parts.push('齿痕');
-    }
-    if (inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) {
-      specialItems.push({ name: '裂纹', confidence, category: 'special' });
-      parts.push('裂纹');
-    }
-    if (specialItems.length > 0) categories.push({ label: '特殊', items: specialItems });
-
-    if (((inputFeatures.distributionFeatures || []).length > 0)) {
-      const regionFeatureItems = inputFeatures.distributionFeatures.map((item: any) => {
-        const regionName = getRegionChineseName(item.part);
-        const displayName = `${regionName}${item.feature}`;
-        return { name: displayName, confidence, category: 'distribution' };
-      });
-      categories.push({ label: '舌色分布', items: regionFeatureItems });
-      regionFeatureItems.forEach((item) => parts.push(item.name));
-    }
-
-    return { categories, rawText: parts.join('·') };
-  })();
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-stone-50 to-orange-50">
@@ -148,21 +91,6 @@ const DiagnosisPage: React.FC = () => {
                   {uiMode === 'v1' ? '🔮 推理链模式' : '📋 简化模式'}
                 </button>
               </div>
-
-              <ImageUpload
-                onFeaturesExtracted={(features, imageData) => {
-                  setInputFeatures(features);
-                  setTongueImage(imageData || null);
-                }}
-              />
-
-              <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
-              <TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })} />
-              <TongueStateSelector value={inputFeatures.tongueState.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })} />
-              <TongueCoatingSelector value={inputFeatures.coating} onChange={(coating) => setInputFeatures({ ...inputFeatures, coating })} />
-              <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
-
-              <SymptomInput value={currentSymptoms || ''} onChange={setCurrentSymptoms} />
 
               <div className="flex items-center gap-3">
                 <span className="text-sm text-stone-600">性别:</span>
@@ -186,6 +114,36 @@ const DiagnosisPage: React.FC = () => {
                   }}
                 />
               </div>
+
+              <ImageUpload
+                onFeaturesExtracted={(features, imageData) => {
+                  setInputFeatures(features);
+                  setTongueImage(imageData || null);
+                }}
+              />
+
+              <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
+              <TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })} />
+              <TongueStateSelector value={inputFeatures.tongueState.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })} />
+              <TongueCoatingSelector value={inputFeatures.coating} onChange={(coating) => setInputFeatures({ ...inputFeatures, coating })} />
+              <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
+
+              <SymptomInput value={currentSymptoms || ''} onChange={setCurrentSymptoms} />
+              {/* 引擎切换选项 */}
+              <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
+                <span className="text-xs text-stone-500">辨证引擎:</span>
+                <button
+                  onClick={() => setUseLocalEngine(!useLocalEngine)}
+                  className={`px-2 py-1 text-xs rounded ${
+                    useLocalEngine 
+                      ? 'bg-primary-100 text-primary-700' 
+                      : 'bg-stone-100 text-stone-500'
+                  }`}
+                >
+                  {useLocalEngine ? '🟢 本地规则' : '🔵 AI推理'}
+                </button>
+              </div>
+
 
               <button
                 onClick={handleSubmit}
@@ -297,3 +255,159 @@ const DiagnosisPage: React.FC = () => {
 };
 
 export default DiagnosisPage;
+
+
+// ========== 辨证结果缓存 ==========
+const DIAG_CACHE = 'tcm_diag_cache_v3';
+const MAX_CACHE = 50;
+function diagCacheKey(f: DiagnosisInput['input_features'], _i: DiagnosisInput): string {
+  // 只用核心舌象字段生成key，忽略年龄/性别/主诉等非核心字段
+  const core = {
+    tongueColor: f.tongueColor?.value,
+    tongueShape: f.tongueShape?.value,
+    tongueState: f.tongueState?.value,
+    coatingColor: f.coating?.color,
+    coatingTexture: f.coating?.texture,
+    coatingMoisture: f.coating?.moisture,
+    teethMark: f.teethMark?.value,
+    crack: f.crack?.value,
+  };
+  const s = JSON.stringify(core); let h = 0;
+  for (let c = 0; c < s.length; c++) { h = ((h << 5) - h) + s.charCodeAt(c); h |= 0; }
+  return String(h);
+}
+function diagCacheGet(k: string): DiagnosisOutput | null {
+  try { const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}'); return c[k]?.v || null; } catch { return null; }
+}
+function diagCacheSet(k: string, v: DiagnosisOutput): void {
+  try {
+    const c = JSON.parse(localStorage.getItem(DIAG_CACHE) || '{}');
+    c[k] = { v, t: Date.now() };
+    const ks = Object.keys(c);
+    if (ks.length > MAX_CACHE) { ks.sort((a, b) => c[a].t - c[b].t); ks.slice(0, ks.length - MAX_CACHE).forEach(x => delete c[x]); }
+    localStorage.setItem(DIAG_CACHE, JSON.stringify(c));
+  } catch {}
+}
+// ========== 缓存结束 ==========
+
+
+// ========== 舌象特征结构化展示 ==========
+// 分类颜色配置
+const TONGUE_CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  tongueColor: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },      // 舌色-红色系
+  tongueShape: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' }, // 舌形-橙色系
+  tongueState: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' }, // 舌态-紫色系
+  coating: { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },      // 苔色/苔质-绿色系
+  moisture: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },       // 润燥-蓝色系
+  special: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },     // 齿痕裂纹-琥珀色系
+};
+
+// 生成结构化展示数据
+function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized: boolean, aiConfidence: number = 0.8): {
+  categories: Array<{
+    label: string;
+    items: Array<{ name: string; confidence: string; category: string }>;
+  }>;
+  rawText: string;
+} {
+  const categories: Array<{
+    label: string;
+    items: Array<{ name: string; confidence: string; category: string }>;
+  }> = [];
+  const parts: string[] = [];
+  const confidence = isAIRecognized ? `AI ${Math.round(aiConfidence * 100)}%` : '手动选择';
+
+  // 舌色
+  if (inputFeatures.tongueColor.value) {
+    categories.push({
+      label: '舌色',
+      items: [{ name: inputFeatures.tongueColor.value, confidence, category: 'tongueColor' }]
+    });
+    parts.push(`舌色:${inputFeatures.tongueColor.value}`);
+  }
+
+  // 舌苔
+  const coatItems: Array<{ name: string; confidence: string; category: string }> = [];
+  if (inputFeatures.coating.color) {
+    coatItems.push({ name: inputFeatures.coating.color, confidence, category: 'coating' });
+    parts.push(`苔色:${inputFeatures.coating.color}`);
+  }
+  if (inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常') {
+    coatItems.push({ name: inputFeatures.coating.texture, confidence, category: 'coating' });
+    parts.push(`苔质:${inputFeatures.coating.texture}`);
+  }
+  if (inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常') {
+    coatItems.push({ name: inputFeatures.coating.moisture, confidence, category: 'moisture' });
+    parts.push(`润燥:${inputFeatures.coating.moisture}`);
+  }
+  if (coatItems.length > 0) {
+    categories.push({ label: '舌苔', items: coatItems });
+  }
+
+  // 舌形
+  if (inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常') {
+    categories.push({
+      label: '舌形',
+      items: [{ name: inputFeatures.tongueShape.value, confidence, category: 'tongueShape' }]
+    });
+    parts.push(`舌形:${inputFeatures.tongueShape.value}`);
+  }
+
+  // 舌态
+  if (inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常') {
+    categories.push({
+      label: '舌态',
+      items: [{ name: inputFeatures.tongueState.value, confidence, category: 'tongueState' }]
+    });
+    parts.push(`舌态:${inputFeatures.tongueState.value}`);
+  }
+
+  // 特殊特征（齿痕、裂纹等）
+  const specialItems: Array<{ name: string; confidence: string; category: string }> = [];
+  if (inputFeatures.teethMark?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('齿痕')) {
+    specialItems.push({ name: '齿痕', confidence, category: 'special' });
+    parts.push('齿痕');
+  }
+  if (inputFeatures.crack?.value === '是' || inputFeatures.shapeDistribution?.depression?.includes('裂纹')) {
+    specialItems.push({ name: '裂纹', confidence, category: 'special' });
+    parts.push('裂纹');
+  }
+  if (specialItems.length > 0) {
+    categories.push({ label: '特殊', items: specialItems });
+  }
+
+  // 舌色分布特征（舌尖红点、舌边瘀斑等）
+  if (inputFeatures.distributionFeatures && inputFeatures.distributionFeatures.length > 0) {
+    const regionFeatureItems = inputFeatures.distributionFeatures?.map((item: DistributionFeature) => {
+      const regionName = getRegionChineseName(item.part);
+      const displayName = `${regionName}${item.feature}`;
+      return { name: displayName, confidence, category: 'distribution' };
+    });
+    categories.push({ label: '舌色分布', items: regionFeatureItems });
+    regionFeatureItems.forEach((item) => parts.push(item.name));
+  }
+
+  // 凹凸形态
+  const shapeItems: Array<{ name: string; confidence: string; category: string }> = [];
+  const otherDepression = inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')) || [];
+  // 凹陷项加"凹陷"后缀，先映射region为中文
+  otherDepression.forEach((rawItem: string) => {
+    const regionName = getRegionChineseName(rawItem.replace('凹陷', ''));
+    const displayItem = regionName.includes('凹陷') ? regionName : regionName + '凹陷';
+    shapeItems.push({ name: displayItem, confidence, category: 'special' });
+    parts.push(displayItem);
+  });
+  // 鼓胀项加"鼓胀"后缀，先映射region为中文
+  inputFeatures.shapeDistribution?.bulge?.forEach((rawItem: string) => {
+    const regionName = getRegionChineseName(rawItem.replace('鼓胀', ''));
+    const displayItem = regionName.includes('鼓胀') ? regionName : regionName + '鼓胀';
+    shapeItems.push({ name: displayItem, confidence, category: 'special' });
+    parts.push(displayItem);
+  });
+  if (shapeItems.length > 0) {
+    categories.push({ label: '形态', items: shapeItems });
+  }
+
+  return { categories, rawText: parts.join('·') };
+}
+// ========== 结构化展示结束 ==========
