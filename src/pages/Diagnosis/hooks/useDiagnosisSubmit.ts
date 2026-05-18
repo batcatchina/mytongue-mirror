@@ -11,7 +11,14 @@ import type { DiagnosisOutput } from '@/types';
 import type { InputFeatures } from '@/types';
 import type { PatientInfo } from '@/types';
 
-export type DiagnosisStep = 'idle' | 'analyzing' | 'result' | 'inquiring' | 'refining';
+export type DiagnosisStep =
+  | 'idle'
+  | 'analyzing'
+  | 'result'
+  | 'inquiring'
+  | 'refining'
+  | 'inquiry_ready'
+  | 'submitting_inquiry';
 
 interface UseDiagnosisSubmitParams {
   inputFeatures: InputFeatures;

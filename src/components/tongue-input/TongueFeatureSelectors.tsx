@@ -238,6 +238,10 @@ interface TongueStateSelectorProps {
   onChange: (value: string, degree?: string) => void;
   shapeValue?: TongueShapeValue;
   onShapeChange?: (value: TongueShapeValue) => void;
+  ecchymosis?: boolean;
+  tongueSurface?: boolean;
+  onEcchymosisChange?: (checked: boolean) => void;
+  onTongueSurfaceChange?: (checked: boolean) => void;
   isAI?: boolean;
 }
 
@@ -253,6 +257,10 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({
   onChange,
   shapeValue = { depression: [], bulge: [] },
   onShapeChange,
+  ecchymosis = false,
+  tongueSurface = false,
+  onEcchymosisChange,
+  onTongueSurfaceChange,
   isAI,
 }) => {
   // 切换凹陷
@@ -305,11 +313,21 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({
         </summary>
         <div className="flex gap-4 mt-2 pl-4">
           <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            <input
+              type="checkbox"
+              checked={ecchymosis}
+              onChange={(e) => onEcchymosisChange?.(e.target.checked)}
+              className="rounded border-stone-300 text-primary-500 focus:ring-primary-400"
+            />
             瘀斑
           </label>
           <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input type="checkbox" className="rounded border-stone-300 text-primary-500 focus:ring-primary-400" />
+            <input
+              type="checkbox"
+              checked={tongueSurface}
+              onChange={(e) => onTongueSurfaceChange?.(e.target.checked)}
+              className="rounded border-stone-300 text-primary-500 focus:ring-primary-400"
+            />
             水滑
           </label>
         </div>

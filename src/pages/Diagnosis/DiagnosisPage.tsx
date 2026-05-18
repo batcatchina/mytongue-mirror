@@ -182,8 +182,24 @@ const DiagnosisPage: React.FC = () => {
                     <span>▲</span>
                   </button>
                   <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
-                  <TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })} />
-                  <TongueStateSelector value={inputFeatures.tongueState.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })} />
+                  <TongueShapeSelector
+                    value={inputFeatures.tongueShape.value}
+                    onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })}
+                    teethMark={inputFeatures.teethMark?.value === '是'}
+                    crack={inputFeatures.crack?.value === '是'}
+                    onTeethMarkChange={(checked) => setInputFeatures({ ...inputFeatures, teethMark: { value: checked ? '是' : '否' } as any })}
+                    onCrackChange={(checked) => setInputFeatures({ ...inputFeatures, crack: { value: checked ? '是' : '否' } as any })}
+                  />
+                  <TongueStateSelector
+                    value={inputFeatures.tongueState.value}
+                    onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })}
+                    shapeValue={inputFeatures.shapeDistribution || { depression: [], bulge: [] }}
+                    onShapeChange={(shapeValue) => setInputFeatures({ ...inputFeatures, shapeDistribution: shapeValue })}
+                    ecchymosis={inputFeatures.ecchymosis?.value === '是'}
+                    tongueSurface={inputFeatures.tongueSurface?.value === '是'}
+                    onEcchymosisChange={(checked) => setInputFeatures({ ...inputFeatures, ecchymosis: { value: checked ? '是' : '否' } as any })}
+                    onTongueSurfaceChange={(checked) => setInputFeatures({ ...inputFeatures, tongueSurface: { value: checked ? '是' : '否' } as any })}
+                  />
                   <TongueCoatingSelector value={inputFeatures.coating} onChange={(coating) => setInputFeatures({ ...inputFeatures, coating })} />
                   <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
 
@@ -463,22 +479,24 @@ function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized
       label: '舌色',
       items: [{ name: inputFeatures.tongueColor.value, confidence, category: 'tongueColor' }]
     });
-    parts.push(`舌色:${inputFeatures.tongueColor.value}`);
+    parts.push(`舌色`);
   }
 
   // 舌苔
   const coatItems: Array<{ name: string; confidence: string; category: string }> = [];
   if (inputFeatures.coating.color) {
     coatItems.push({ name: inputFeatures.coating.color, confidence, category: 'coating' });
-    parts.push(`苔色:${inputFeatures.coating.color}`);
+    const coatTexture = inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常'
+      ? inputFeatures.coating.texture
+      : '';
+    parts.push(`苔`);
   }
   if (inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常') {
     coatItems.push({ name: inputFeatures.coating.texture, confidence, category: 'coating' });
-    parts.push(`苔质:${inputFeatures.coating.texture}`);
   }
   if (inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常') {
     coatItems.push({ name: inputFeatures.coating.moisture, confidence, category: 'moisture' });
-    parts.push(`润燥:${inputFeatures.coating.moisture}`);
+    parts.push(`苔`);
   }
   if (coatItems.length > 0) {
     categories.push({ label: '舌苔', items: coatItems });
@@ -490,7 +508,7 @@ function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized
       label: '舌形',
       items: [{ name: inputFeatures.tongueShape.value, confidence, category: 'tongueShape' }]
     });
-    parts.push(`舌形:${inputFeatures.tongueShape.value}`);
+    parts.push(`舌形`);
   }
 
   // 舌态
@@ -499,7 +517,7 @@ function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized
       label: '舌态',
       items: [{ name: inputFeatures.tongueState.value, confidence, category: 'tongueState' }]
     });
-    parts.push(`舌态:${inputFeatures.tongueState.value}`);
+    parts.push(`舌态`);
   }
 
   // 特殊特征（齿痕、裂纹等）
@@ -524,7 +542,7 @@ function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized
       return { name: displayName, confidence, category: 'distribution' };
     });
     categories.push({ label: '舌色分布', items: regionFeatureItems });
-    regionFeatureItems.forEach((item) => parts.push(item.name));
+    regionFeatureItems.forEach((item) => parts.push(`明显`));
   }
 
   // 凹凸形态
