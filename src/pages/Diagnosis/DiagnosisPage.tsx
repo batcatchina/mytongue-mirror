@@ -363,7 +363,7 @@ export default function DiagnosisPage() {
   }, [isRefiningDiagnosis, diagnosisResult, inputFeatures, patientInfo.age]);
 
   // 提交问诊答案 - 调用后端DeepSeek API整合答案
-  const handleInquirySubmit = useCallback(async (answers: Record<string, string>) => {
+  const handleInquirySubmit = useCallback(async (answers: { questionId: string; selectedOption: string }[]) => {
     if (!preliminaryResult || !inquiryConversationId) {
       throw new Error('问诊数据不完整');
     }
@@ -387,12 +387,6 @@ export default function DiagnosisPage() {
         distributionFeatures: inputFeatures.distributionFeatures,
       };
 
-      // 转换answers格式
-      const formattedAnswers = Object.entries(answers).map(([questionId, selectedOption]) => ({
-        questionId,
-        selectedOption,
-      }));
-
       // 调用后端confirm API
       const response = await fetch('/api/tongue-ai/diagnose', {
         method: 'POST',
@@ -400,7 +394,7 @@ export default function DiagnosisPage() {
         body: JSON.stringify({
           tongueFeatures,
           age: (patientInfo.age && patientInfo.age > 0) ? patientInfo.age : 30,
-          answers: formattedAnswers,
+          answers,
           conversationId: inquiryConversationId,
           preliminaryResult,
           mode: 'confirm',
