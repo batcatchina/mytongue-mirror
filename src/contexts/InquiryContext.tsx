@@ -8,6 +8,24 @@ import { generateInquiryQuestions, submitInquiryAnswers } from '@/services/Inqui
 import { useDiagnosisStore } from '@/stores/diagnosisStore';
 import toast from 'react-hot-toast';
 
+function getErrorMessage(error: unknown): string {
+  if (!error) return '未知错误';
+  if (typeof error === 'string') return error;
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === 'object') {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+      return maybeMessage;
+    }
+  }
+
+  return '未知错误';
+}
+
 interface InquiryContextValue {
   // 状态
   showInquiry: boolean;
@@ -93,7 +111,7 @@ export function InquiryProvider({ children }: { children: React.ReactNode }) {
       return finalResult;
     } catch (error) {
       console.error('提交问诊失败:', error);
-      toast.error('提交问诊失败，请重试');
+      toast.error(`提交问诊失败: ${getErrorMessage(error)}`);
       throw error;
     }
   }, [preliminaryResult, inquiryConversationId, inputFeatures, patientAge]);
