@@ -95,7 +95,7 @@ export const SymptomInput: React.FC<SymptomInputProps> = ({
       )}
 
       {/* 症状列表 */}
-      {symptoms.length > 0 ? (
+      {symptoms?.length ?? 0 > 0 ? (
         <div className="space-y-2">
           {symptoms.map((symptom, index) => (
             <div

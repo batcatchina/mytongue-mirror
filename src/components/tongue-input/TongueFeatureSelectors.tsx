@@ -350,7 +350,7 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({
                 onClick={() => onShapeChange?.({ ...shapeValue, depression: [] })}
                 className={clsx(
                   'px-2.5 py-1 rounded-full text-xs transition-all',
-                  shapeValue.depression.length === 0
+                  shapeValue.depression?.length ?? 0 === 0
                     ? 'bg-green-100 text-green-700'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                 )}
@@ -384,7 +384,7 @@ export const TongueStateSelector: React.FC<TongueStateSelectorProps> = ({
                 onClick={() => onShapeChange?.({ ...shapeValue, bulge: [] })}
                 className={clsx(
                   'px-2.5 py-1 rounded-full text-xs transition-all',
-                  shapeValue.bulge.length === 0
+                  shapeValue.bulge?.length ?? 0 === 0
                     ? 'bg-green-100 text-green-700'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                 )}

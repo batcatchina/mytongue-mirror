@@ -78,7 +78,7 @@ export const TongueColorDistribution: React.FC<TongueColorDistributionProps> = (
       </div>
 
       {/* 已添加的分布特征列表 */}
-      {distributions.length > 0 && (
+      {distributions?.length > 0 && (
         <div className="space-y-2">
           {distributions.map((dist, index) => (
             <div

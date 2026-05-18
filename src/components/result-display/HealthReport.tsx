@@ -72,7 +72,7 @@ export const HealthReport: React.FC<HealthReportProps> = ({
             </div>
 
             {/* 兼证 */}
-            {diagnosisResult.secondarySyndromes.length > 0 && (
+            {(diagnosisResult.secondarySyndromes?.length ?? 0) > 0 && (
               <div>
                 <span className="text-xs text-stone-500">兼证</span>
                 <div className="flex flex-wrap gap-2 mt-1">
@@ -86,7 +86,7 @@ export const HealthReport: React.FC<HealthReportProps> = ({
             )}
 
             {/* 传变预警 */}
-            {diagnosisResult.organLocation.length > 1 && (
+            {(diagnosisResult.organLocation?.length ?? 0) > 1 && (
               <div>
                 <span className="text-xs text-stone-500">传变预警</span>
                 <div className="text-sm text-orange-600 mt-1">
@@ -122,7 +122,7 @@ export const HealthReport: React.FC<HealthReportProps> = ({
             </div>
 
             {/* 配穴 */}
-            {acupuncturePlan.secondaryPoints.length > 0 && (
+            {(acupuncturePlan.secondaryPoints?.length ?? 0) > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded">配穴</span>

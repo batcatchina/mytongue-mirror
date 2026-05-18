@@ -34,9 +34,14 @@ const InquiryDialog: React.FC<InquiryDialogProps> = ({
   const [answers, setAnswers] = useState<InquiryAnswer[]>([]);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-  const currentQuestion = questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === ((questions || []).length) - 1;
-  const progress = `第 ${currentQuestionIndex + 1} 题 / 共 ${((questions || []).length)} 题`;
+  const questionCount = questions?.length ?? 0;
+  const currentQuestion = questions?.[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === questionCount - 1;
+  const progress = `第 ${currentQuestionIndex + 1} 题 / 共 ${questionCount} 题`;
+
+  if (!currentQuestion || questionCount === 0) {
+    return null;
+  }
 
   const handleOptionSelect = (option: string) => {
     setSelectedOption(option);
@@ -100,7 +105,7 @@ const InquiryDialog: React.FC<InquiryDialogProps> = ({
         <div className="h-1 bg-stone-100">
           <div 
             className="h-full bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-300"
-            style={{ width: `${((currentQuestionIndex + 1) / ((questions || []).length)) * 100}%` }}
+            style={{ width: `${questionCount > 0 ? ((currentQuestionIndex + 1) / questionCount) * 100 : 0}%` }}
           />
         </div>
 

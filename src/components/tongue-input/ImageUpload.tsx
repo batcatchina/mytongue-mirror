@@ -130,7 +130,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   value, 
   onChange, 
   onAIRecognition,
-  aiApiUrl = 'https://she-zhen-app.vercel.app/api/tongue'
+  aiApiUrl = '/api/tongue'
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);

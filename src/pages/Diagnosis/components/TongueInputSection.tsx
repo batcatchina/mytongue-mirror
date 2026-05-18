@@ -197,7 +197,7 @@ export default function TongueInputSection({
           <div className="flex flex-wrap gap-2">
             {(() => {
               const display = getStructuredTongueDisplay(inputFeatures, isAIRecognized, inputFeatures.aiConfidence || 0.8);
-              if (display.categories.length === 0) return null;
+              if (display.categories?.length ?? 0 === 0) return null;
               return display.categories.map((cat, catIdx) => (
                 <div key={catIdx} className="flex items-center gap-1.5">
                   <span className="text-xs text-stone-400">{cat.label}:</span>
@@ -270,7 +270,7 @@ export default function TongueInputSection({
                     setTeethMark('否');
                     const currentShape = inputFeatures.shapeDistribution || { depression: [], bulge: [] };
                     const newDepression = currentShape.depression.filter(d => d !== '齿痕');
-                    if (newDepression.length !== currentShape.depression.length) {
+                    if (newDepression.length !== currentShape.depression?.length ?? 0) {
                       setShapeDistribution({ ...currentShape, depression: newDepression });
                     }
                   }
@@ -282,7 +282,7 @@ export default function TongueInputSection({
                     setCrack('否');
                     const currentShape = inputFeatures.shapeDistribution || { depression: [], bulge: [] };
                     const newDepression = currentShape.depression.filter(d => d !== '裂纹');
-                    if (newDepression.length !== currentShape.depression.length) {
+                    if (newDepression.length !== currentShape.depression?.length ?? 0) {
                       setShapeDistribution({ ...currentShape, depression: newDepression });
                     }
                   }

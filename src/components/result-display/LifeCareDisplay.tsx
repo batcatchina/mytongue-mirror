@@ -49,7 +49,7 @@ export const LifeCareDisplay: React.FC<LifeCareDisplayProps> = ({ advice }) => {
       </div>
 
       {/* 注意事项 */}
-      {precautions.length > 0 && (
+      {precautions?.length > 0 && (
         <div className="tcm-card p-4 bg-amber-50 border-amber-200">
           <h4 className="tcm-section-title text-base text-amber-700">
             <span className="text-xl">📢</span> 注意事项
