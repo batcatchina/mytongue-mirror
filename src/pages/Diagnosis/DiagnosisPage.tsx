@@ -186,29 +186,37 @@ export default function DiagnosisPage() {
     setIsAIRecognized(true);
   }, []);
 
-  // 处理提交诊断
+  // 处理提交诊断 - 确保每次都从 store 获取最新状态
   const handleSubmit = useCallback(async () => {
-    const input = getDiagnosisInput();
+    // 验证并获取最新状态（每次调用都重新获取）
+    const currentInput = getDiagnosisInput();
+    const currentFeatures = currentInput.input_features;
+    const currentPatientInfo = currentInput.patientInfo;
 
-    // 验证
-    if (!inputFeatures.tongueColor.value) {
+    // 验证必填项
+    if (!currentFeatures.tongueColor.value) {
       toast.error('请选择舌色');
       return;
     }
-    if (!inputFeatures.coating.color) {
+    if (!currentFeatures.coating.color) {
       toast.error('请选择苔色');
       return;
     }
-    if (!patientInfo.gender) {
+    if (!currentPatientInfo.gender) {
       toast.error('请选择性别');
       return;
     }
 
-    // 填充默认值
-    if (!inputFeatures.tongueShape.value) setTongueShape('正常');
-    if (!inputFeatures.tongueState.value) setTongueState('正常');
-    if (!inputFeatures.coating.texture) setCoating(inputFeatures.coating.color, '薄', '润');
-    if (!inputFeatures.coating.moisture) setCoating(inputFeatures.coating.color, inputFeatures.coating.texture || '薄', '润');
+    // 填充默认值（如果为空）
+    if (!currentFeatures.tongueShape.value) setTongueShape('正常');
+    if (!currentFeatures.tongueState.value) setTongueState('正常');
+    if (!currentFeatures.coating.texture) setCoating(currentFeatures.coating.color, '薄', '润');
+    if (!currentFeatures.coating.moisture) setCoating(currentFeatures.coating.color, currentFeatures.coating.texture || '薄', '润');
+
+    // 再次获取最新状态（填充默认值后）
+    const input = getDiagnosisInput();
+    
+    console.log('[辨证提交] 最新输入特征:', JSON.stringify(input.input_features, null, 2));
 
     setLocalIsAnalyzing(true);
     setLocalDiagnosisResult(null);
@@ -231,17 +239,21 @@ export default function DiagnosisPage() {
       // 降级到本地引擎
       toast('远程辨证失败，切换到本地快速分析...', { icon: '⚡' });
       try {
-        const localResult = handleFallbackToLocal(input);
+        // 再次获取最新输入（确保使用最新状态）
+        const latestInput = getDiagnosisInput();
+        console.log('[降级] 本地引擎输入:', JSON.stringify(latestInput.input_features, null, 2));
+        const localResult = handleFallbackToLocal(latestInput);
         setLocalDiagnosisResult(localResult);
         setLocalCurrentStep('result');
         toast.success(`本地辨证完成！${localResult.diagnosisResult?.primarySyndrome || ''}`);
       } catch (localErr) {
         console.error('[降级] 本地引擎也失败:', localErr);
+        toast.error('本地引擎也失败了，请检查输入');
       }
     } finally {
       setLocalIsAnalyzing(false);
     }
-  }, [inputFeatures, patientInfo, getDiagnosisInput]);
+  }, [getDiagnosisInput]);
 
   // Fallback 到本地引擎
   const handleFallbackToLocalCallback = useCallback(() => {
@@ -301,11 +313,24 @@ export default function DiagnosisPage() {
         }),
       });
 
-      if (!response.ok) throw new Error('问诊问题生成失败');
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.error('问诊问题生成失败:', response.status, errBody);
+        throw new Error(`问诊问题生成失败: ${response.status}`);
+      }
 
       const data = await response.json();
       
-      if (data.success && data.questions && data.questions.length > 0) {
+      // 处理 API 返回错误的情况
+      if (!data.success) {
+        const errorMsg = data.error || '生成问诊问题失败';
+        console.error('[问诊] API返回错误:', errorMsg);
+        toast.error(errorMsg);
+        setShowRefineButton(true);
+        return;
+      }
+      
+      if (data.questions && data.questions.length > 0) {
         // DeepSeek生成了问诊问题
         const questions: InquiryQuestion[] = data.questions.map((q: any) => ({
           id: q.id,
@@ -322,11 +347,10 @@ export default function DiagnosisPage() {
         }
         
         setShowInquiry(true);
-      } else if (data.success && (!data.questions || data.questions.length === 0)) {
+      } else {
         // 高置信度，不需要问诊
         toast.success('辨证置信度较高，无需进一步问诊');
         setShowRefineButton(true);
-        setIsRefiningDiagnosis(false);
       }
     } catch (error) {
       console.error('生成问诊问题失败:', error);

@@ -72,6 +72,51 @@ export async function diagnoseWithDeepSeek(
 }
 
 /**
+ * 本地规则引擎输入转换
+ * 将 store 格式转换为本地引擎格式
+ */
+function convertToLocalEngineInput(input: DiagnosisInput) {
+  const features = input.input_features;
+  const hasTeethMark = features.teethMark?.value === '是' || features.shapeDistribution?.depression?.includes('齿痕') || false;
+  const hasCrack = features.crack?.value === '是' || features.shapeDistribution?.depression?.includes('裂纹') || false;
+  
+  return {
+    tongueColor: features.tongueColor.value || '淡红',
+    tongueShape: features.tongueShape.value || '正常',
+    tongueState: features.tongueState.value || '正常',
+    coatingColor: features.coating.color || '薄白',
+    coatingTexture: features.coating.texture || '薄',
+    coatingMoisture: features.coating.moisture || '润',
+    teethMark: hasTeethMark,
+    crack: hasCrack,
+  };
+}
+
+/**
+ * 本地规则引擎输出转换
+ * 将本地引擎输出转换为前端格式
+ */
+function convertLocalEngineOutput(localOutput: any, originalInput: DiagnosisInput): DiagnosisOutput {
+  const primary = localOutput.primaryResult;
+  
+  return {
+    diagnosisResult: {
+      primarySyndrome: primary.syndrome,
+      confidence: primary.confidence / 100,
+      syndromeTypes: localOutput.alternativeResults.map((r: any) => r.syndrome),
+      reasoning: primary.pathogenesis,
+    },
+    acupuncturePlan: {
+      mainPoints: localOutput.acupointSelection.mainPoints,
+      secondaryPoints: localOutput.acupointSelection.secondaryPoints,
+      technique: localOutput.acupointSelection.method.technique,
+    },
+    lifeCareAdvice: primary.treatment ? [primary.treatment] : [],
+    clinicalNotes: localOutput.clinicalNotes,
+  };
+}
+
+/**
  * 使用本地规则引擎进行诊断（Fallback）
  */
 export function diagnoseWithLocalEngine(
@@ -83,8 +128,16 @@ export function diagnoseWithLocalEngine(
   try {
     onStepChange?.('analyzing');
     
+    // 转换输入格式
+    const localInput = convertToLocalEngineInput(input);
+    console.log('[本地引擎] 输入:', JSON.stringify(localInput, null, 2));
+    
     // 调用本地规则引擎
-    const result = localDiagnose(input);
+    const localResult = localDiagnose(localInput);
+    console.log('[本地引擎] 结果:', JSON.stringify(localResult, null, 2));
+    
+    // 转换输出格式
+    const result = convertLocalEngineOutput(localResult, input);
     
     onStepChange?.('result');
     
