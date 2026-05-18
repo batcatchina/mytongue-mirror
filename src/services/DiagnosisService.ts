@@ -96,23 +96,30 @@ function convertToLocalEngineInput(input: DiagnosisInput) {
  * 本地规则引擎输出转换
  * 将本地引擎输出转换为前端格式
  */
-function convertLocalEngineOutput(localOutput: any, originalInput: DiagnosisInput): DiagnosisOutput {
-  const primary = localOutput.primaryResult;
+function convertLocalEngineOutput(localOutput: any): DiagnosisOutput {
+  const primary = localOutput?.primaryResult;
+  const rawConfidence = Number(primary?.confidence);
+  const normalizedConfidence = Number.isFinite(rawConfidence)
+    ? rawConfidence > 1
+      ? rawConfidence / 100
+      : rawConfidence
+    : 0;
+  const confidence = Math.max(0, Math.min(1, normalizedConfidence));
   
   return {
     diagnosisResult: {
-      primarySyndrome: primary.syndrome,
-      confidence: primary.confidence / 100,
-      syndromeTypes: localOutput.alternativeResults.map((r: any) => r.syndrome),
-      reasoning: primary.pathogenesis,
+      primarySyndrome: primary?.syndrome || '',
+      confidence,
+      syndromeTypes: localOutput?.alternativeResults?.map((r: any) => r?.syndrome).filter(Boolean) || [],
+      reasoning: primary?.pathogenesis || '',
     },
     acupuncturePlan: {
-      mainPoints: localOutput.acupointSelection.mainPoints,
-      secondaryPoints: localOutput.acupointSelection.secondaryPoints,
-      technique: localOutput.acupointSelection.method.technique,
+      mainPoints: localOutput?.acupointSelection?.mainPoints || [],
+      secondaryPoints: localOutput?.acupointSelection?.secondaryPoints || [],
+      technique: localOutput?.acupointSelection?.method?.technique || '',
     },
-    lifeCareAdvice: primary.treatment ? [primary.treatment] : [],
-    clinicalNotes: localOutput.clinicalNotes,
+    lifeCareAdvice: primary?.treatment ? [primary.treatment] : [],
+    clinicalNotes: localOutput?.clinicalNotes || '',
   };
 }
 
@@ -137,7 +144,7 @@ export function diagnoseWithLocalEngine(
     console.log('[本地引擎] 结果:', JSON.stringify(localResult, null, 2));
     
     // 转换输出格式
-    const result = convertLocalEngineOutput(localResult, input);
+    const result = convertLocalEngineOutput(localResult);
     
     onStepChange?.('result');
     
