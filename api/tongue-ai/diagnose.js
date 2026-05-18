@@ -615,16 +615,30 @@ async function handleConfirmMode(req) {
     return { status: 400, data: { success: false, error: '缺少问诊回答' } };
   }
 
+  // 兼容历史前端：answers 可能是 [{ questionId, answer }] 或 [{ id, value }]
+  // 统一转换为 [{ questionId, selectedOption, reason? }]，避免类型不匹配导致提交失败
+  const normalizedAnswers = Array.isArray(answers)
+    ? answers.map((a, idx) => ({
+        questionId: a?.questionId || a?.id || `q${idx + 1}`,
+        selectedOption: a?.selectedOption || a?.answer || a?.value || '',
+        reason: a?.reason,
+      })).filter(a => a.selectedOption)
+    : [];
+
+  if (normalizedAnswers.length === 0) {
+    return { status: 400, data: { success: false, error: '问诊回答格式错误，缺少 selectedOption/answer/value' } };
+  }
+
   console.log('[舌镜AI诊断] Confirm模式请求');
   console.log('[舌镜AI诊断] 会话ID:', conversationId);
-  console.log('[舌镜AI诊断] 回答数量:', answers.length);
+  console.log('[舌镜AI诊断] 回答数量:', normalizedAnswers.length);
 
   const systemPrompt = loadSystemPrompt('confirm');
   // 使用公共函数
   const confirmShapeDistText = buildShapeDistributionText(tongueFeatures.shapeDistribution);
   const confirmDistFeaturesText = buildDistributionFeaturesText(tongueFeatures.distributionFeatures);
 
-  const userMessage = buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, answers, confirmShapeDistText, confirmDistFeaturesText);
+  const userMessage = buildConfirmationUserMessage(tongueFeatures, age, preliminaryResult, normalizedAnswers, confirmShapeDistText, confirmDistFeaturesText);
 
   const assistantMessage = await callDeepSeek([
     { role: 'system', content: systemPrompt },
@@ -634,7 +648,7 @@ async function handleConfirmMode(req) {
   let diagnosisResult = parseJSONResponse(assistantMessage);
 
   let confidenceBoost = 0;
-  for (const answer of answers) {
+  for (const answer of normalizedAnswers) {
     if (preliminaryResult?.mainSyndrome) {
       const syndromeKeywords = preliminaryResult.mainSyndrome;
       const answerText = answer.selectedOption || '';
