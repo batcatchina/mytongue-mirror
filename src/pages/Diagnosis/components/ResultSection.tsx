@@ -1,6 +1,6 @@
 /**
  * 结果展示区组件
- * 包含辨证结果、病机分析、针灸方案、生活调理等
+ * 包含辨证结果、病机病理、针方穴位、生活调理等
  */
 import React from 'react';
 import { DiagnosisOutput, SecondarySyndrome } from '@/types';
@@ -144,7 +144,7 @@ export default function ResultSection({
         </button>
       )}
 
-      {/* Tab切换：病机 | 针灸 | 调理 */}
+      {/* Tab切换：病机病理 | 针方穴位 | 生活调理 */}
       <div className="flex border-b border-stone-200 animate-fade-in animation-delay-100">
         <button
           onClick={() => onResultTabChange('pathogenesis')}
@@ -154,7 +154,7 @@ export default function ResultSection({
               : 'text-stone-500 hover:text-stone-700'
           }`}
         >
-          病机分析
+          病机病理
         </button>
         <button
           onClick={() => onResultTabChange('acupuncture')}
@@ -164,7 +164,7 @@ export default function ResultSection({
               : 'text-stone-500 hover:text-stone-700'
           }`}
         >
-          针灸方案
+          针方穴位
         </button>
         <button
           onClick={() => onResultTabChange('care')}
@@ -211,7 +211,7 @@ export default function ResultSection({
           <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
         ) : (
           <div className="tcm-card p-6 text-center text-stone-400 text-sm">
-            🔒 请先解锁深度辨证方案查看针灸配穴
+            🔒 请先解锁深度辨证方案查看针方穴位
           </div>
         )
       )}
@@ -239,7 +239,7 @@ export default function ResultSection({
         <div className="tcm-card p-4 text-center space-y-3 bg-gradient-to-r from-primary-50 to-secondary-50">
           <div className="text-sm text-stone-600">
             <span className="text-lg mr-1">🔒</span>
-            针灸方案和生活调理需解锁查看
+            针方穴位和生活调理需解锁查看
           </div>
           <div className="flex justify-center">
             <PayButton 
@@ -248,7 +248,7 @@ export default function ResultSection({
               size="medium"
             />
           </div>
-          <p className="text-xs text-stone-400">包含完整针灸配穴和个性化生活调理建议</p>
+          <p className="text-xs text-stone-400">包含完整针方穴位和个性化生活调理建议</p>
         </div>
       ) : (
         <div className="tcm-card p-3 text-center bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">

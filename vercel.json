@@ -40,6 +40,14 @@
       "destination": "/api/tongue-ai/result"
     },
     {
+      "source": "/api/ai/inquiry/generate",
+      "destination": "/api/tongue-ai/inquiry-generate"
+    },
+    {
+      "source": "/api/ai/inquiry/submit",
+      "destination": "/api/tongue-ai/inquiry-submit"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     }

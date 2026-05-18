@@ -29,9 +29,9 @@ export function useDiagnosisSubmit({
 
   const handleSubmit = useCallback(async () => {
     setCurrentStep('analyzing');
+    const input = { input_features: inputFeatures, patientInfo };
 
     try {
-      const input = { inputFeatures, patientInfo };
       const result = await submitDiagnosis(input, (step) => {
         // 进度回调可以扩展
         console.log('[DiagnosisSubmit] Progress:', step);
@@ -46,7 +46,9 @@ export function useDiagnosisSubmit({
       console.error('云端辨证失败，尝试降级本地引擎:', error);
 
       try {
-        const localResult = await handleFallbackToLocal(inputFeatures, patientInfo.age || 30);
+        const localResult = await handleFallbackToLocal(input, (step) =>
+          setCurrentStep(step as DiagnosisStep)
+        );
         const normalizedLocal = normalizeDiagnosisOutput(localResult as Partial<DiagnosisOutput>);
         setDiagnosisResult(normalizedLocal);
         setCurrentStep('result');

@@ -305,10 +305,6 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-stone-700">
-        📷 舌象图片上传
-      </label>
-      
       {preview ? (
         <div className="relative rounded-xl overflow-hidden border-2 border-primary-200 bg-gradient-to-br from-primary-50 to-secondary-50">
           <img 

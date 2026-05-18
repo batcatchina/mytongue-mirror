@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import NavBar from '@/components/common/NavBar';
@@ -11,7 +11,6 @@ import {
   TongueColorDistribution,
 } from '@/components/tongue-input/TongueFeatureSelectors';
 import ImageUpload from '@/components/tongue-input/ImageUpload';
-import SymptomInput from '@/components/tongue-input/SymptomInput';
 import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
 import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
@@ -23,6 +22,7 @@ import { getRegionChineseName } from '@/config/tongueDisplay';
 import { useDiagnosisFlow } from './hooks/useDiagnosisFlow';
 import InferenceChainView from '@/components/inference/InferenceChainView';
 import { DiagnosisInput, DiagnosisOutput, InputFeatures, DistributionFeature } from '@/services/diagnosisEngine';
+import { COMMON_SYMPTOMS } from '@/types';
 const DiagnosisPage: React.FC = () => {
   const navigate = useNavigate();
   const isUnlocked = usePaymentStatus();
@@ -31,7 +31,10 @@ const DiagnosisPage: React.FC = () => {
   const [useLocalEngine, setUseLocalEngine] = useState(true);
   const [showEngineSwitch, setShowEngineSwitch] = useState(false);
   const [isAIRecognized, setIsAIRecognized] = useState(false);
+  const [recognitionExpanded, setRecognitionExpanded] = useState(false);
+  const [symptomSelectorExpanded, setSymptomSelectorExpanded] = useState(false);
   const [inferenceChain, setInferenceChain] = useState<any>(null);
+  const [customSymptomInput, setCustomSymptomInput] = useState('');
   
   // 年龄组选项
   const ageGroups = [
@@ -45,6 +48,7 @@ const DiagnosisPage: React.FC = () => {
     inputFeatures,
     patientInfo,
     currentSymptoms,
+    saveCase,
     setInputFeatures,
     setPatientInfo,
     setCurrentSymptoms,
@@ -70,6 +74,41 @@ const DiagnosisPage: React.FC = () => {
 
   
   const structuredDisplay = getStructuredTongueDisplay(inputFeatures, isAIRecognized);
+  const selectedSymptoms = useMemo(
+    () => (currentSymptoms || '').split(/[，,、\s]+/).map((s) => s.trim()).filter(Boolean),
+    [currentSymptoms]
+  );
+  const commonSymptoms = COMMON_SYMPTOMS.slice(0, 6);
+
+  const updateSelectedSymptoms = (nextSymptoms: string[]) => {
+    const normalized = Array.from(new Set(nextSymptoms.map((item) => item.trim()).filter(Boolean)));
+    setCurrentSymptoms(normalized.join('、'));
+  };
+
+  const toggleSymptom = (symptom: string) => {
+    if (selectedSymptoms.includes(symptom)) {
+      updateSelectedSymptoms(selectedSymptoms.filter((item) => item !== symptom));
+      return;
+    }
+    updateSelectedSymptoms([...selectedSymptoms, symptom]);
+  };
+
+  const addCustomSymptom = () => {
+    const value = customSymptomInput.trim();
+    if (!value || selectedSymptoms.includes(value)) {
+      setCustomSymptomInput('');
+      return;
+    }
+    updateSelectedSymptoms([...selectedSymptoms, value]);
+    setCustomSymptomInput('');
+  };
+
+  const handleSaveCase = () => {
+    if (diagnosisResult) {
+      saveCase(diagnosisResult);
+      toast.success('病例已保存');
+    }
+  };
 
   
 
@@ -122,27 +161,124 @@ const DiagnosisPage: React.FC = () => {
                 }}
               />
 
-              <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
-              <TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })} />
-              <TongueStateSelector value={inputFeatures.tongueState.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })} />
-              <TongueCoatingSelector value={inputFeatures.coating} onChange={(coating) => setInputFeatures({ ...inputFeatures, coating })} />
-              <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
-
-              <SymptomInput value={currentSymptoms || ''} onChange={setCurrentSymptoms} />
-              {/* 引擎切换选项 */}
-              <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
+              <div className="flex items-center justify-center gap-2 p-2 bg-stone-100 rounded-lg mb-4">
                 <span className="text-xs text-stone-500">辨证引擎:</span>
-                <button
-                  onClick={() => setUseLocalEngine(!useLocalEngine)}
-                  className={`px-2 py-1 text-xs rounded ${
-                    useLocalEngine 
-                      ? 'bg-primary-100 text-primary-700' 
-                      : 'bg-stone-100 text-stone-500'
-                  }`}
-                >
-                  {useLocalEngine ? '🟢 本地规则' : '🔵 AI推理'}
+                <button onClick={() => setUseLocalEngine(true)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${useLocalEngine ? 'bg-green-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
+                  🟢 本地引擎
+                </button>
+                <button onClick={() => setUseLocalEngine(false)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!useLocalEngine ? 'bg-blue-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
+                  ☁️ AI推理
                 </button>
               </div>
+
+              {recognitionExpanded ? (
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setRecognitionExpanded(false)}
+                    className="w-full flex items-center justify-between text-sm text-stone-600 px-3 py-2 rounded-lg bg-stone-50 border border-stone-200"
+                  >
+                    <span>智能识别区</span>
+                    <span>▲</span>
+                  </button>
+                  <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
+                  <TongueShapeSelector value={inputFeatures.tongueShape.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })} />
+                  <TongueStateSelector value={inputFeatures.tongueState.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })} />
+                  <TongueCoatingSelector value={inputFeatures.coating} onChange={(coating) => setInputFeatures({ ...inputFeatures, coating })} />
+                  <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
+
+                  <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-stone-600">伴随症状</span>
+                      <button
+                        type="button"
+                        onClick={() => setSymptomSelectorExpanded((prev) => !prev)}
+                        className="h-5 w-5 rounded-md border border-stone-300 text-xs text-stone-600 hover:bg-stone-100"
+                        aria-label="切换伴随症状输入"
+                      >
+                        {symptomSelectorExpanded ? '−' : '+'}
+                      </button>
+                    </div>
+
+                    {!symptomSelectorExpanded && selectedSymptoms.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {selectedSymptoms.map((symptom, index) => (
+                          <span key={`${symptom}-${index}`} className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] text-primary-700 border border-primary-200">
+                            {symptom}
+                            <button type="button" onClick={() => toggleSymptom(symptom)} className="ml-1 text-primary-500 hover:text-primary-700" aria-label={`删除${symptom}`}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {symptomSelectorExpanded && (
+                      <div className="mt-2 space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {commonSymptoms.map((symptom) => {
+                            const active = selectedSymptoms.includes(symptom);
+                            return (
+                              <button
+                                key={symptom}
+                                type="button"
+                                onClick={() => toggleSymptom(symptom)}
+                                className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${active ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-stone-300 bg-white text-stone-600 hover:bg-stone-100'}`}
+                              >
+                                {symptom}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={customSymptomInput}
+                            onChange={(e) => setCustomSymptomInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addCustomSymptom();
+                              }
+                            }}
+                            placeholder="自定义症状"
+                            className="h-7 flex-1 rounded-md border border-stone-300 bg-white px-2 text-xs text-stone-700 focus:border-primary-400 focus:outline-none"
+                          />
+                          <button type="button" onClick={addCustomSymptom} className="h-7 rounded-md border border-stone-300 px-2 text-xs text-stone-600 hover:bg-stone-100">
+                            添加
+                          </button>
+                        </div>
+                        {selectedSymptoms.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedSymptoms.map((symptom, index) => (
+                              <span key={`${symptom}-${index}`} className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] text-primary-700 border border-primary-200">
+                                {symptom}
+                                <button type="button" onClick={() => toggleSymptom(symptom)} className="ml-1 text-primary-500 hover:text-primary-700" aria-label={`删除${symptom}`}>
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setRecognitionExpanded(true)}
+                  className="w-full flex items-center justify-between text-sm text-stone-600 px-3 py-2 rounded-lg bg-stone-50 border border-stone-200"
+                >
+                  <span>
+                    {(inputFeatures.tongueColor.value || inputFeatures.coating.color || inputFeatures.tongueShape.value || inputFeatures.tongueState.value)
+                      ? `舌色: ${inputFeatures.tongueColor.value || '-'} | 舌苔: ${inputFeatures.coating.color || '-'} | 舌形: ${inputFeatures.tongueShape.value || '-'} | 舌态: ${inputFeatures.tongueState.value || '-'}`
+                      : '点击输入舌象特征'}
+                  </span>
+                  <span>▼</span>
+                </button>
+              )}
+
 
 
               <button
@@ -150,7 +286,7 @@ const DiagnosisPage: React.FC = () => {
                 disabled={isAnalyzing}
                 className="w-full py-2.5 rounded-xl bg-primary-600 text-white text-sm font-medium disabled:opacity-60"
               >
-                {isAnalyzing ? '辨证分析中...' : '开始辨证'}
+                {isAnalyzing ? '望诊辨证中...' : '望诊·辨证'}
               </button>
             </div>
 
@@ -188,9 +324,9 @@ const DiagnosisPage: React.FC = () => {
                 <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
 
                 <div className="flex gap-2">
-                  <button onClick={() => setResultTab('pathogenesis')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">病机</button>
-                  <button onClick={() => setResultTab('acupuncture')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">针灸</button>
-                  <button onClick={() => setResultTab('care')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">调理</button>
+                  <button onClick={() => setResultTab('pathogenesis')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">病机病理</button>
+                  <button onClick={() => setResultTab('acupuncture')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">针方穴位</button>
+                  <button onClick={() => setResultTab('care')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">生活调理</button>
                 </div>
 
                 {resultTab === 'pathogenesis' && (
@@ -199,19 +335,23 @@ const DiagnosisPage: React.FC = () => {
                   </div>
                 )}
                 {resultTab === 'acupuncture' && (
-                  isUnlocked ? <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} /> : <PaidDiagnosisSection />
+                  isUnlocked
+                    ? (diagnosisResult.acupuncturePlan?.mainPoints?.length || diagnosisResult.acupuncturePlan?.secondaryPoints?.length
+                      ? <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
+                      : <div className="tcm-card p-4 text-sm text-stone-600">暂无针方穴位数据</div>)
+                    : <PaidDiagnosisSection />
                 )}
                 {resultTab === 'care' && (
                   isUnlocked ? <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} /> : <PaidDiagnosisSection />
                 )}
 
-                {!showRefineButton && (
+                {showRefineButton && (
                   <button
                     onClick={handleRefineDiagnosis}
                     disabled={isRefiningDiagnosis}
                     className="w-full py-2 rounded-xl bg-amber-500 text-white text-sm font-medium disabled:opacity-60"
                   >
-                    {isRefiningDiagnosis ? '生成问诊中...' : '问而确之（提升准确率）'}
+                    {isRefiningDiagnosis ? '智能问诊生成中...' : '智能问诊（望问合参）'}
                   </button>
                 )}
 
@@ -219,7 +359,7 @@ const DiagnosisPage: React.FC = () => {
 
                 {!isUnlocked && (
                   <div className="tcm-card p-4 text-center space-y-2">
-                    <div className="text-sm text-stone-600">🔒 针灸方案和生活调理需解锁查看</div>
+                    <div className="text-sm text-stone-600">🔒 针方穴位和生活调理需解锁查看</div>
                     <div className="flex justify-center"><PayButton amount={9.9} title="舌镜深度辨证方案" size="medium" /></div>
                   </div>
                 )}
@@ -232,7 +372,7 @@ const DiagnosisPage: React.FC = () => {
       </main>
 
       {showInquiry && (
-        isLoadingInquiry ? (
+        (isLoadingInquiry && inquiryQuestions.length === 0) ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
               <p className="text-stone-600 font-medium">正在生成问诊问题...</p>
