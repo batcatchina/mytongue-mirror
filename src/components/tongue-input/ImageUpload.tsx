@@ -131,7 +131,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   value, 
   onChange, 
   onAIRecognition,
-  aiApiUrl = '/api/tongue',
+  aiApiUrl = '/api/tongue-ai/tongue',
   children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
