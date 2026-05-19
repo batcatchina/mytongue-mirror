@@ -269,7 +269,8 @@ export function useInquiryFlow({
 
       const data = await response.json();
       console.log('[InquiryFlow] submit response body:', data);
-      const normalizedResult = transformToDiagnosisOutput(data.data || {});
+      const apiResult = data.data || data;
+      const normalizedResult = transformToDiagnosisOutput(apiResult);
       const finalResult: DiagnosisOutput = normalizeDiagnosisOutput(normalizedResult, preliminaryResult);
 
       setPreliminaryResult(finalResult);

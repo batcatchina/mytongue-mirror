@@ -54,13 +54,20 @@ function buildSubmitSystemPrompt() {
 
 返回JSON格式：
 {
-  "updatedDiagnosisResult": {
-    "mainSyndrome": "主证",
-    "confidence": 0.0,
-    "reasoning": "综合推理说明",
-    "keyEvidence": ["证据1", "证据2"],
-    "advice": "调理建议"
-  }
+  "syndrome": "综合辨证主证",
+  "syndromeType": "证型分类",
+  "confidence": 0.85,
+  "patternAnalysis": "病机分析",
+  "pathogenesis": "病机",
+  "acupuncturePlan": {
+    "mainPoints": ["主穴1", "主穴2"],
+    "secondaryPoints": ["配穴1"],
+    "technique": "补泻手法"
+  },
+  "lifestyleAdvice": [
+    {"category":"饮食","content":"具体建议"},
+    {"category":"起居","content":"具体建议"}
+  ]
 }`;
 }
 
@@ -83,13 +90,20 @@ ${JSON.stringify(patientInfo || {}, null, 2)}
 
 请输出JSON格式：
 {
-  "updatedDiagnosisResult": {
-    "mainSyndrome": "主证",
-    "confidence": 0.0,
-    "reasoning": "综合推理说明",
-    "keyEvidence": ["证据1", "证据2"],
-    "advice": "调理建议"
-  }
+  "syndrome": "综合辨证主证",
+  "syndromeType": "证型分类",
+  "confidence": 0.85,
+  "patternAnalysis": "病机分析",
+  "pathogenesis": "病机",
+  "acupuncturePlan": {
+    "mainPoints": ["主穴1", "主穴2"],
+    "secondaryPoints": ["配穴1"],
+    "technique": "补泻手法"
+  },
+  "lifestyleAdvice": [
+    {"category":"饮食","content":"具体建议"},
+    {"category":"起居","content":"具体建议"}
+  ]
 }
 
 注意：只返回JSON，不要额外解释。`;
@@ -141,9 +155,7 @@ export default async function handler(req, res) {
       status: 200,
       data: {
         success: true,
-        data: {
-          updatedDiagnosisResult,
-        },
+        data: updatedDiagnosisResult,
       },
     });
   } catch (error) {

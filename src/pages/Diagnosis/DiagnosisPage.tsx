@@ -155,13 +155,6 @@ const DiagnosisPage: React.FC = () => {
                 />
               </div>
 
-              <ImageUpload
-                onFeaturesExtracted={(features, imageData) => {
-                  setInputFeatures(features);
-                  setTongueImage(imageData || null);
-                }}
-              />
-
               <div className="flex items-center justify-center gap-2 p-2 bg-stone-100 rounded-lg mb-4">
                 <span className="text-xs text-stone-500">辨证引擎:</span>
                 <button onClick={() => setUseLocalEngine(true)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${useLocalEngine ? 'bg-green-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
@@ -171,6 +164,15 @@ const DiagnosisPage: React.FC = () => {
                   ☁️ AI推理
                 </button>
               </div>
+
+              <ImageUpload
+                onFeaturesExtracted={(features, imageData) => {
+                  setInputFeatures(features);
+                  setTongueImage(imageData || null);
+                }}
+              />
+
+
 
               {recognitionExpanded ? (
                 <div className="space-y-3">
@@ -201,7 +203,29 @@ const DiagnosisPage: React.FC = () => {
                     onEcchymosisChange={(checked) => setInputFeatures({ ...inputFeatures, ecchymosis: { value: checked ? '是' : '否' } as any })}
                     onTongueSurfaceChange={(checked) => setInputFeatures({ ...inputFeatures, tongueSurface: { value: checked ? '是' : '否' } as any })}
                   />
-                  <TongueCoatingSelector value={inputFeatures.coating} onChange={(coating) => setInputFeatures({ ...inputFeatures, coating })} />
+                  <TongueCoatingSelector
+                    color={inputFeatures.coating.color}
+                    texture={inputFeatures.coating.texture}
+                    moisture={inputFeatures.coating.moisture}
+                    onColorChange={(c) =>
+                      setInputFeatures({
+                        ...inputFeatures,
+                        coating: { ...inputFeatures.coating, color: c },
+                      })
+                    }
+                    onTextureChange={(t) =>
+                      setInputFeatures({
+                        ...inputFeatures,
+                        coating: { ...inputFeatures.coating, texture: t },
+                      })
+                    }
+                    onMoistureChange={(m) =>
+                      setInputFeatures({
+                        ...inputFeatures,
+                        coating: { ...inputFeatures.coating, moisture: m },
+                      })
+                    }
+                  />
                   <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
 
                   <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
@@ -287,21 +311,50 @@ const DiagnosisPage: React.FC = () => {
                   onClick={() => setRecognitionExpanded(true)}
                   className="w-full flex items-center justify-between text-sm text-stone-600 px-3 py-2 rounded-lg bg-stone-50 border border-stone-200"
                 >
-                  <span>
-                    {(inputFeatures.tongueColor.value || inputFeatures.coating.color || inputFeatures.tongueShape.value || inputFeatures.tongueState.value)
-                      ? `舌色: ${inputFeatures.tongueColor.value || '-'} | 舌苔: ${inputFeatures.coating.color || '-'} | 舌形: ${inputFeatures.tongueShape.value || '-'} | 舌态: ${inputFeatures.tongueState.value || '-'}`
-                      : '点击输入舌象特征'}
-                  </span>
+                  <span>舌象特征选择区</span>
                   <span>▼</span>
                 </button>
               )}
 
 
 
-              {((structuredDisplay.categories || []).length) > 0 && (
-                <div className="px-3 py-2 rounded-lg bg-stone-50 border border-stone-200">
-                  <span className="text-xs text-stone-500">舌象智能识别：</span>
-                  <span className="text-sm text-stone-700">{structuredDisplay.rawText}</span>
+              {/* 舌象智能识别区 - 独立显示已选特征 */}
+              {(inputFeatures.tongueColor.value || inputFeatures.coating.color || inputFeatures.tongueShape.value || inputFeatures.tongueState.value) ? (
+                <div className="px-3 py-2.5 rounded-lg bg-blue-50 border border-blue-200">
+                  <div className="text-xs font-medium text-blue-600 mb-1">舌象智能识别</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {inputFeatures.tongueColor.value && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">舌色 {inputFeatures.tongueColor.value}</span>
+                    )}
+                    {inputFeatures.tongueShape.value && inputFeatures.tongueShape.value !== '正常' && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">舌形 {inputFeatures.tongueShape.value}</span>
+                    )}
+                    {(inputFeatures.teethMark?.value === '是') && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">齿痕</span>
+                    )}
+                    {(inputFeatures.crack?.value === '是') && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">裂纹</span>
+                    )}
+                    {inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常' && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">舌态 {inputFeatures.tongueState.value}</span>
+                    )}
+                    {inputFeatures.coating.color && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">苔色 {inputFeatures.coating.color}</span>
+                    )}
+                    {inputFeatures.coating.texture && inputFeatures.coating.texture !== '正常' && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">苔质 {inputFeatures.coating.texture}</span>
+                    )}
+                    {inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常' && (
+                      <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">润燥 {inputFeatures.coating.moisture}</span>
+                    )}
+                    {selectedSymptoms.length > 0 && selectedSymptoms.map((s, i) => (
+                      <span key={i} className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-primary-700 border border-primary-200">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="px-3 py-2 rounded-lg bg-stone-50 border border-dashed border-stone-300 text-center">
+                  <span className="text-xs text-stone-400">请在上方选择舌象特征，识别结果将显示在此处</span>
                 </div>
               )}
               <button
@@ -325,10 +378,10 @@ const DiagnosisPage: React.FC = () => {
               <div className="space-y-4">
                 <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
 
-                <div className="flex gap-2">
-                  <button onClick={() => setResultTab('pathogenesis')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">病机病理</button>
-                  <button onClick={() => setResultTab('acupuncture')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">针方穴位</button>
-                  <button onClick={() => setResultTab('care')} className="px-3 py-1.5 rounded-lg bg-stone-100 text-xs">生活调理</button>
+                <div className="bg-stone-50 rounded-xl p-1.5 flex gap-2">
+                  <button onClick={() => setResultTab('pathogenesis')} className={`flex-1 text-sm font-medium py-2.5 px-4 rounded-lg transition-all ${resultTab === 'pathogenesis' ? 'bg-primary-50 border-b-2 border-primary-500 text-primary-700' : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'}`}>病机病理</button>
+                  <button onClick={() => setResultTab('acupuncture')} className={`flex-1 text-sm font-medium py-2.5 px-4 rounded-lg transition-all ${resultTab === 'acupuncture' ? 'bg-primary-50 border-b-2 border-primary-500 text-primary-700' : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'}`}>针方穴位</button>
+                  <button onClick={() => setResultTab('care')} className={`flex-1 text-sm font-medium py-2.5 px-4 rounded-lg transition-all ${resultTab === 'care' ? 'bg-primary-50 border-b-2 border-primary-500 text-primary-700' : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'}`}>生活调理</button>
                 </div>
 
                 {resultTab === 'pathogenesis' && (
