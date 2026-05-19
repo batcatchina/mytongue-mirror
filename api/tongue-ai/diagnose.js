@@ -119,17 +119,27 @@ function loadInquiryPrompt() {
  */
 function buildShapeDistributionText(shapeDist) {
   if (!shapeDist) return '';
+  const partMap = {
+    tip: '舌尖',
+    middle: '舌中',
+    sides: '舌边',
+    root: '舌根',
+  };
+  const toChinesePart = (part) => {
+    if (typeof part !== 'string' || !part) return '';
+    return partMap[part] || part;
+  };
   const parts = [];
   if (shapeDist.depression && shapeDist.depression.length > 0) {
     const otherDepression = shapeDist.depression.filter(d => !d.includes('teeth') && !d.includes('crack'));
     if (otherDepression.length > 0) {
-      parts.push('depression:' + otherDepression.join(','));
+      parts.push(...otherDepression.map(part => `${toChinesePart(part)}凹陷`));
     }
   }
   if (shapeDist.bulge && shapeDist.bulge.length > 0) {
-    parts.push('bulge:' + shapeDist.bulge.join(','));
+    parts.push(...shapeDist.bulge.map(part => `${toChinesePart(part)}鼓胀`));
   }
-  return parts.length > 0 ? parts.join(';') : '';
+  return parts.length > 0 ? parts.join(',') : '';
 }
 
 /**
