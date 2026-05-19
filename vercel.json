@@ -28,6 +28,10 @@
   ],
   "rewrites": [
     {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    },
+    {
       "source": "/api/diagnose",
       "destination": "/api/tongue-ai/diagnose"
     },
