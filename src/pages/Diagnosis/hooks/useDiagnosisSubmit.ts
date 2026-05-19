@@ -13,7 +13,10 @@ import type { PatientInfo } from '@/types';
 
 export type DiagnosisStep =
   | 'idle'
+  | 'recognizing'
   | 'analyzing'
+  | 'reasoning'
+  | 'matching'
   | 'result'
   | 'inquiring'
   | 'refining'
@@ -42,8 +45,8 @@ export function useDiagnosisSubmit({
 
     try {
       const result = await submitDiagnosis(input, (step) => {
-        // 进度回调可以扩展
-        console.log('[DiagnosisSubmit] Progress:', step);
+        // 将后端进度阶段映射到前端步骤，驱动进度条UI更新
+        setCurrentStep(step as DiagnosisStep);
       });
 
       const normalizedResult: DiagnosisOutput = normalizeDiagnosisOutput(result);

@@ -106,7 +106,7 @@ export interface DiagnosisOptions {
 // 完整输入数据
 export interface DiagnosisInput {
   input_features: InputFeatures;
-  symptoms?: Symptom[];
+  symptoms?: string | Symptom[];
   patientInfo: PatientInfo;
   options?: Partial<DiagnosisOptions>;
   imageData?: string; // 舌象图片的base64数据

@@ -28,7 +28,6 @@ const DiagnosisPage: React.FC = () => {
   const isUnlocked = usePaymentStatus();
   const [resultTab, setResultTab] = useState<'pathogenesis' | 'acupuncture' | 'care'>('pathogenesis');
   const [uiMode, setUiMode] = useState<'v1' | 'v2'>('v1');
-  const [useLocalEngine, setUseLocalEngine] = useState(true);
   const [showEngineSwitch, setShowEngineSwitch] = useState(false);
   const [isAIRecognized, setIsAIRecognized] = useState(false);
   const [recognitionExpanded, setRecognitionExpanded] = useState(false);
@@ -168,17 +167,7 @@ const DiagnosisPage: React.FC = () => {
                   setInputFeatures(features);
                   setTongueImage(imageData || null);
                 }}
-              >
-                <div className="flex items-center justify-center gap-2 p-2 bg-stone-100 rounded-lg">
-                  <span className="text-xs text-stone-500">辨证引擎:</span>
-                  <button onClick={() => setUseLocalEngine(true)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${useLocalEngine ? 'bg-green-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
-                    🟢 本地引擎
-                  </button>
-                  <button onClick={() => setUseLocalEngine(false)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!useLocalEngine ? 'bg-blue-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
-                    ☁️ AI推理
-                  </button>
-                </div>
-              </ImageUpload>
+              />
 
 
 

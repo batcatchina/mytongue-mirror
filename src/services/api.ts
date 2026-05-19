@@ -706,7 +706,7 @@ export async function submitDiagnosis(
   const chiefComplaint = input.patientInfo?.chiefComplaint || '';
 
   // 获取伴随症状
-  const symptoms = input.symptoms?.map(s => s.symptom).join('、') || '';
+  const symptoms = typeof input.symptoms === 'string' ? input.symptoms : input.symptoms?.map(s => s.symptom).join('、') || '';
 
   // 开始进度模拟
   let progressController: { stop: () => void } | null = null;
