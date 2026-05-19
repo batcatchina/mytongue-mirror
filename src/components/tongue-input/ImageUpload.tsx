@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import clsx from 'clsx';
+import { recognizeTongue, TongueNotDetectedError } from '@/services/tongueAI';
 
 // AI识别结果类型
 export interface AIRecognitionResult {
@@ -32,7 +33,6 @@ interface ImageUploadProps {
   onChange: (imageData: string | null) => void;
   onCompressionProgress?: (status: string) => void;
   onAIRecognition?: (result: AIRecognitionResult) => void; // 新增：AI识别回调
-  aiApiUrl?: string; // 新增：AI识别API地址，支持热切换
   children?: React.ReactNode;
 }
 
@@ -131,7 +131,6 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   value, 
   onChange, 
   onAIRecognition,
-  aiApiUrl = '/api/tongue',
   children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -250,7 +249,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     setProgressInfo(null);
   }, [onChange]);
 
-  // AI识别功能
+  // AI识别功能 - 使用tongueAI.ts的两步轮询
   const handleAIRecognition = useCallback(async () => {
     if (!preview) return;
     
@@ -269,32 +268,37 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     }, 2000);
     
     try {
-      const response = await fetch(aiApiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: preview })
+      // 使用recognizeTongue进行两步轮询识别
+      const result = await recognizeTongue(preview, (status) => {
+        setRecognitionStatus(status);
+        // 从status中提取百分比
+        const match = status.match(/(\d+)%/);
+        if (match) {
+          const percent = parseInt(match[1], 10);
+          setProgressInfo({ status, percent: Math.min(percent, 95) });
+        }
       });
       
-      const result = await response.json();
+      // 识别成功
+      setAiResult(result);
+      const statusMsg = `识别完成 (置信度: ${Math.round(result.overall_confidence * 100)}%)`;
+      setRecognitionStatus(statusMsg);
+      setProgressInfo({ status: '识别完成', percent: 100 });
+      onAIRecognition?.(result);
       
-      if (result.success && result.data) {
-        setAiResult(result.data);
-        const statusMsg = `识别完成 (置信度: ${Math.round(result.data.overall_confidence * 100)}%)`;
-        setRecognitionStatus(statusMsg);
-        setProgressInfo({ status: '识别完成', percent: 100 });
-        onAIRecognition?.(result.data);
-      } else if (result.tongueNotDetected) {
+    } catch (error) {
+      if (error instanceof TongueNotDetectedError) {
         // 安全验证：未检测到舌头
-        setRecognitionStatus('⚠️ ' + (result.error || '未检测到舌象，请上传清晰的舌头照片'));
+        setRecognitionStatus('⚠️ ' + error.message);
         setAiResult(null);
         setProgressInfo(null);
+      } else if (error instanceof Error) {
+        setRecognitionStatus('识别失败: ' + error.message);
+        setProgressInfo(null);
       } else {
-        setRecognitionStatus('识别失败: ' + (result.error || '未知错误'));
+        setRecognitionStatus('识别失败: 未知错误');
         setProgressInfo(null);
       }
-    } catch (e: any) {
-      setRecognitionStatus('网络错误: ' + e.message);
-      setProgressInfo(null);
     } finally {
       // 清理进度定时器
       if (progressTimerRef.current) {
@@ -303,7 +307,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       }
       setIsRecognizing(false);
     }
-  }, [preview, aiApiUrl, onAIRecognition]);
+  }, [preview, onAIRecognition]);
 
   return (
     <div className="space-y-3">
