@@ -169,7 +169,8 @@ const DiagnosisPage: React.FC = () => {
                 }}
                 onRecognize={(result: TongueRecognitionResult) => {
                   const features = mapRecognitionToInputFeatures(result);
-                  setInputFeatures((prev: any) => ({ ...prev, ...features }));
+                  // AI识别时先重置再填充，避免旧数据残留
+                  setInputFeatures(features);
                   setIsAIRecognized(true);
                   setRecognitionExpanded(true);
                 }}

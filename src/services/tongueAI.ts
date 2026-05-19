@@ -200,8 +200,10 @@ export function mapRecognitionToInputFeatures(result: TongueRecognitionResult): 
       texture: result.tongue_coating?.texture || '正常',
       moisture: result.tongue_coating?.moisture || '正常',
     },
+    tongueSurface: { value: '否' },
+    ecchymosis: { value: '否' },
     shapeDistribution: { depression: depressionRegions, bulge: bulgeRegions },
-    distributionFeatures: distributionFeatures.length > 0 ? distributionFeatures : undefined,
+    distributionFeatures: distributionFeatures,
     aiConfidence: result.overall_confidence,
   };
 }
