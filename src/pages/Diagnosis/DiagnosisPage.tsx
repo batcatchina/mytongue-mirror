@@ -187,7 +187,7 @@ const DiagnosisPage: React.FC = () => {
                     <span>舌象特征选择区</span>
                     <span>▲</span>
                   </button>
-                  <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} />
+                  <TongueColorSelector value={inputFeatures.tongueColor.value} onChange={(value) => setInputFeatures({ ...inputFeatures, tongueColor: { value } as any })} isAI={isAIRecognized} />
                   <TongueShapeSelector
                     value={inputFeatures.tongueShape.value}
                     onChange={(value) => setInputFeatures({ ...inputFeatures, tongueShape: { value } as any })}
@@ -195,6 +195,7 @@ const DiagnosisPage: React.FC = () => {
                     crack={inputFeatures.crack?.value === '是'}
                     onTeethMarkChange={(checked) => setInputFeatures({ ...inputFeatures, teethMark: { value: checked ? '是' : '否' } as any })}
                     onCrackChange={(checked) => setInputFeatures({ ...inputFeatures, crack: { value: checked ? '是' : '否' } as any })}
+                    isAI={isAIRecognized}
                   />
                   <TongueStateSelector
                     value={inputFeatures.tongueState.value}
@@ -207,6 +208,7 @@ const DiagnosisPage: React.FC = () => {
                     tongueSurface={inputFeatures.tongueSurface?.value === '是'}
                     onEcchymosisChange={(checked) => setInputFeatures({ ...inputFeatures, ecchymosis: { value: checked ? '是' : '否' } as any })}
                     onTongueSurfaceChange={(checked) => setInputFeatures({ ...inputFeatures, tongueSurface: { value: checked ? '是' : '否' } as any })}
+                    isAI={isAIRecognized}
                   />
                   <TongueCoatingSelector
                     color={inputFeatures.coating.color}
@@ -230,8 +232,9 @@ const DiagnosisPage: React.FC = () => {
                         coating: { ...inputFeatures.coating, moisture: m },
                       })
                     }
+                    isAI={isAIRecognized}
                   />
-                  <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
+                  <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} isAI={isAIRecognized} />
 
                   <button
                     type="button"
@@ -334,7 +337,12 @@ const DiagnosisPage: React.FC = () => {
               {/* 舌象智能识别区 - 独立显示已选特征 */}
               {([inputFeatures?.tongueColor?.value, inputFeatures?.coating?.color, inputFeatures?.tongueShape?.value, inputFeatures?.tongueState?.value].some(Boolean)) ? (
                 <div className="px-3 py-2.5 rounded-lg bg-blue-50 border border-blue-200">
-                  <div className="text-xs font-medium text-blue-600 mb-1">舌象智能识别</div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-blue-600">舌象智能识别</span>
+                    {isAIRecognized && (
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">AI</span>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {inputFeatures.tongueColor.value && (
                       <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">舌色 {inputFeatures.tongueColor.value}</span>
@@ -386,6 +394,15 @@ const DiagnosisPage: React.FC = () => {
                     {inputFeatures.coating.moisture && inputFeatures.coating.moisture !== '正常' && (
                       <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">润燥 {inputFeatures.coating.moisture}</span>
                     )}
+                    {/* 舌色分布特征 */}
+                    {inputFeatures.distributionFeatures && inputFeatures.distributionFeatures.length > 0 && inputFeatures.distributionFeatures.map((item: any, i: number) => (
+                      <span
+                        key={`dist-${i}`}
+                        className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs text-purple-700 border border-purple-200"
+                      >
+                        {item.part}{item.feature}
+                      </span>
+                    ))}
                     {selectedSymptoms.length > 0 && selectedSymptoms.map((s, i) => (
                       <span key={i} className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-primary-700 border border-primary-200">{s}</span>
                     ))}

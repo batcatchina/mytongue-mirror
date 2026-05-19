@@ -4,6 +4,7 @@ import { TONGUE_PARTS, DEGREE_LEVELS } from '@/types';
 
 interface TongueColorDistributionProps {
   onChange: (distribution: TongueColorDistribution[]) => void;
+  isAI?: boolean;
 }
 
 export interface TongueColorDistribution {
@@ -14,7 +15,7 @@ export interface TongueColorDistribution {
 
 const FEATURE_OPTIONS = ['红点', '瘀斑', '齿痕', '裂纹', '齿痕裂纹'];
 
-export const TongueColorDistribution: React.FC<TongueColorDistributionProps> = ({ onChange }) => {
+export const TongueColorDistribution: React.FC<TongueColorDistributionProps> = ({ onChange, isAI, value = [] }) => {
   const [distributions, setDistributions] = useState<TongueColorDistribution[]>([]);
   const [newDist, setNewDist] = useState<TongueColorDistribution>({
     part: TONGUE_PARTS[0] as string,
@@ -34,11 +35,28 @@ export const TongueColorDistribution: React.FC<TongueColorDistributionProps> = (
     onChange(updated);
   };
 
+  // 当外部值传入时同步到内部状态
+  React.useEffect(() => {
+    // 避免循环更新：只有当外部值和内部状态不一致时才更新
+    const externalArr = value || [];
+    const externalStr = JSON.stringify(externalArr);
+    const internalStr = JSON.stringify(distributions);
+    // 当外部有值且与内部不一致时才同步
+    if (externalArr.length > 0 && externalStr !== internalStr) {
+      setDistributions(externalArr);
+    }
+  }, [value]);
+
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-stone-700">
-        舌色分布特征 (可选)
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="block text-sm font-medium text-stone-700">
+          舌色分布特征 (可选)
+        </label>
+        {isAI && distributions.length > 0 && (
+          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">AI</span>
+        )}
+      </div>
       
       {/* 添加新的分布特征 */}
       <div className="flex flex-wrap gap-2 p-3 bg-stone-50 rounded-lg">
