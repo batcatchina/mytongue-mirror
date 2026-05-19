@@ -142,3 +142,66 @@ export async function recognizeTongue(
 
   throw new Error('识别超时，请重试');
 }
+
+// 将AI识别结果映射为InputFeatures格式
+export function mapRecognitionToInputFeatures(result: TongueRecognitionResult): Record<string, any> {
+  // 区域英文→中文映射
+  const regionMap: Record<string, string> = { tip: '舌尖', sides: '舌边', middle: '舌中', root: '舌根' };
+  
+  // 构建distributionFeatures
+  const distributionFeatures: { part: string; feature: string; degree: string }[] = [];
+  if (result.region_features) {
+    for (const [key, region] of Object.entries(result.region_features)) {
+      const partName = regionMap[key] || key;
+      if (region.features && region.features.length > 0) {
+        for (const f of region.features) {
+          distributionFeatures.push({ part: partName, feature: f, degree: '中等' });
+        }
+      }
+      if (region.color && region.color !== '') {
+        distributionFeatures.push({ part: partName, feature: region.color, degree: '中等' });
+      }
+    }
+  }
+
+  // 构建shapeDistribution - 从region_features的depression/bulge推导
+  const depressionRegions: string[] = [];
+  const bulgeRegions: string[] = [];
+  if (result.region_features) {
+    for (const [key, region] of Object.entries(result.region_features)) {
+      if (region.depression) depressionRegions.push(regionMap[key] || key);
+      if (region.bulge) bulgeRegions.push(regionMap[key] || key);
+    }
+  }
+  // 也从shape_distribution获取
+  if (result.shape_distribution) {
+    if (result.shape_distribution.depression) {
+      for (const d of result.shape_distribution.depression) {
+        const name = regionMap[d.region] || d.region;
+        if (!depressionRegions.includes(name)) depressionRegions.push(name);
+      }
+    }
+    if (result.shape_distribution.bulge) {
+      for (const b of result.shape_distribution.bulge) {
+        const name = regionMap[b.region] || b.region;
+        if (!bulgeRegions.includes(name)) bulgeRegions.push(name);
+      }
+    }
+  }
+
+  return {
+    tongueColor: { value: result.tongue_color?.value || '', confidence: result.tongue_color?.confidence },
+    tongueShape: { value: result.tongue_shape?.value || '正常', confidence: undefined },
+    crack: { value: result.tongue_shape?.crack?.has ? '是' : '否', degree: result.tongue_shape?.crack?.degree, distribution: result.tongue_shape?.crack?.position ? regionMap[result.tongue_shape.crack.position] || result.tongue_shape.crack.position : undefined },
+    teethMark: { value: result.tongue_shape?.teeth_mark?.has ? '是' : '否', degree: result.tongue_shape?.teeth_mark?.degree, distribution: result.tongue_shape?.teeth_mark?.position },
+    tongueState: { value: result.tongue_state?.value || '正常' },
+    coating: {
+      color: result.tongue_coating?.color || '',
+      texture: result.tongue_coating?.texture || '正常',
+      moisture: result.tongue_coating?.moisture || '正常',
+    },
+    shapeDistribution: { depression: depressionRegions, bulge: bulgeRegions },
+    distributionFeatures: distributionFeatures.length > 0 ? distributionFeatures : undefined,
+    aiConfidence: result.overall_confidence,
+  };
+}

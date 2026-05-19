@@ -11,6 +11,7 @@ import {
   TongueColorDistribution,
 } from '@/components/tongue-input/TongueFeatureSelectors';
 import ImageUpload from '@/components/tongue-input/ImageUpload';
+import { mapRecognitionToInputFeatures, TongueRecognitionResult } from '@/services/tongueAI';
 import DiagnosisResultDisplay from '@/components/result-display/DiagnosisResultDisplay';
 import AcupunctureDisplay from '@/components/result-display/AcupunctureDisplay';
 import LifeCareDisplay from '@/components/result-display/LifeCareDisplay';
@@ -163,9 +164,14 @@ const DiagnosisPage: React.FC = () => {
               </div>
 
               <ImageUpload
-                onFeaturesExtracted={(features, imageData) => {
-                  setInputFeatures(features);
-                  setTongueImage(imageData || null);
+                onChange={(imageData) => {
+                  setTongueImage(imageData);
+                }}
+                onRecognize={(result: TongueRecognitionResult) => {
+                  const features = mapRecognitionToInputFeatures(result);
+                  setInputFeatures((prev: any) => ({ ...prev, ...features }));
+                  setIsAIRecognized(true);
+                  setRecognitionExpanded(true);
                 }}
               />
 

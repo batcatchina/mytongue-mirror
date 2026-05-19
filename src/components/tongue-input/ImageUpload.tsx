@@ -258,7 +258,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
             </div>
           )}
 
-          {/* 识别结果摘要条 */}
+          {/* 识别结果摘要条 - 智能识别区展示 */}
           {recognizeResult && (
             <div className="px-3 py-2.5 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-xs text-stone-600 leading-relaxed">
               <div className="flex items-center gap-1.5 mb-1">
