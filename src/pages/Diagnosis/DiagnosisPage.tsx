@@ -48,14 +48,13 @@ const DiagnosisPage: React.FC = () => {
   const {
     inputFeatures,
     patientInfo,
-    currentSymptoms,
     saveCase,
     setInputFeatures,
     setPatientInfo,
-    setCurrentSymptoms,
     setTongueImage,
   } = useDiagnosisStore();
 
+  const [currentSymptoms, setCurrentSymptoms] = useState('');
   const {
     diagnosisResult,
     currentStep,
@@ -72,7 +71,7 @@ const DiagnosisPage: React.FC = () => {
     handleRefineDiagnosis,
     handleInquirySubmit,
     cancelInquiry,
-  } = useDiagnosisFlow({ inputFeatures, patientInfo });
+  } = useDiagnosisFlow({ inputFeatures, patientInfo, symptoms: currentSymptoms });
 
   
   const structuredDisplay = getStructuredTongueDisplay(inputFeatures, isAIRecognized);

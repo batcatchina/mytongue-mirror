@@ -23,11 +23,13 @@ export type DiagnosisStep =
 interface UseDiagnosisSubmitParams {
   inputFeatures: InputFeatures;
   patientInfo: PatientInfo;
+  symptoms?: string;
 }
 
 export function useDiagnosisSubmit({
   inputFeatures,
   patientInfo,
+  symptoms,
 }: UseDiagnosisSubmitParams) {
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisOutput | null>(null);
   const [currentStep, setCurrentStep] = useState<DiagnosisStep>('idle');
@@ -36,7 +38,7 @@ export function useDiagnosisSubmit({
 
   const handleSubmit = useCallback(async () => {
     setCurrentStep('analyzing');
-    const input = { input_features: inputFeatures, patientInfo };
+    const input = { input_features: inputFeatures, patientInfo, symptoms };
 
     try {
       const result = await submitDiagnosis(input, (step) => {
@@ -67,7 +69,7 @@ export function useDiagnosisSubmit({
         toast.error('辨证失败，请检查网络或稍后重试');
       }
     }
-  }, [inputFeatures, patientInfo]);
+  }, [inputFeatures, patientInfo, symptoms]);
 
   const clearResult = useCallback(() => {
     setDiagnosisResult(null);

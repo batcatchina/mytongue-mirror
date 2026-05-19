@@ -10,9 +10,10 @@ import type { InputFeatures, PatientInfo } from '@/types';
 interface UseDiagnosisFlowParams {
   inputFeatures: InputFeatures;
   patientInfo: PatientInfo;
+  symptoms?: string;
 }
 
-export function useDiagnosisFlow({ inputFeatures, patientInfo }: UseDiagnosisFlowParams) {
+export function useDiagnosisFlow({ inputFeatures, patientInfo, symptoms }: UseDiagnosisFlowParams) {
   // 提交辨证
   const {
     diagnosisResult,
@@ -26,6 +27,7 @@ export function useDiagnosisFlow({ inputFeatures, patientInfo }: UseDiagnosisFlo
   } = useDiagnosisSubmit({
     inputFeatures,
     patientInfo,
+    symptoms,
   });
 
   // 问诊流程
