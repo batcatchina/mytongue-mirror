@@ -35,6 +35,7 @@ const DiagnosisPage: React.FC = () => {
   const [symptomSelectorExpanded, setSymptomSelectorExpanded] = useState(false);
   const [inferenceChain, setInferenceChain] = useState<any>(null);
   const [customSymptomInput, setCustomSymptomInput] = useState('');
+  const [inquiryCompleted, setInquiryCompleted] = useState(false);
   
   // 年龄组选项
   const ageGroups = [
@@ -104,6 +105,14 @@ const DiagnosisPage: React.FC = () => {
     setCustomSymptomInput('');
   };
 
+  const handleInquirySubmitWithTracking = async (...args: any[]) => {
+    const data = await (handleInquirySubmit as any)(...args);
+    if (data?.inquiryDiagnosis?.diagnosis) {
+      setInquiryCompleted(true);
+    }
+    return data;
+  };
+
   const handleSaveCase = () => {
     if (diagnosisResult) {
       saveCase(diagnosisResult);
@@ -146,7 +155,7 @@ const DiagnosisPage: React.FC = () => {
                 <span className="text-sm text-stone-600">年龄:</span>
                 <input
                   type="number"
-                  className="w-24 px-2 py-1 border rounded"
+                  className={`w-24 px-2 py-1 border rounded ${!patientInfo.age ? 'border-red-500' : ''}`}
                   value={patientInfo.age ?? ''}
                   onChange={(e) => {
                     const raw = e.target.value;
@@ -227,6 +236,14 @@ const DiagnosisPage: React.FC = () => {
                     }
                   />
                   <TongueColorDistribution value={inputFeatures.distributionFeatures || []} onChange={(distributionFeatures) => setInputFeatures({ ...inputFeatures, distributionFeatures })} />
+
+                  <button
+                    type="button"
+                    onClick={() => setRecognitionExpanded(false)}
+                    className="w-full py-2.5 rounded-xl bg-primary-600 text-white text-sm font-medium"
+                  >
+                    ✓ 确认选择
+                  </button>
 
                   <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
@@ -359,10 +376,10 @@ const DiagnosisPage: React.FC = () => {
               )}
               <button
                 onClick={handleSubmit}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !patientInfo.age}
                 className="w-full py-2.5 rounded-xl bg-primary-600 text-white text-sm font-medium disabled:opacity-60"
               >
-                {isAnalyzing ? '望诊辨证中...' : '望诊·辨证'}
+                {!patientInfo.age ? '请先填写年龄' : isAnalyzing ? '综合辨证中...' : inquiryCompleted ? '综合辨证（望诊+问诊）' : '望诊·辨证'}
               </button>
             </div>
 
@@ -376,6 +393,9 @@ const DiagnosisPage: React.FC = () => {
 
             {diagnosisResult ? (
               <div className="space-y-4">
+                {inquiryCompleted && (
+                  <div className="text-lg font-semibold text-gray-800">综合辨证（望诊+问诊）</div>
+                )}
                 <DiagnosisResultDisplay result={diagnosisResult.diagnosisResult} />
 
                 <div className="bg-stone-50 rounded-xl p-1.5 flex gap-2">
@@ -440,7 +460,7 @@ const DiagnosisPage: React.FC = () => {
             questions={inquiryQuestions}
             conversationId={inquiryConversationId || ''}
             preliminaryResult={preliminaryResult}
-            onSubmit={handleInquirySubmit as any}
+            onSubmit={handleInquirySubmitWithTracking as any}
             onCancel={cancelInquiry}
             isLoading={isSubmittingInquiry}
           />
