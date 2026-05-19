@@ -94,7 +94,7 @@ export default async function handler(req, res) {
           role: 'user',
           content_type: 'object_string',
           content: JSON.stringify([
-            { type: 'image', file_id: fileId },
+            { type: 'file', file_id: fileId },
             { type: 'text', text: TONGUE_PROMPT }
           ])
         }]
