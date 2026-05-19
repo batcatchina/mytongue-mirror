@@ -20,6 +20,7 @@
 （无）
 
 ## Done（完成）
+- [05-19] AI舌象识别修复+识别区特征区联动 | 总调度 | 恢复Prompt+轮询40次+mapRecognitionToInputFeatures
 - [05-18] DiagnosisPage按领域拆分（1762→438行，-75%）| Codex | 6Service+4Context+3Component
 - [05-17] 仓库整理+v2.0-dev合并+目录归档 | Codex | build一遍过
 - [05-17] 架构诊断报告（557行）| Codex | 5项自主进化能力评估
@@ -28,5 +29,5 @@
 - [05-14] 微信WebView白屏修复 | 总调度
 
 ---
-*最后更新：2026-05-18 00:16*
+*最后更新：2026-05-20 00:13*
 *规则：典策调度→Codex执行→典策验收→状态回写*
