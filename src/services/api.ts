@@ -531,42 +531,64 @@ export function normalizeDiagnosisOutput(result: Partial<DiagnosisOutput> | null
 }
 
 export function transformToDiagnosisOutput(apiResult: unknown): DiagnosisOutput {
+  const data = (apiResult && typeof apiResult === 'object')
+    ? (apiResult as Record<string, any>)
+    : {};
+
   // 提取证型信息
-  const syndrome = apiResult.syndrome || apiResult.mainSyndrome || '辨证分析完成';
-  const syndromeType = apiResult.syndromeType || apiResult.mainSyndromeType || '其他';
-  const confidence = apiResult.confidence || 0.8;
-  const patternAnalysis = apiResult.patternAnalysis || apiResult.analysis || '';
-  const pathogenesis = apiResult.pathogenesis || '';
+  const syndrome = data.syndrome || data.mainSyndrome || '辨证分析完成';
+  const confidence = data.confidence || 0.8;
+  const pathogenesis = data.pathogenesis || '';
 
   // 提取穴位数组：优先用 acupuncturePlan.mainPoints/secondaryPoints，退化用 acupoints
   // 直接使用 acupuncturePlan 中的 mainPoints 和 secondaryPoints
-  const planMainPoints = Array.isArray(apiResult.acupuncturePlan?.mainPoints) 
-    ? apiResult.acupuncturePlan.mainPoints 
+  const planMainPoints = Array.isArray(data.acupuncturePlan?.mainPoints)
+    ? data.acupuncturePlan.mainPoints
     : [];
-  const planSecondaryPoints = Array.isArray(apiResult.acupuncturePlan?.secondaryPoints) 
-    ? apiResult.acupuncturePlan.secondaryPoints 
+  const planSecondaryPoints = Array.isArray(data.acupuncturePlan?.secondaryPoints)
+    ? data.acupuncturePlan.secondaryPoints
     : [];
+
+  const toPointName = (point: unknown): string => {
+    if (typeof point === 'string') return cleanAcupointName(point);
+    if (point && typeof point === 'object') {
+      const p = point as Record<string, unknown>;
+      const raw = typeof p.point === 'string'
+        ? p.point
+        : typeof p.name === 'string'
+          ? p.name
+          : '';
+      return cleanAcupointName(raw);
+    }
+    return '';
+  };
   
   // 处理主穴
-  const mainPointNames = planMainPoints.map((name: string) => cleanAcupointName(name));
+  const mainPointNames = planMainPoints.map(toPointName).filter(Boolean);
   const mainPoints = mainPointNames.map((name: string) => ({
     point: name,
     meridian: getMeridian(name) || '',
     effect: getEffect(name) || '',
-    technique: apiResult.acupuncturePlan?.technique || '平补平泻',
+    technique: data.acupuncturePlan?.technique || '平补平泻',
   }));
 
   // 处理配穴
-  const secondaryPointNames = planSecondaryPoints.map((name: string) => cleanAcupointName(name));
+  const secondaryPointNames = planSecondaryPoints.map(toPointName).filter(Boolean);
   const secondaryPoints = secondaryPointNames.map((name: string) => ({
     point: name,
     meridian: getMeridian(name) || '',
     effect: getEffect(name) || '',
-    technique: apiResult.acupuncturePlan?.technique || '平补平泻',
+    technique: data.acupuncturePlan?.technique || '平补平泻',
   }));
 
   // 提取养生建议
-  const lifestyleAdvice = apiResult.lifestyleAdvice || apiResult.lifeCareAdvice || [];
+  const lifeCareRaw = data.lifeCareAdvice;
+  const lifestyleAdvice = data.lifestyleAdvice
+    || (Array.isArray(lifeCareRaw)
+      ? lifeCareRaw
+      : Array.isArray(lifeCareRaw?.dietSuggestions)
+        ? lifeCareRaw.dietSuggestions
+        : []);
 
   // 判断优先级
   let priority: '高' | '中' | '低' = '中';
@@ -580,20 +602,20 @@ export function transformToDiagnosisOutput(apiResult: unknown): DiagnosisOutput 
       confidence,
       secondarySyndromes: [],
       pathogenesis,
-      organLocation: apiResult.organLocation || [],
+      organLocation: data.organLocation || [],
       diagnosisEvidence: [],
       priority,
       diagnosisTime: new Date().toISOString(),
     },
     acupuncturePlan: {
-      treatmentPrinciple: apiResult.treatmentPrinciple || apiResult.acupuncturePlan?.treatmentPrinciple || '',
+      treatmentPrinciple: data.treatmentPrinciple || data.acupuncturePlan?.treatmentPrinciple || '',
       mainPoints,
       secondaryPoints,
       contraindications: [],
       treatmentAdvice: {
-        techniquePrinciple: apiResult.acupuncturePlan?.technique || '平补平泻',
-        needleRetentionTime: apiResult.acupuncturePlan?.needleRetentionTime || '',
-        treatmentFrequency: apiResult.acupuncturePlan?.treatmentFrequency || '',
+        techniquePrinciple: data.acupuncturePlan?.technique || '平补平泻',
+        needleRetentionTime: data.acupuncturePlan?.needleRetentionTime || '',
+        treatmentFrequency: data.acupuncturePlan?.treatmentFrequency || '',
         treatmentSessions: '',
         sessionInterval: '',
       },

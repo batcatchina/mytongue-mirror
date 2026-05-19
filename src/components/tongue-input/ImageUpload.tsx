@@ -33,6 +33,7 @@ interface ImageUploadProps {
   onCompressionProgress?: (status: string) => void;
   onAIRecognition?: (result: AIRecognitionResult) => void; // 新增：AI识别回调
   aiApiUrl?: string; // 新增：AI识别API地址，支持热切换
+  children?: React.ReactNode;
 }
 
 // 图片压缩配置
@@ -130,7 +131,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   value, 
   onChange, 
   onAIRecognition,
-  aiApiUrl = '/api/tongue'
+  aiApiUrl = '/api/tongue',
+  children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
@@ -415,6 +417,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           </div>
         </div>
       )}
+
+      {children ? <div className="pt-1">{children}</div> : null}
       
       {/* AI识别结果预览 */}
       {aiResult && (

@@ -152,11 +152,8 @@ export default async function handler(req, res) {
     const updatedDiagnosisResult = parsed.updatedDiagnosisResult || parsed;
 
     return res.status(200).json({
-      status: 200,
-      data: {
-        success: true,
-        data: updatedDiagnosisResult,
-      },
+      success: true,
+      data: updatedDiagnosisResult,
     });
   } catch (error) {
     console.error('[问诊提交] 处理失败:', error);

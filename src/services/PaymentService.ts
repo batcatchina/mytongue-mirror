@@ -24,6 +24,9 @@ export function generateReportId(): string {
  * 检查是否已解锁深度辨证（全局状态）
  */
 export function checkGlobalUnlocked(): boolean {
+  // 临时开放，后续恢复付费墙
+  return true;
+  // 保留原逻辑，恢复付费墙时删除上面的 return true
   try {
     return localStorage.getItem(UNLOCK_KEY) === 'true';
   } catch {

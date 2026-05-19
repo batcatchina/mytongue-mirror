@@ -3,7 +3,7 @@
  * 成交第一：拆分不能破坏付费流程
  */
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import { checkGlobalUnlocked, setGlobalUnlocked, unlockReport, generateReportId, PaymentConfig, getPaymentConfig } from '@/services/PaymentService';
+import { setGlobalUnlocked, unlockReport, generateReportId, PaymentConfig, getPaymentConfig } from '@/services/PaymentService';
 import toast from 'react-hot-toast';
 
 interface PaymentContextValue {
@@ -20,17 +20,16 @@ interface PaymentContextValue {
 const PaymentContext = createContext<PaymentContextValue | null>(null);
 
 export function PaymentProvider({ children }: { children: React.ReactNode }) {
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  // 临时开放，后续恢复付费墙
+  const [isUnlocked, setIsUnlocked] = useState(true);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
   const paymentConfig = useMemo(() => getPaymentConfig(), []);
   
-  // 初始化：检查是否已解锁
+  // 临时全量开放：始终维持解锁态
   useEffect(() => {
-    const unlocked = checkGlobalUnlocked();
-    setIsUnlocked(unlocked);
-    if (unlocked) {
-      setCurrentReportId(generateReportId());
-    }
+    setIsUnlocked(true);
+    setGlobalUnlocked(true);
+    setCurrentReportId(generateReportId());
   }, []);
   
   // 解锁付费内容
@@ -53,8 +52,9 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
   
   // 重置支付状态
   const resetPayment = useCallback(() => {
-    setIsUnlocked(false);
-    setCurrentReportId(null);
+    setIsUnlocked(true);
+    setGlobalUnlocked(true);
+    setCurrentReportId(generateReportId());
   }, []);
   
   const value = useMemo(() => ({

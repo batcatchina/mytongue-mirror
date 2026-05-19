@@ -155,22 +155,22 @@ const DiagnosisPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-center gap-2 p-2 bg-stone-100 rounded-lg mb-4">
-                <span className="text-xs text-stone-500">辨证引擎:</span>
-                <button onClick={() => setUseLocalEngine(true)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${useLocalEngine ? 'bg-green-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
-                  🟢 本地引擎
-                </button>
-                <button onClick={() => setUseLocalEngine(false)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!useLocalEngine ? 'bg-blue-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
-                  ☁️ AI推理
-                </button>
-              </div>
-
               <ImageUpload
                 onFeaturesExtracted={(features, imageData) => {
                   setInputFeatures(features);
                   setTongueImage(imageData || null);
                 }}
-              />
+              >
+                <div className="flex items-center justify-center gap-2 p-2 bg-stone-100 rounded-lg">
+                  <span className="text-xs text-stone-500">辨证引擎:</span>
+                  <button onClick={() => setUseLocalEngine(true)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${useLocalEngine ? 'bg-green-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
+                    🟢 本地引擎
+                  </button>
+                  <button onClick={() => setUseLocalEngine(false)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!useLocalEngine ? 'bg-blue-500 text-white shadow-lg' : 'bg-stone-200 text-stone-500'}`}>
+                    ☁️ AI推理
+                  </button>
+                </div>
+              </ImageUpload>
 
 
 
@@ -319,7 +319,7 @@ const DiagnosisPage: React.FC = () => {
 
 
               {/* 舌象智能识别区 - 独立显示已选特征 */}
-              {(inputFeatures.tongueColor.value || inputFeatures.coating.color || inputFeatures.tongueShape.value || inputFeatures.tongueState.value) ? (
+              {([inputFeatures?.tongueColor?.value, inputFeatures?.coating?.color, inputFeatures?.tongueShape?.value, inputFeatures?.tongueState?.value].some(Boolean)) ? (
                 <div className="px-3 py-2.5 rounded-lg bg-blue-50 border border-blue-200">
                   <div className="text-xs font-medium text-blue-600 mb-1">舌象智能识别</div>
                   <div className="flex flex-wrap gap-1.5">
@@ -390,14 +390,14 @@ const DiagnosisPage: React.FC = () => {
                   </div>
                 )}
                 {resultTab === 'acupuncture' && (
-                  isUnlocked
-                    ? (diagnosisResult.acupuncturePlan?.mainPoints?.length || diagnosisResult.acupuncturePlan?.secondaryPoints?.length
-                      ? <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
-                      : <div className="tcm-card p-4 text-sm text-stone-600">暂无针方穴位数据</div>)
-                    : <PaidDiagnosisSection />
+                  // 临时开放，后续恢复付费墙
+                  (diagnosisResult.acupuncturePlan?.mainPoints?.length || diagnosisResult.acupuncturePlan?.secondaryPoints?.length)
+                    ? <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
+                    : <div className="tcm-card p-4 text-sm text-stone-600">暂无针方穴位数据</div>
                 )}
                 {resultTab === 'care' && (
-                  isUnlocked ? <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} /> : <PaidDiagnosisSection />
+                  // 临时开放，后续恢复付费墙
+                  <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
                 )}
 
                 {showRefineButton && (
@@ -412,7 +412,8 @@ const DiagnosisPage: React.FC = () => {
 
                 <button onClick={handleSaveCase} className="w-full py-2 rounded-xl bg-stone-100 text-stone-600 text-sm">保存此病例</button>
 
-                {!isUnlocked && (
+                {/* 临时开放，后续恢复付费墙：底部解锁提示区域暂时隐藏 */}
+                {false && !isUnlocked && (
                   <div className="tcm-card p-4 text-center space-y-2">
                     <div className="text-sm text-stone-600">🔒 针方穴位和生活调理需解锁查看</div>
                     <div className="flex justify-center"><PayButton amount={9.9} title="舌镜深度辨证方案" size="medium" /></div>

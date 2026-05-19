@@ -207,23 +207,13 @@ export default function ResultSection({
       )}
 
       {resultTab === 'acupuncture' && (
-        isUnlocked ? (
-          <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
-        ) : (
-          <div className="tcm-card p-6 text-center text-stone-400 text-sm">
-            🔒 请先解锁深度辨证方案查看针方穴位
-          </div>
-        )
+        // 临时开放，后续恢复付费墙
+        <AcupunctureDisplay plan={diagnosisResult.acupuncturePlan} />
       )}
 
       {resultTab === 'care' && (
-        isUnlocked ? (
-          <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
-        ) : (
-          <div className="tcm-card p-6 text-center text-stone-400 text-sm">
-            🔒 请先解锁深度辨证方案查看生活调理建议
-          </div>
-        )
+        // 临时开放，后续恢复付费墙
+        <LifeCareDisplay advice={diagnosisResult.lifeCareAdvice} />
       )}
 
       {/* 保存病例 */}
@@ -235,7 +225,8 @@ export default function ResultSection({
       </button>
 
       {/* 深度辨证解锁区域 */}
-      {!isUnlocked ? (
+      {/* 临时开放，后续恢复付费墙：底部解锁提示区域暂时隐藏 */}
+      {false && !isUnlocked ? (
         <div className="tcm-card p-4 text-center space-y-3 bg-gradient-to-r from-primary-50 to-secondary-50">
           <div className="text-sm text-stone-600">
             <span className="text-lg mr-1">🔒</span>
