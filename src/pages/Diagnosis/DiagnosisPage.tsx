@@ -206,7 +206,9 @@ const DiagnosisPage: React.FC = () => {
                     value={inputFeatures.tongueState.value}
                     onChange={(value) => setInputFeatures({ ...inputFeatures, tongueState: { value } as any })}
                     shapeValue={inputFeatures.shapeDistribution || { depression: [], bulge: [] }}
-                    onShapeChange={(shapeValue) => setInputFeatures({ ...inputFeatures, shapeDistribution: shapeValue })}
+                    onShapeChange={(value) => {
+                      setInputFeatures({ shapeDistribution: value });
+                    }}
                     ecchymosis={inputFeatures.ecchymosis?.value === '是'}
                     tongueSurface={inputFeatures.tongueSurface?.value === '是'}
                     onEcchymosisChange={(checked) => setInputFeatures({ ...inputFeatures, ecchymosis: { value: checked ? '是' : '否' } as any })}
@@ -352,6 +354,32 @@ const DiagnosisPage: React.FC = () => {
                     {(inputFeatures.crack?.value === '是') && (
                       <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">裂纹</span>
                     )}
+                    {(inputFeatures.shapeDistribution?.depression || [])
+                      .filter((item: string) => !item.includes('齿痕') && !item.includes('裂纹'))
+                      .map((rawItem: string, i: number) => {
+                        const regionName = getRegionChineseName(rawItem.replace('凹陷', ''));
+                        const displayItem = regionName.includes('凹陷') ? regionName : `${regionName}凹陷`;
+                        return (
+                          <span
+                            key={`depression-${rawItem}-${i}`}
+                            className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-xs text-orange-700 border border-orange-200"
+                          >
+                            {displayItem}
+                          </span>
+                        );
+                      })}
+                    {(inputFeatures.shapeDistribution?.bulge || []).map((rawItem: string, i: number) => {
+                      const regionName = getRegionChineseName(rawItem.replace('鼓胀', ''));
+                      const displayItem = regionName.includes('鼓胀') ? regionName : `${regionName}鼓胀`;
+                      return (
+                        <span
+                          key={`bulge-${rawItem}-${i}`}
+                          className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-xs text-orange-700 border border-orange-200"
+                        >
+                          {displayItem}
+                        </span>
+                      );
+                    })}
                     {inputFeatures.tongueState.value && inputFeatures.tongueState.value !== '正常' && (
                       <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">舌态 {inputFeatures.tongueState.value}</span>
                     )}
