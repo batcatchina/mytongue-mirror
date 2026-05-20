@@ -358,7 +358,7 @@ const DiagnosisPage: React.FC = () => {
                       <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs text-stone-700 border border-stone-200">裂纹</span>
                     )}
                     {(inputFeatures.shapeDistribution?.depression || [])
-                      .filter((item: string) => !item.includes('齿痕') && !item.includes('裂纹'))
+                      .filter((item: string) => item && !item.includes('齿痕') && !item.includes('裂纹'))
                       .map((rawItem: string, i: number) => {
                         const regionName = getRegionChineseName(rawItem.replace('凹陷', ''));
                         const displayItem = regionName.includes('凹陷') ? regionName : `${regionName}凹陷`;
@@ -371,7 +371,7 @@ const DiagnosisPage: React.FC = () => {
                           </span>
                         );
                       })}
-                    {(inputFeatures.shapeDistribution?.bulge || []).map((rawItem: string, i: number) => {
+                    {(inputFeatures.shapeDistribution?.bulge || []).filter((item: string) => item).map((rawItem: string, i: number) => {
                       const regionName = getRegionChineseName(rawItem.replace('鼓胀', ''));
                       const displayItem = regionName.includes('鼓胀') ? regionName : `${regionName}鼓胀`;
                       return (
@@ -647,7 +647,7 @@ function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized
 
   // 凹凸形态
   const shapeItems: Array<{ name: string; confidence: string; category: string }> = [];
-  const otherDepression = inputFeatures.shapeDistribution?.depression?.filter((d: string) => !d.includes('齿痕') && !d.includes('裂纹')) || [];
+  const otherDepression = inputFeatures.shapeDistribution?.depression?.filter((d: string) => d && !d.includes('齿痕') && !d.includes('裂纹')) || [];
   // 凹陷项加"凹陷"后缀，先映射region为中文
   otherDepression.forEach((rawItem: string) => {
     const regionName = getRegionChineseName(rawItem.replace('凹陷', ''));
@@ -656,7 +656,7 @@ function getStructuredTongueDisplay(inputFeatures: InputFeatures, isAIRecognized
     parts.push(displayItem);
   });
   // 鼓胀项加"鼓胀"后缀，先映射region为中文
-  inputFeatures.shapeDistribution?.bulge?.forEach((rawItem: string) => {
+  inputFeatures.shapeDistribution?.bulge?.filter((b: string) => b).forEach((rawItem: string) => {
     const regionName = getRegionChineseName(rawItem.replace('鼓胀', ''));
     const displayItem = regionName.includes('鼓胀') ? regionName : regionName + '鼓胀';
     shapeItems.push({ name: displayItem, confidence, category: 'special' });
