@@ -1,7 +1,7 @@
 // 舌象识别 Step2: 查询对话结果
 
 const COZE_CONFIG = {
-  token: 'pat_cT0kGwXPwioWz69z65sLufTqcr1PJNorzO4EJbymAfbMM7uWC2W2qDCvdEqiK1l6'
+  token: process.env.COZE_TOKEN
 };
 
 // 前端枚举值映射表

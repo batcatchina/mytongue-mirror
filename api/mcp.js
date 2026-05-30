@@ -790,7 +790,7 @@ const COZE_CONFIG = {
   botId: '7634049322782785572',
   chatApiUrl: 'https://api.coze.cn/v3/chat',
   uploadApiUrl: 'https://api.coze.cn/v1/files/upload',
-  token: 'pat_cT0kGwXPwioWz69z65sLufTqcr1PJNorzO4EJbymAfbMM7uWC2W2qDCvdEqiK1l6'
+  token: process.env.COZE_TOKEN
 };
 
 // ==================== 工具定义 ====================
