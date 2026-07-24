@@ -90,28 +90,30 @@ export async function recognizeTongue(
     body: JSON.stringify({ image: imageData })
   });
 
-  const createData = await createRes.json();
-  
+  const createData = await createRes.json().catch(() => null);
+
   // 更新进度
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
   onProgress?.({ status: getProgressMessage(elapsed), percent: getProgressPercent(elapsed) });
+
+  if (!createData) {
+    throw new Error(`识别服务异常（HTTP ${createRes.status}），请稍后重试`);
+  }
+
+  // 安全验证：未检测到舌头（优先于通用错误判断）
+  if (createData.tongueNotDetected) {
+    throw new TongueNotDetectedError(createData.error || '未检测到舌象，请上传清晰的舌头照片');
+  }
 
   if (!createData.success) {
     throw new Error(createData.error || '识别失败');
   }
 
-  // DeepSeek同步返回，直接获取结果
-  if (createData.status === 'completed') {
-    // 安全验证：未检测到舌头
-    if (createData.tongueNotDetected) {
-      throw new TongueNotDetectedError(createData.error || '未检测到舌象，请上传清晰的舌头照片');
-    }
+  // 同步返回，直接获取结果
+  if (createData.status === 'completed' || createData.data) {
     if (createData.data) {
       onProgress?.({ status: '识别完成', percent: 100, isComplete: true });
       return createData.data;
-    }
-    if (createData.error) {
-      throw new Error(createData.error);
     }
     throw new Error('识别结果为空');
   }

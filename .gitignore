@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+.next/
 
 # Environment files
 .env
@@ -23,14 +24,27 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Cache
+# Cache / deploy
 .cache/
 .vercel
+
+# Agent 工具本地配置（不进仓库）
+.codex/
+
+# 备份/废弃文件
+*.bak
+*.old
+舌镜/backup/
+
+# 截图与测试产物
+*.png
+tests/e2e-test-results.json
+用户上传/
+
+# 个人资料（与项目无关）
+六度研究/
 
 # 知识文件私有层（公开层core版保留）
 舌镜/diagnose_knowledge.md
 舌镜/diagnose_knowledge_full.md
 舌镜/diagnose_upgrade_log.md
-舌镜/backup/
-diagnosis-*.png\nscreenshots/\n*.png
-*.png
