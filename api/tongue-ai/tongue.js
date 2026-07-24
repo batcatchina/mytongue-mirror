@@ -59,7 +59,8 @@ export default async function handler(req, res) {
         messages: messages,
         temperature: 0.3,
         max_tokens: 200
-      })
+      }),
+      signal: AbortSignal.timeout(30000) // 30秒超时
     });
 
     console.log('智谱响应状态:', response.status);
