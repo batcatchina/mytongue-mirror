@@ -31,9 +31,6 @@ export interface TongueRecognitionResult {
   message?: string;
 }
 
-const POLL_INTERVAL = 1500;
-const MAX_POLL = 40;
-
 // 获取进度文案 - 前置舌象检测步骤
 function getProgressMessage(elapsedSeconds: number): string {
   if (elapsedSeconds < 6) {
@@ -86,7 +83,7 @@ export async function recognizeTongue(
   const startTime = Date.now();
   onProgress?.({ status: '正在上传图片...', percent: 0 });
 
-  // Step 1: 上传图片 + 创建对话
+  // Step 1: 直接调用DeepSeek Vision API（同步返回，2026-07-24从Coze切换）
   const createRes = await fetch('/api/tongue-ai/tongue', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -94,50 +91,29 @@ export async function recognizeTongue(
   });
 
   const createData = await createRes.json();
-  if (!createData.success) {
-    throw new Error(createData.error || '创建识别任务失败');
-  }
-
-  const { chat_id, conversation_id } = createData;
   
-  // 获取初始进度文案
+  // 更新进度
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
   onProgress?.({ status: getProgressMessage(elapsed), percent: getProgressPercent(elapsed) });
 
-  // Step 2: 轮询结果
-  for (let i = 0; i < MAX_POLL; i++) {
-    await new Promise(r => setTimeout(r, POLL_INTERVAL));
+  if (!createData.success) {
+    throw new Error(createData.error || '识别失败');
+  }
 
-    const pollRes = await fetch(
-      `/api/tongue-ai/result?chat_id=${chat_id}&conversation_id=${conversation_id}`
-    );
-    const pollData = await pollRes.json();
-
-    if (!pollData.success && pollData.code === 4100) {
-      throw new Error('Token权限不足，需要添加chat:retrieve和message:list权限');
+  // DeepSeek同步返回，直接获取结果
+  if (createData.status === 'completed') {
+    // 安全验证：未检测到舌头
+    if (createData.tongueNotDetected) {
+      throw new TongueNotDetectedError(createData.error || '未检测到舌象，请上传清晰的舌头照片');
     }
-    if (!pollData.success) {
-      throw new Error(pollData.error || '查询结果失败');
+    if (createData.data) {
+      onProgress?.({ status: '识别完成', percent: 100, isComplete: true });
+      return createData.data;
     }
-
-    if (pollData.status === 'completed') {
-      // 安全验证：未检测到舌头
-      if (pollData.tongueNotDetected) {
-        throw new TongueNotDetectedError(pollData.error || '未检测到舌象，请上传清晰的舌头照片');
-      }
-      if (pollData.data) {
-        onProgress?.({ status: '识别完成', percent: 100, isComplete: true });
-        return pollData.data;
-      }
-      if (pollData.error) {
-        throw new Error(pollData.error);
-      }
-      throw new Error('识别结果为空');
+    if (createData.error) {
+      throw new Error(createData.error);
     }
-
-    // 更新进度文案
-    const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
-    onProgress?.({ status: getProgressMessage(currentElapsed), percent: getProgressPercent(currentElapsed) });
+    throw new Error('识别结果为空');
   }
 
   throw new Error('识别超时，请重试');
