@@ -1,10 +1,10 @@
-// 舌象识别 Step1: 直接调用DeepSeek V4 Vision API（同步返回，无需轮询）
-// 2026-07-24: 从Coze切换到DeepSeek，修复token过期问题
+// 舌象识别 Step1: 直接调用智谱GLM-4V-Flash API（同步返回，无需轮询）
+// 2026-07-24: 从Coze切换到智谱视觉模型
 
-const DEEPSEEK_CONFIG = {
-  apiUrl: 'https://api.deepseek.com/v1/chat/completions',
-  model: 'deepseek-v4-flash',
-  apiKey: 'sk-6f6b12f2cc28408dbd78d5956ea15522'
+const ZHIPU_CONFIG = {
+  apiUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+  model: 'glm-4v-flash',
+  apiKey: '48f22f613f474a8f9f230226f0eacade.EEd3qhXSqQm7T1Oh'
 };
 
 const TONGUE_SYSTEM_PROMPT = `你是一个专业的中医舌象识别系统。请严格执行以下判断：
@@ -36,29 +36,27 @@ export default async function handler(req, res) {
     const { image } = req.body;
     if (!image) return res.status(400).json({ success: false, error: '缺少图片数据' });
 
-    // 构建DeepSeek V4 Vision请求（使用image类型+base64）
+    // 构建智谱GLM-4V-Flash请求（支持网络URL）
+    const imageContent = image.startsWith('http') 
+      ? { type: 'image_url', image_url: { url: image } }
+      : { type: 'image_url', image_url: { url: image } };  // 也支持base64
+
     const messages = [
       { role: 'system', content: TONGUE_SYSTEM_PROMPT },
       { role: 'user', content: [
-        {
-          type: 'image',
-          image: image  // base64格式
-        },
-        {
-          type: 'text',
-          text: '请分析这张图片中的舌象特征。'
-        }
+        { type: 'text', text: '请分析这张图片中的舌象特征。' },
+        imageContent
       ]}
     ];
 
-    const response = await fetch(DEEPSEEK_CONFIG.apiUrl, {
+    const response = await fetch(ZHIPU_CONFIG.apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_CONFIG.apiKey}`
+        'Authorization': `Bearer ${ZHIPU_CONFIG.apiKey}`
       },
       body: JSON.stringify({
-        model: DEEPSEEK_CONFIG.model,
+        model: ZHIPU_CONFIG.model,
         messages: messages,
         temperature: 0.3,
         max_tokens: 2000
@@ -67,7 +65,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('DeepSeek API错误:', response.status, errorText);
+      console.error('智谱API错误:', response.status, errorText);
       return res.json({ success: false, error: `API调用失败: ${response.status}` });
     }
 
