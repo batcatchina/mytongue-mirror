@@ -3,7 +3,7 @@
 
 const DEEPSEEK_CONFIG = {
   apiUrl: 'https://api.deepseek.com/v1/chat/completions',
-  model: 'deepseek-chat',  // V4 Flash或deepseek-chat
+  model: 'deepseek-v4-flash',  // V4 Flash或deepseek-chat
   apiKey: 'sk-6f6b12f2cc28408dbd78d5956ea15522'
 };
 
