@@ -4,7 +4,7 @@
 const DEEPSEEK_CONFIG = {
   apiUrl: 'https://api.deepseek.com/v1/chat/completions',
   model: 'deepseek-chat',  // V4 Flash或deepseek-chat
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-6f6b12f2cc28408dbd78d5956ea15522'
+  apiKey: 'sk-6f6b12f2cc28408dbd78d5956ea15522'
 };
 
 const TONGUE_SYSTEM_PROMPT = `你是一个专业的中医舌象识别系统。请严格执行以下判断：
