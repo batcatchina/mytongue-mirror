@@ -3,7 +3,7 @@
 
 const DEEPSEEK_CONFIG = {
   apiUrl: 'https://api.deepseek.com/v1/chat/completions',
-  model: 'deepseek-v4-flash',  // V4 Flash或deepseek-chat
+  model: 'deepseek-v4-flash',
   apiKey: 'sk-6f6b12f2cc28408dbd78d5956ea15522'
 };
 
@@ -36,12 +36,18 @@ export default async function handler(req, res) {
     const { image } = req.body;
     if (!image) return res.status(400).json({ success: false, error: '缺少图片数据' });
 
-    // 构建DeepSeek请求
+    // 构建DeepSeek V4 Vision请求（使用image类型+base64）
     const messages = [
       { role: 'system', content: TONGUE_SYSTEM_PROMPT },
       { role: 'user', content: [
-        { type: 'image_url', image_url: { url: image } },
-        { type: 'text', text: '请分析这张图片中的舌象特征。' }
+        {
+          type: 'image',
+          image: image  // base64格式
+        },
+        {
+          type: 'text',
+          text: '请分析这张图片中的舌象特征。'
+        }
       ]}
     ];
 
