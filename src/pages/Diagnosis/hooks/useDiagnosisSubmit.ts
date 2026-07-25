@@ -55,17 +55,25 @@ export function useDiagnosisSubmit({
       setShowRefineButton(true);
       toast.success(`辨证完成！${normalizedResult.diagnosisResult?.primarySyndrome || ''}`);
     } catch (error) {
+      const cloudMsg = error instanceof Error ? error.message : '网络异常';
       console.error('云端辨证失败，尝试降级本地引擎:', error);
+      toast.error(`云端辨证失败（${cloudMsg}），已切换本地引擎`, { duration: 5000 });
 
       try {
         const localResult = await handleFallbackToLocal(input, (step) =>
           setCurrentStep(step as DiagnosisStep)
         );
         const normalizedLocal = normalizeDiagnosisOutput(localResult as Partial<DiagnosisOutput>);
+        // 本地引擎结果为空（无证型无配穴）时视为失败，提示用户重试而不是展示空报告
+        const lp = normalizedLocal.diagnosisResult?.primarySyndrome;
+        const hasPoints = (normalizedLocal.acupuncturePlan?.mainPoints?.length || 0) > 0;
+        if (!lp || (!hasPoints && !normalizedLocal.pathogenesis)) {
+          throw new Error('本地引擎未能生成有效辨证结果');
+        }
         setDiagnosisResult(normalizedLocal);
         setCurrentStep('result');
         setShowRefineButton(true);
-        toast.success(`本地辨证完成！${normalizedLocal.diagnosisResult?.primarySyndrome || ''}`);
+        toast.success(`本地辨证完成！${lp}`);
       } catch (localErr) {
         console.error('[降级] 本地引擎也失败:', localErr);
         setCurrentStep('idle');
