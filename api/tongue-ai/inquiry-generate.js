@@ -8,7 +8,7 @@ const __dirname = dirname(__filename);
 const DEEPSEEK_CONFIG = {
   apiUrl: 'https://api.deepseek.com/chat/completions',
   apiKey: process.env.DEEPSEEK_API_KEY,
-  model: 'deepseek-chat',
+  model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
 };
 
 function generateConversationId() {
