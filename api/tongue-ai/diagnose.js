@@ -150,7 +150,7 @@ function buildDistributionFeaturesText(distFeatures) {
   return distFeatures.map(f => f.part + f.feature).join(',');
 }
 
-async function callDeepSeek(messages, temperature = 0.3, maxTokens = 2000) {
+async function callDeepSeek(messages, temperature = 0, maxTokens = 2000) {
   const response = await fetch(DEEPSEEK_CONFIG.apiUrl, {
     method: 'POST',
     headers: {
