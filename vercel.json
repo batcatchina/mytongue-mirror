@@ -59,6 +59,9 @@
   "functions": {
     "api/alipay/*.js": {
       "maxDuration": 10
+    },
+    "api/tongue-ai/*.js": {
+      "maxDuration": 30
     }
   }
 }

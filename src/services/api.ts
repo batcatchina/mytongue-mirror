@@ -10,10 +10,6 @@ import type {
 } from '@/types';
 import { getMeridian, getEffect } from './acupoint_data';
 
-const API_BASE_URL = 'https://api.coze.cn';
-const BOT_ID = '7630373624734236672';
-const API_TOKEN = 'pat_RpduRPvBPQIbpRLtAXy9NBFruewZlVKN4gH4aLgby6z2MgjNEejR2E7X8PV1L2iJ';
-
 // ============================================
 // 统一错误关键词定义（核心配置）
 // 注意：只保留真正的错误信号，避免误判Bot的正常诊断反馈
@@ -815,52 +811,8 @@ export function getApiConfig() {
 }
 
 // 验证图片是否为舌象
-export async function validateTongueImage(imageBase64: string): Promise<{ valid: boolean; message?: string }> {
-  try {
-    // 提取base64数据（去掉data:image/xxx;base64,前缀）
-    const base64Data = imageBase64.split(',')[1] || imageBase64;
-    
-    const requestPayload = {
-      bot_id: BOT_ID,
-      user_id: generateUserId(),
-      stream: false,
-      additional_messages: [{
-        role: 'user',
-        content: JSON.stringify({
-          action: 'validate_image',
-          image_data: base64Data.substring(0, 100) // 发送部分数据用于验证提示
-        }),
-        content_type: 'text'
-      }]
-    };
-
-    const response = await fetch(`${API_BASE_URL}/v3/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_TOKEN}`,
-      },
-      body: JSON.stringify(requestPayload),
-    });
-
-    if (!response.ok) {
-      console.log('验证API调用失败，默认通过');
-      return { valid: true };
-    }
-
-    const data = await response.json();
-    const content = data?.data?.content || '';
-    
-    // 使用统一的错误关键词检测
-    for (const keyword of ERROR_KEYWORDS) {
-      if (content.includes(keyword)) {
-        return { valid: false, message: '请上传舌象图片，图片中应清晰显示舌头表面特征。' };
-      }
-    }
-    
-    return { valid: true };
-  } catch (error) {
-    console.log('验证出错，默认通过:', error);
-    return { valid: true };
-  }
+// 2026-07-24: 舌象校验已上移到服务端 /api/tongue-ai/tongue（tongueNotDetected 标记），
+// 此函数保留仅为兼容旧调用，不再直连第三方API。
+export async function validateTongueImage(_imageBase64: string): Promise<{ valid: boolean; message?: string }> {
+  return { valid: true };
 }

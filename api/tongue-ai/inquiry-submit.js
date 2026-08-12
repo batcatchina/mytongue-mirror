@@ -1,7 +1,7 @@
 const DEEPSEEK_CONFIG = {
   apiUrl: 'https://api.deepseek.com/chat/completions',
   apiKey: process.env.DEEPSEEK_API_KEY,
-  model: 'deepseek-chat',
+  model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
 };
 
 async function callDeepSeek(messages, temperature = 0.3, maxTokens = 2200) {

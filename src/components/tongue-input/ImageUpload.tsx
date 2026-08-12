@@ -69,17 +69,20 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, onRec
     }
 
     try {
-      const imageData = await new Promise<string>((resolve, reject) => {
+      const rawData = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target?.result as string);
         reader.onerror = () => reject(new Error('文件读取失败'));
         reader.readAsDataURL(file);
       });
-      
+
+      // 压缩后再上传，避免超过 Vercel 请求体上限导致 400/超时
+      const imageData = await compressImage(rawData);
+      console.log(`[图片上传] 压缩: ${Math.round(file.size / 1024)}KB -> ${Math.round(imageData.length * 0.75 / 1024)}KB`);
+
       setPreview(imageData);
       onChange(imageData);
       setRecognizeResult(null);
-      console.log(`[图片上传] 成功，大小: ${Math.round(file.size / 1024)}KB`);
       
       // 自动触发AI识别（如果开启）
       if (autoRecognize) {
